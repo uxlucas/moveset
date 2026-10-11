@@ -81,7 +81,7 @@ Category slugs, in display order: `scroll`, `motion`, `transitions`, `gestures`,
 
 ## 3. Stack
 
-- Next.js (App Router), fully static output, TypeScript, Tailwind CSS v4, Motion (`motion/react`).
+- Next.js (App Router), statically generated pages (no `output: 'export'`, so routes with zero published terms still build), TypeScript, Tailwind CSS v4, Motion (`motion/react`).
 - GSAP appears only as code-reference text in entries, never as a site dependency.
 - Deployed on Vercel.
 - Public GitHub repo `uxlucas/moveset`, written by Lucas and agents only (no outside contributions planned).
@@ -96,28 +96,31 @@ A generator script (`scripts/generate-registry.ts`) runs automatically before `d
 
 ### Fields
 
-| Field | Draft | Published | Notes |
+| Field | Draft | Review / Published | Notes |
 |---|---|---|---|
 | `slug` | required | required | Must match the filename |
 | `name` | required | required | |
 | `category` | required | required | One of the seven slugs |
 | `order` | required | required | Position within category; unique per category; drives prev/next |
-| `status` | required | required | `'draft' \| 'published'` |
+| `status` | required | required | `'draft' \| 'review' \| 'published'` |
 | `definition` | required | required | One sentence. Used on cards, search, llms.txt |
 | `demo` | required | required | `{ component, controls? }` |
+| `demo.label` | required | required | Required for all statuses: a text description of the motion |
 | `aliases` | optional | required | Loose phrasings people actually use. Searchable |
 | `description` | — | required | Short plain-language paragraph |
 | `useWhen` | — | required | String list |
 | `avoidWhen` | — | required | String list |
 | `prompt` | — | required | `(values) => string` |
 | `acceptance` | — | required | `(values) => string[]`. Holds the states and edge cases agents forget |
-| `code` | — | required | `(values) => { css?, motion?, gsap? }`. Only approaches that make sense |
+| `code` | — | required | `(values) => { css?, js?, motion?, gsap? }`. Only approaches that make sense |
 | `a11y` | — | required | Short note |
 | `related` | — | required | `TermSlug[]` |
 | `confusedWith` | optional | optional | `{ slug, difference }[]`. Declared on one side; the build links both directions |
 | `sources` | optional | optional | `{ label, url }[]`. Credits per entry; `/about` collects them |
 
 TypeScript enforces the table: `status: 'published'` makes every published field required, so a half-written entry cannot publish. `related` and `confusedWith` slugs are checked against `TermSlug`.
+
+`review` means the content is complete but not yet approved. Review terms are visible only when `NEXT_PUBLIC_SHOW_REVIEW=1` (local development) and never appear in production or agent outputs.
 
 ### Controls
 
@@ -132,6 +135,7 @@ type DemoProps<V> = {
   replayKey: number      // increments on replay; demo restarts
   size: 'card' | 'detail'
   timeScale: number      // 1 normally; 0.25 in /review slow motion
+  onCycleEnd: () => void   // call when one cycle finishes; the runtime decides whether to loop
 }
 ```
 
@@ -202,7 +206,7 @@ These are starting defaults. Lucas reviews the first milestone in the browser an
 Copy → check icon swap, press feedback on buttons, 150ms hover color changes, card hover darkens the border (no lift). No page transitions, no scroll reveals.
 
 ### Interface basics (from Rauno's guidelines)
-Focus rings via box-shadow so they follow radius; hit areas ≥ 44px on touch; search input ≥ 16px; `pointer-events: none` on decorative layers; `::selection` styled; icon-only buttons have `aria-label`; looping animation paused off-screen.
+Focus rings via `outline` with offset (it follows radius in current browsers); hit areas ≥ 44px on touch; search input ≥ 16px; `pointer-events: none` on decorative layers; `::selection` styled; icon-only buttons have `aria-label`; looping animation paused off-screen.
 
 ### House rules document
 `docs/house-rules.md` distills the motion and interface rules above, in our own words, with the decisions where sources conflict. Builders and the reviewer agent work from it.
