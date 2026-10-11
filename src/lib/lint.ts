@@ -12,12 +12,40 @@ export const BLOCKED_WORDS = [
 const MAX_DEFINITION = 140
 
 const EASE_IN = /\bease-in\b(?!-out)|\beaseIn\b/
-const TRANSITION_ALL = /transition(?:-property)?\s*:\s*all\b|\btransition-all\b/
-const SCALE_ZERO = /scale\(\s*0\s*\)|\bscale\s*:\s*0(?![.\d])/
+// `all` as a standalone token anywhere in a transition value, quoted or not; not `small`.
+const TRANSITION_ALL = /transition(?:-property)?\s*:[^;{}]*(?<![\w-])all(?![\w-])|\btransition-all\b/
+// scale, scaleX/Y/Z and scale3d whose first argument is exactly 0, plus Motion's `scale: 0`.
+const SCALE_ZERO = /\bscale(?:[XYZ]|3d)?\(\s*0(?![.\d])|\bscale\s*:\s*0(?![.\d])/
+const LAYOUT_NAMES = '(?:width|height|top|left|right|bottom|margin[A-Za-z]*|padding[A-Za-z]*|minWidth|maxWidth|minHeight|maxHeight)'
 const LAYOUT_TRANSITION = /transition(?:-property)?\s*:[^;{}]*\b(?:width|height|top|left|right|bottom|margin|padding)\b/
-const LAYOUT_MOTION = /animate=\{\{[^}]*\b(?:width|height|top|left)\s*:/
-const HAS_MOTION = /\btransition\b|\banimation\b|@keyframes|\banimate\(|<motion\.|\buseSpring\b|\bgsap\./
-const REDUCED = /prefers-reduced-motion|useReducedMotion/
+// Object keys in js, motion and gsap snippets: `height: 0`, `maxHeight: 10`, `'margin-left': 4`.
+const LAYOUT_KEY = new RegExp(`(?<![\\w-])["']?${LAYOUT_NAMES}["']?\\s*:`)
+// Declarations inside @keyframes bodies: `top: 0`, `margin-left: 4px`.
+const LAYOUT_DECL = /(?<![\w-])(?:width|height|top|left|right|bottom|margin(?:-[a-z]+)?|padding(?:-[a-z]+)?|min-width|max-width|min-height|max-height)\s*:/
+const HAS_MOTION =
+  /\btransition\b|\banimation\b|@keyframes|\banimate\(|\bmotion\.[a-zA-Z]|\buseSpring\b|\buseAnimate\b|\bgsap\.|scroll-behavior\s*:\s*smooth|\banimate-(?:spin|pulse|bounce|ping|\[)/
+const REDUCED = /prefers-reduced-motion|useReducedMotion|<MotionConfig\b[^>]*\breducedMotion\b/
+
+function keyframeBodies(src: string): string[] {
+  const bodies: string[] = []
+  for (const m of src.matchAll(/@keyframes\s+[\w-]+\s*\{/g)) {
+    let depth = 1
+    let i = m.index + m[0].length
+    const start = i
+    for (; i < src.length && depth > 0; i++) {
+      if (src[i] === '{') depth++
+      else if (src[i] === '}') depth--
+    }
+    bodies.push(src.slice(start, i))
+  }
+  return bodies
+}
+
+function animatesLayout(approach: string, src: string): boolean {
+  if (LAYOUT_TRANSITION.test(src)) return true
+  if (keyframeBodies(src).some((body) => LAYOUT_DECL.test(body))) return true
+  return approach !== 'css' && LAYOUT_KEY.test(src)
+}
 
 export function parseFrontmatter(src: string): Record<string, string | boolean> {
   const match = src.match(/^---\r?\n([\s\S]*?)\r?\n---/)
@@ -85,7 +113,7 @@ export function lintTerms(terms: readonly Term[], reviews: readonly Review[], co
         if (!config.allowEaseIn.includes(slug) && EASE_IN.test(src)) add(slug, 'code-ease-in', `${approach}: don't use ease-in on UI.`)
         if (TRANSITION_ALL.test(src)) add(slug, 'code-transition-all', `${approach}: name the transitioned properties.`)
         if (SCALE_ZERO.test(src)) add(slug, 'code-scale-zero', `${approach}: start from scale(0.95), not 0.`)
-        if (!config.allowLayoutProps.includes(slug) && (LAYOUT_TRANSITION.test(src) || LAYOUT_MOTION.test(src))) {
+        if (!config.allowLayoutProps.includes(slug) && animatesLayout(approach, src)) {
           add(slug, 'code-layout-prop', `${approach}: animate transform or opacity, not layout properties.`)
         }
         if (HAS_MOTION.test(src) && !REDUCED.test(src)) add(slug, 'code-reduced-motion', `${approach}: add a prefers-reduced-motion path.`)
