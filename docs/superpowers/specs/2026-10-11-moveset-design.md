@@ -92,7 +92,7 @@ Chosen over Astro (a term would have to be a folder, two templating systems) and
 
 Each term is one file: `src/terms/<slug>.tsx`, default-exporting `defineTerm({...})`. The demo component lives in the same file.
 
-A generator script (`scripts/generate-registry.ts`) runs automatically before `dev`, `build` and tests. It reads `src/terms/`, writes a gitignored registry, and emits a `TermSlug` type union of every slug. Nobody edits the registry by hand.
+A generator script (`scripts/generate.ts`) runs automatically before `dev`, `build` and tests. It reads `src/terms/`, writes a gitignored registry, and emits a `TermSlug` type union of every slug. Nobody edits the registry by hand.
 
 ### Fields
 
