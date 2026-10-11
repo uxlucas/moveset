@@ -1,12 +1,12 @@
-# moveset.dev — design spec
+# moveset — design spec
 
 - **Date:** 2026-10-11
-- **Status:** awaiting review
+- **Status:** approved 2026-10-11
 - **Owner:** Lucas Lima (design, content approval). Built by Claude Code agents.
 
 ## 1. What this is
 
-moveset.dev is a visual dictionary of design engineering terms. Every term has a live demo, plain-language guidance, and a copy-ready prompt that tells an AI coding agent exactly what to build.
+moveset is a visual dictionary of design engineering terms. Every term has a live demo, plain-language guidance, and a copy-ready prompt that tells an AI coding agent exactly what to build.
 
 **Problem.** People know what they want ("that thing where the header sticks and the content slides under it") but not what it's called. Prompting an agent becomes slow and vague, and the result is close but wrong.
 
@@ -19,7 +19,7 @@ moveset.dev is a visual dictionary of design engineering terms. Every term has a
 - The other 41 terms exist as drafts with a name, definition and working demo.
 - All agent outputs (section 7) are live and generated from the content.
 - Adding a term means creating one file.
-- Deployed at moveset.dev.
+- Deployed at moveset.lucaslima.design.
 
 **Design principle.** Demos are the content. Everything else stays calm.
 
@@ -213,7 +213,7 @@ All generated from term files at build time. Only **published** terms appear in 
 
 - **Copy as prompt:** prompt with current control values, the acceptance checklist, the house token values it relies on, and the entry URL. Self-contained for an agent with zero context.
 - **Copy as markdown:** the whole entry as markdown. Also served at `/terms/<slug>.md`.
-- **`/llms.txt`:** title, one-paragraph summary, then per category: `- [Name](https://moveset.dev/terms/<slug>.md): definition`.
+- **`/llms.txt`:** title, one-paragraph summary, then per category: `- [Name](https://moveset.lucaslima.design/terms/<slug>.md): definition`.
 - **`/api/terms.json`:** full published data, with prompt, acceptance and code rendered at default control values, plus control definitions.
 - **Agent skill:** generated `skills/moveset/SKILL.md` committed to the repo so `npx skills add uxlucas/moveset` works. Short main file (how to map a vague description to a term, plus the glossary) with one reference file per term holding the full guidance and prompt, loaded on demand. The same files are downloadable from the site.
 - **Semantic HTML:** each entry is an `<article>` with real headings, `<pre><code>` blocks and a text label on every demo describing the motion. Prompt text is in the server HTML at default values, so fetching the URL without JavaScript gets everything.
@@ -258,7 +258,7 @@ Milestones are reported with actual test output and screenshots. Failures are re
 3. Agent outputs and layer-2 browser checks.
 4. Remaining five scroll terms (1–3, 5, 6) fully written; layer-3 review and Lucas's approval for all six.
 5. The 41 drafts: name, definition, demo.
-6. Deploy to Vercel at moveset.dev.
+6. Deploy to Vercel at moveset.lucaslima.design.
 
 ## 10. Out of scope for v1
 
@@ -267,7 +267,8 @@ Milestones are reported with actual test output and screenshots. Failures are re
 - Analytics, accounts, comments, i18n.
 - Final wordmark and brand (placeholder until Lucas designs it).
 
-## 11. Assumptions to confirm
+## 11. Hosting
 
-- Lucas owns moveset.dev and deploys via Vercel.
-- Repo name `uxlucas/moveset`.
+- Domain: `moveset.lucaslima.design` (subdomain of Lucas's own domain), deployed via Vercel.
+- The site URL lives in one config value (`SITE_URL`) used by every generated output, so a future move to another domain is a one-line change.
+- Repo: `uxlucas/moveset`.
