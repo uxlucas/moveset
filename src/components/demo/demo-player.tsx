@@ -2,7 +2,7 @@
 
 import { Play } from 'lucide-react'
 import { useInView } from 'motion/react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { defaultValues } from '@/lib/content'
 import type { Values } from '@/lib/term-types'
 import { getTerm } from '@/lib/terms'
@@ -30,16 +30,26 @@ export function DemoPlayer({ slug, size, values, timeScale = 1, replayRequest = 
   const [replayKey, setReplayKey] = useState(0)
   const holdTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const playing = isPlaying({ inView, pageVisible, reducedMotion, requested })
+  const defaults = useMemo(() => defaultValues(term.demo.controls), [term])
 
   useEffect(() => {
     if (replayRequest === 0) return
+    clearTimeout(holdTimer.current)
     setRequested(true)
     setReplayKey((k) => k + 1)
   }, [replayRequest])
 
+  // Leaving the screen or hiding the tab ends the play: under reduced motion an
+  // interrupted requested play must not resume by itself when the demo returns.
   useEffect(() => {
-    if (!playing) clearTimeout(holdTimer.current)
-  }, [playing])
+    if (playing) return
+    clearTimeout(holdTimer.current)
+    if (reducedMotion) setRequested(false)
+  }, [playing, reducedMotion])
+  // A new cycle or a new speed supersedes any pending hold.
+  useEffect(() => {
+    clearTimeout(holdTimer.current)
+  }, [replayKey, timeScale])
   useEffect(() => () => clearTimeout(holdTimer.current), [])
 
   const onCycleEnd = useCallback(() => {
@@ -53,6 +63,7 @@ export function DemoPlayer({ slug, size, values, timeScale = 1, replayRequest = 
   }, [reducedMotion, size, timeScale])
 
   const play = () => {
+    clearTimeout(holdTimer.current)
     setRequested(true)
     setReplayKey((k) => k + 1)
   }
@@ -67,7 +78,7 @@ export function DemoPlayer({ slug, size, values, timeScale = 1, replayRequest = 
         aria-label={size === 'detail' ? term.demo.label : undefined}
       >
         <Demo
-          values={values ?? defaultValues(term.demo.controls)}
+          values={values ?? defaults}
           playing={playing}
           replayKey={replayKey}
           size={size}

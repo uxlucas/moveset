@@ -23,6 +23,7 @@ export function BrowserFrame({ children, scrollRef, size, label }: Props) {
       <div
         ref={scrollRef}
         data-scroller=""
+        role={size === 'detail' ? 'region' : undefined}
         tabIndex={size === 'detail' ? 0 : -1}
         aria-label={size === 'detail' ? label : undefined}
         className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]"
