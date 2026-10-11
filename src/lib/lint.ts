@@ -14,8 +14,9 @@ const MAX_DEFINITION = 140
 const EASE_IN = /\bease-in\b(?!-out)|\beaseIn\b/
 // `all` as a standalone token anywhere in a transition value, quoted or not; not `small`.
 const TRANSITION_ALL = /transition(?:-property)?\s*:[^;{}]*(?<![\w-])all(?![\w-])|\btransition-all\b/
-// scale, scaleX/Y/Z and scale3d whose first argument is exactly 0, plus Motion's `scale: 0`.
-const SCALE_ZERO = /\bscale(?:[XYZ]|3d)?\(\s*0(?![.\d])|\bscale\s*:\s*0(?![.\d])/
+// scale, scaleZ and scale3d whose first argument is exactly 0, plus Motion's `scale: 0`.
+// scaleX(0) and scaleY(0) are allowed: growing a bar from nothing is not an entrance.
+const SCALE_ZERO = /\bscale(?:Z|3d)?\(\s*0(?![.\d])|\bscale\s*:\s*0(?![.\d])/
 const LAYOUT_NAMES = '(?:width|height|top|left|right|bottom|margin[A-Za-z]*|padding[A-Za-z]*|minWidth|maxWidth|minHeight|maxHeight)'
 const LAYOUT_TRANSITION = /transition(?:-property)?\s*:[^;{}]*\b(?:width|height|top|left|right|bottom|margin|padding)\b/
 // Object keys in js, motion and gsap snippets: `height: 0`, `maxHeight: 10`, `'margin-left': 4`.

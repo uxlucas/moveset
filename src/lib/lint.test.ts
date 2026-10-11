@@ -115,8 +115,14 @@ describe('code rules', () => {
   test('scale3d, multi-argument and axis scale from zero are flagged', () => {
     expect(rules([term(css('.a { transform: scale3d(0, 0, 0); }'))])).toContain('code-scale-zero')
     expect(rules([term(css('.a { transform: scale(0, 0); }'))])).toContain('code-scale-zero')
-    expect(rules([term(css('.a { transform: scaleX(0); }'))])).toContain('code-scale-zero')
+    expect(rules([term(css('.a { transform: scaleZ(0); }'))])).toContain('code-scale-zero')
+    expect(rules([term({ code: () => ({ motion: 'initial={{ scale: 0 }}' }) })])).toContain('code-scale-zero')
     expect(rules([term(css('.a { transform: scale3d(0.95, 0.95, 1); }'))])).not.toContain('code-scale-zero')
+  })
+  test('scaleX and scaleY from zero are allowed (progress bars)', () => {
+    expect(rules([term(css('.a { transform: scaleX(0); }'))])).toEqual([])
+    expect(rules([term(css('.a { transform: scaleY(0); }'))])).toEqual([])
+    expect(rules([term({ code: () => ({ motion: 'initial={{ scaleX: 0 }} animate={{ scaleY: 0 }}' }) })])).toEqual([])
   })
   test('more motion needs a reduced-motion path', () => {
     expect(rules([term(css('html { scroll-behavior: smooth; }'))])).toContain('code-reduced-motion')
