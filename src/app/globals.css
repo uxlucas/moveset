@@ -1,26 +1,103 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --canvas: oklch(0.985 0 0);
+  --surface: oklch(1 0 0);
+  --line: oklch(0.922 0 0);
+  --line-strong: oklch(0.86 0 0);
+  --ink: oklch(0.205 0 0);
+  --ink-muted: oklch(0.48 0 0);
+  --ink-faint: oklch(0.66 0 0);
+  --demo: oklch(0.93 0 0);
+  --demo-2: oklch(0.87 0 0);
+  --demo-subject: oklch(0.205 0 0);
+  --shadow-color: oklch(0 0 0 / 0.04);
+  --selection: oklch(0.205 0 0 / 0.12);
+  --duration-1: 150ms;
+  --duration-2: 200ms;
+  --duration-3: 250ms;
+  --duration-4: 300ms;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: oklch(0.145 0 0);
+  --surface: oklch(0.185 0 0);
+  --line: oklch(0.26 0 0);
+  --line-strong: oklch(0.34 0 0);
+  --ink: oklch(0.95 0 0);
+  --ink-muted: oklch(0.7 0 0);
+  --ink-faint: oklch(0.52 0 0);
+  --demo: oklch(0.25 0 0);
+  --demo-2: oklch(0.32 0 0);
+  --demo-subject: oklch(0.95 0 0);
+  --shadow-color: transparent;
+  --selection: oklch(0.95 0 0 / 0.16);
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-demo: var(--demo);
+  --color-demo-2: var(--demo-2);
+  --color-demo-subject: var(--demo-subject);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --shadow-card: 0 0 0 1px var(--line), 0 1px 2px var(--shadow-color), 0 4px 12px var(--shadow-color);
+  --shadow-card-hover: 0 0 0 1px var(--line-strong), 0 1px 2px var(--shadow-color), 0 4px 12px var(--shadow-color);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@utility press {
+  transition-property: scale, color, background-color, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-out);
+  &:active {
+    scale: 0.97;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--canvas);
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  ::selection {
+    background: var(--selection);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ink-faint);
+    outline-offset: 2px;
+  }
+}
+
+/* Site chrome goes still under reduced motion. Demos handle it themselves (play on request). */
+@media (prefers-reduced-motion: reduce) {
+  *:not([data-demo] *),
+  *:not([data-demo] *)::before,
+  *:not([data-demo] *)::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
