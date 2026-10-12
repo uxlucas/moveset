@@ -199,24 +199,25 @@ export default defineTerm({
     return [
       'Make the section headers in this list sticky.',
       '',
-      '- Wrap each header and its rows in their own element, header first. Sticky only holds inside its parent, which lets the next header push the current one away instead of stacking on it.',
-      `- Give each section header \`position: sticky; top: ${offset}px;\`${offset > 0 ? ` (${offset}px is the height of a bar pinned with \`position: sticky; top: 0\` inside the same scroll container. If your bar sits outside the scroll container, use \`top: 0\`.)` : ''} inside the list's own scroll container.`,
-      '- Give headers an opaque background that matches the list, and a z-index above the rows, so rows never show through.',
-      '- Check every ancestor between the header and the scroll container: `overflow: hidden`, `auto` or `scroll` on any of them (either axis) silently breaks sticky. Use `overflow: clip` for clipping.',
-      `- Set \`scroll-padding-top\` on the scroll container to the header height${offset > 0 ? ` plus ${offset}px` : ''} (replace 32px with yours): \`scroll-padding-top: ${padding}\`. Shift+Tab is the case that needs it: moving focus up scrolls the row in under a stuck header.`,
+      '- Wrap each header and its rows in their own element, header first.',
+      `- Header: real h2 or h3, \`position: sticky; top: ${offset}px;\` in the list's own scroll container, opaque background, z-index above rows.`,
+      ...(offset > 0
+        ? [`- ${offset}px is a bar pinned with \`position: sticky; top: 0\` in the same scroll container; if the bar sits outside it, use \`top: 0\`.`]
+        : []),
+      `- Headers are 32px tall; \`scroll-padding-top: ${padding}\` on the scroll container matches.`,
+      '- No `overflow: hidden`, `auto` or `scroll` on ancestors between the header and the scroll container; use `overflow: clip`.',
+      ...(v.shadow ? ['- Scroll container: no padding.', '- First section wrapper: `margin-top: 1px`.'] : []),
+      '- A last section shorter than the container height never pins.',
       ...(v.shadow
         ? [
-            '- While a header is stuck, show a soft shadow under it: `box-shadow: var(--stuck-shadow, 0 1px 0 var(--border, rgb(0 0 0 / 0.08)), 0 4px 12px rgb(0 0 0 / 0.06))`, transitioned over 150ms with `ease`. In dark mode set `--stuck-shadow: 0 1px 0 rgb(255 255 255 / 0.12), 0 4px 12px rgb(0 0 0 / 0.4)`.',
-            `- Detect "stuck" with one IntersectionObserver on the headers themselves: root is the list's scroll container, rootMargin is '-${offset + 1}px 0px 100000px 0px', threshold is [0, 0.01, 1]. A header is stuck when \`entry.isIntersecting && entry.intersectionRatio < 1 && entry.boundingClientRect.top <= entry.rootBounds.top && entry.boundingClientRect.bottom > entry.rootBounds.top\`. Write the result to a \`data-stuck\` attribute on the header. Do not use a scroll listener.`,
-            '- Keep the 100000px bottom margin, `isIntersecting` and the 0.01 threshold as given; they cover one-step jumps and headers that land exactly on the line.',
-            "- The scroll container must have no padding of its own (put it on a wrapper): `top` counts from inside the padding but the observer's root from its edge, so `rootMargin` would stop lining up with `top`.",
-            '- Apply `margin-top: 1px` to the first section wrapper.',
-            '- Under `prefers-reduced-motion: reduce`, drop the shadow transition so the shadow just appears.',
+            '- `[data-stuck="true"]`: `box-shadow: var(--stuck-shadow, 0 1px 0 var(--border, rgb(0 0 0 / 0.08)), 0 4px 12px rgb(0 0 0 / 0.06))`, 150ms `ease`. Reduced motion: no transition.',
+            '- Under `prefers-color-scheme: dark`, set `--stuck-shadow: 0 1px 0 rgb(255 255 255 / 0.12), 0 4px 12px rgb(0 0 0 / 0.4)`.',
+            `- One IntersectionObserver on the headers: root = scroll container, rootMargin '-${offset + 1}px 0px 100000px 0px', threshold [0, 0.01, 1]. Stuck = \`entry.isIntersecting && entry.intersectionRatio < 1 && entry.boundingClientRect.top <= entry.rootBounds.top && entry.boundingClientRect.bottom > entry.rootBounds.top\`, written to the header as \`data-stuck="true"\` or \`"false"\`. Use these values exactly.`,
           ]
         : ["- Don't change the header's style when it is stuck."]),
-      '- Keep the headers as real headings (h2 or h3) in DOM order.',
     ].join('\n')
   },
+
   acceptance: (v) => {
     const offset = Number(v.offset)
     return [
@@ -228,7 +229,7 @@ export default defineTerm({
       'The next header pushes the current one up; they never overlap.',
       'No row content is visible through a stuck header.',
       v.shadow
-        ? "The shadow appears only while a header is stuck, also after setting the scroll container's scrollTop past a header in one step, and goes away when the header scrolls back into place or is pushed out."
+        ? "The shadow appears only while a header is stuck, also after setting the scroll container's scrollTop past a header in one step, and goes away when the header scrolls back into place or once it is pushed out (a 1px sliver may remain)."
         : 'A stuck header looks the same as one in its normal place.',
       "Headers pin to the top of the list's own scroll area, not to the page.",
       'Tabbing through rows, including Shift+Tab back up, never leaves the focused row hidden behind a stuck header.',
