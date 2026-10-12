@@ -487,7 +487,7 @@ export default defineTerm({
         ? `- Each callback: keep \`isIntersecting\` entries not yet revealed (by focus or first paint), in DOM order; delay = min(index, ${MAX_STEPS}) × ${STAGGER_MS}ms. Set at reveal; clear on \`transitionend\`.`
         : '- Each callback: keep `isIntersecting` entries not yet revealed (by focus or first paint). No stagger.',
       '- First paint: cards with any pixel on screen at load (also after a `#hash` jump) show without animating: run the pass at DOMContentLoaded and again at `load`, setting `data-in` with inline `transition: none`.',
-      '- Observer script (end of <body> or deferred): mark those and cards scrolled past with `data-in="true"`, then add `js` to <html>. Hidden state: `.js .reveal:not([data-in="true"]) > .reveal-inner`; transition on the revealed state only.',
+      '- Observer script (end of `<body>` or deferred): mark those and cards scrolled past with `data-in="true"`, then add `js` to `<html>`. Hidden state: `.js .reveal:not([data-in="true"]) > .reveal-inner`; transition on the revealed state only.',
       '- Cards are in the initial HTML (server-rendered or static markup), keeping their space.',
       '- `focusin` on an unrevealed card: reveal now, no delay.',
       '- `@media print`: all cards visible, no transition.',
