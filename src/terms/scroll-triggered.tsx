@@ -126,7 +126,7 @@ function useReveals(
     root.scrollTop = 0
     const waiting: HTMLElement[] = []
     for (const tile of tiles) {
-      const inView = visibleRatio(tile, view) >= THRESHOLD
+      const inView = visibleRatio(tile, view) > 0
       tile.dataset.in = String(inView)
       if (!inView) waiting.push(tile)
     }
@@ -206,13 +206,20 @@ function ScrollTriggeredGlyph({ active }: GlyphProps) {
 
 const seconds = (ms: string) => Number(ms) / 1000
 
+// Where each duration fits, said once around the chosen value so the prompt never repeats it.
+const DURATION_NOTE: Record<V['duration'], string> = {
+  '300': ', which suits app UI (500ms is the editorial default; 800ms only when pacing matters more than speed)',
+  '500': ', the editorial default (300ms suits app UI; 800ms only when pacing matters more than speed)',
+  '800': ', only when pacing matters more than speed (300ms suits app UI; 500ms is the editorial default)',
+}
+
 function timingLine(v: V): string {
   const ms = Number(v.duration)
-  const budget = '(300ms for app UI; 500 to 800ms only for editorial pacing)'
+  const duration = `${ms}ms${DURATION_NOTE[v.duration]}`
   if (v.easing === 'spring') {
-    return `- Timing: a spring with bounce 0.2 over ${ms}ms ${budget} on both properties (Motion: \`{ type: 'spring', duration: ${seconds(v.duration)}, bounce: 0.2 }\`; CSS has no spring, so use \`transition-duration: ${ms}ms\` with \`transition-timing-function: ${SPRING_LINEAR}\`, which samples it). What the spring adds over ease-out is a softer start. Build it with the spring as specified. It is a comparison option; ease-out is the recommended default for entrances.`
+    return `- Timing: a spring with bounce 0.2 over ${duration} on both properties (Motion: \`{ type: 'spring', duration: ${seconds(v.duration)}, bounce: 0.2 }\`; CSS has no spring, so use \`transition-duration: ${ms}ms\` with \`transition-timing-function: ${SPRING_LINEAR}\`, which samples it). What the spring adds over ease-out is a softer start. Build it with the spring as specified. It is a comparison option; ease-out is the recommended default for entrances.`
   }
-  const line = `- Timing: ${ms}ms ${budget} with \`${EASING[v.easing].css}\` on both properties.`
+  const line = `- Timing: ${duration}, with \`${EASING[v.easing].css}\` on both properties.`
   return v.easing === 'out'
     ? line
     : `${line} Build it with \`${EASING[v.easing].css}\` as specified. It is a comparison option; ease-out is the recommended default for entrances.`
@@ -300,9 +307,9 @@ function jsCode(v: V): string {
     '',
     "for (const card of document.querySelectorAll('.reveal')) {",
     '  const box = card.getBoundingClientRect()',
-    '  const seen = Math.min(box.bottom, innerHeight) - Math.max(box.top, 0)',
-    '  // In view now, or already scrolled past: it stays visible as it is.',
-    `  if (box.bottom <= 0 || seen >= box.height * ${THRESHOLD}) card.dataset.in = 'true'`,
+    '  // Any part on screen, or already scrolled past: it stays visible as it is.',
+    `  // The ${THRESHOLD * 100}% rule is only for cards still to come (the observer).`,
+    "  if (box.top < innerHeight) card.dataset.in = 'true'",
     '  else io.observe(card)',
     '}',
     '// Only now hide the cards that are still to come.',
@@ -325,7 +332,8 @@ function motionCode(v: V): string {
     '',
     '// Add this to <head>. Motion writes `initial` into the server HTML, so the',
     '// cards start hidden there; these show them without JavaScript, in print,',
-    `// and after ${FAILSAFE_MS / 1000}s if the bundle never hydrates.`,
+    `// and after ${FAILSAFE_MS / 1000}s if the bundle never hydrates. If hydration takes longer`,
+    `// than ${FAILSAFE_MS / 1000}s, the failsafe stays on: cards show without animating.`,
     '//   <noscript>',
     '//     <style>.reveal { opacity: 1 !important; transform: none !important; }</style>',
     '//   </noscript>',
@@ -468,7 +476,8 @@ export default defineTerm({
         ? `- The first observer callback reports every observed card; later ones report only cards whose visibility changed, including cards leaving. So filter each callback to entries that are intersecting, then start those ${STAGGER_MS}ms apart in DOM order, capped at ${MAX_STEPS} steps (${MAX_STEPS * STAGGER_MS}ms) so a fast jump never queues a long wave. Set the delay on the card when it reveals, and clear it once the transition ends.`
         : '- Cards that enter together all start at the same moment. No stagger. Filter each observer callback to entries that are intersecting: the first callback reports every observed card, and later ones include cards leaving.',
       `- Detect entry with one IntersectionObserver, \`threshold: ${THRESHOLD}\` (with Motion: \`whileInView\` and \`viewport={{ once: true, amount: ${THRESHOLD} }}\`). On intersect, set \`data-in="true"\` on the card (the CSS keys off it) and \`unobserve\` it. Don't use a scroll listener.`,
-      '- Hide only cards that are not in view yet, and only from JavaScript. The observer script (end of <body>, or deferred) first marks every card already in view, or already scrolled past, with `data-in="true"`, then adds a `js` class to <html>. The hidden state is `.js .reveal:not([data-in="true"])`, and the transition lives on the revealed state only, so hiding is instant. Cards on the first screen are never hidden, and if the script fails to load, no card is.',
+      '- Hide only cards that are not in view yet, and only from JavaScript. The observer script (end of <body>, or deferred) first marks every card with any part on screen, or already scrolled past, with `data-in="true"`, then adds a `js` class to <html>. The hidden state is `.js .reveal:not([data-in="true"])`, and the transition lives on the revealed state only, so hiding is instant. Cards on the first screen are never hidden, and if the script fails to load, no card is.',
+      `- With Motion, \`initial\` is rendered into the server HTML: skip \`initial\` for cards on the first screen, and add a \`<noscript>\`, print and ${FAILSAFE_MS / 1000}s failsafe style that forces \`.reveal\` visible with \`!important\`.`,
       '- States to handle: in view on first paint (visible from the first frame, never animated); before reveal (invisible but holding its space, so nothing shifts); revealing; revealed (opacity 1, no transform left); after an instant jump such as an anchor link (cards in view end fully visible; cards never in view reveal when reached); keyboard focus landing in a card that has not revealed (on `focusin` it starts revealing immediately, with the same transition and no stagger delay); printing (`@media print` shows every card, with no transition).',
       '- Under `prefers-reduced-motion: reduce`: no movement and no stagger. In CSS, drop the transform and fade opacity only, over 150ms. In JS, set no delays, and read the media query inside the callback so a change mid-session counts.',
       '- Transition only `opacity` and `transform`, and name them; never `transition: all`.',

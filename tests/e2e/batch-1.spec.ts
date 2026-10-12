@@ -30,11 +30,13 @@ for (const { slug, name } of [
 test.describe('Scroll-triggered', () => {
   test('controls rewrite the prompt', async ({ page }) => {
     await page.goto('/terms/scroll-triggered')
-    const budget = '(300ms for app UI; 500 to 800ms only for editorial pacing)'
-    await expect(prompt(page)).toContainText(`Timing: 500ms ${budget} with \`var(--ease-out)\` on both properties.`)
+    await expect(prompt(page)).toContainText(
+      'Timing: 500ms, the editorial default (300ms suits app UI; 800ms only when pacing matters more than speed), with `var(--ease-out)` on both properties.',
+    )
     await expect(prompt(page)).not.toContainText('comparison option')
+    await expect(prompt(page)).toContainText('With Motion, `initial` is rendered into the server HTML')
     await option(page, 'Duration', '800ms').click()
-    await expect(prompt(page)).toContainText(`Timing: 800ms ${budget}`)
+    await expect(prompt(page)).toContainText('Timing: 800ms, only when pacing matters more than speed (300ms suits app UI; 500ms is the editorial default)')
     await option(page, 'Easing', 'Spring').click()
     await expect(prompt(page)).toContainText('a spring with bounce 0.2 over 800ms')
     await expect(prompt(page)).toContainText('It is a comparison option; ease-out is the recommended default for entrances.')
