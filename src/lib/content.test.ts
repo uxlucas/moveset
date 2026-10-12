@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  compareSlug, confusedPairs, defaultValues, groupByCategory, isVisible, matchesQuery, neighbors, normalize,
+  compareSlug, confusedPairs, defaultValues, groupByCategory, isVisible, matchesQuery, neighbors, normalize, visibleConfusedPairs,
 } from './content'
 import type { TermData } from './term-data'
 
@@ -42,6 +42,14 @@ describe('neighbors', () => {
     expect(neighbors(list, 'one', false)).toEqual({ prev: undefined, next: list[2] })
     expect(neighbors(list, 'three', false)).toEqual({ prev: list[0], next: undefined })
   })
+  test('a review term in review mode keeps its published neighbour and skips its draft one', () => {
+    const rev = [
+      t({ slug: 'pub', order: 1 }),
+      t({ slug: 'mid', order: 2, status: 'review' }),
+      t({ slug: 'drf', order: 3, status: 'draft' }),
+    ]
+    expect(neighbors(rev, 'mid', true)).toEqual({ prev: rev[0], next: undefined })
+  })
   test('unknown slug has no neighbors', () => {
     expect(neighbors(list, 'nope', false)).toEqual({})
   })
@@ -78,5 +86,23 @@ describe('defaultValues', () => {
       { id: 'b', type: 'toggle', label: 'B', default: false },
     ])).toEqual({ a: 1, b: false })
     expect(defaultValues()).toEqual({})
+  })
+})
+
+describe('visibleConfusedPairs', () => {
+  const link = (slug: string, status: TermData['status'], other: string) =>
+    t({ slug, status, confusedWith: [{ slug: other, difference: 'Differs.' }] })
+  test('returns a pair whose sides are both published', () => {
+    const list = [link('a', 'published', 'b'), t({ slug: 'b' })]
+    expect(visibleConfusedPairs(list, false)).toEqual([{ a: 'a', b: 'b', difference: 'Differs.' }])
+  })
+  test('drops a pair with a draft side', () => {
+    const list = [link('a', 'published', 'b'), t({ slug: 'b', status: 'draft' })]
+    expect(visibleConfusedPairs(list, true)).toEqual([])
+  })
+  test('counts a review side only in review mode', () => {
+    const list = [link('a', 'published', 'b'), t({ slug: 'b', status: 'review' })]
+    expect(visibleConfusedPairs(list, false)).toEqual([])
+    expect(visibleConfusedPairs(list, true)).toHaveLength(1)
   })
 })

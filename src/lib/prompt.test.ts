@@ -36,9 +36,42 @@ describe('buildPromptText', () => {
 
 describe('buildMarkdown', () => {
   test('contains every section of the entry', () => {
-    const md = buildMarkdown(term, { ms: 200 }, (slug) => slug)
+    const md = buildMarkdown(term, { ms: 200 }, (slug) => ({ name: slug, visible: true }))
     for (const part of ['# Demo', 'Also called: sample, example', '> A demo term.', 'What it is.', '## Use when', '- Here.', '## Avoid when', '## Prompt', '## Code', '### CSS', '```css', '## Accessibility', 'Be kind.']) {
       expect(md).toContain(part)
     }
+  })
+})
+
+describe('buildMarkdown links', () => {
+  const linked = defineTerm({
+    ...term,
+    related: ['sticky', 'parallax'],
+    confusedWith: [
+      { slug: 'scroll-linked', difference: 'Tied to scroll position.' },
+      { slug: 'parallax', difference: 'Layers move at different speeds.' },
+    ],
+  } as never) as FullTerm
+  const resolve = (slug: string) => ({ name: slug.toUpperCase(), visible: slug !== 'parallax' })
+  const md = buildMarkdown(linked, { ms: 200 }, resolve)
+
+  test('lists only visible related terms', () => {
+    expect(md).toContain('- [STICKY](https://moveset.lucaslima.design/terms/sticky)')
+    expect(md).not.toContain('PARALLAX')
+    expect(md).not.toContain('/terms/parallax')
+  })
+  test('often confused with links the compare page, and only for visible sides', () => {
+    expect(md).toContain('- [Demo vs SCROLL-LINKED](https://moveset.lucaslima.design/compare/demo-vs-scroll-linked): Tied to scroll position.')
+    expect(md).not.toContain('compare/demo-vs-parallax')
+    expect(md).not.toContain('Layers move')
+  })
+  test('omits a section when nothing visible remains', () => {
+    const none = buildMarkdown(linked, { ms: 200 }, () => ({ name: 'x', visible: false }))
+    expect(none).not.toContain('## Related')
+    expect(none).not.toContain('## Often confused with')
+  })
+  test('omits Code when no approach has code', () => {
+    const bare = defineTerm({ ...term, code: () => ({}) } as never) as FullTerm
+    expect(buildMarkdown(bare, { ms: 200 }, resolve)).not.toContain('## Code')
   })
 })

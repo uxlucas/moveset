@@ -51,12 +51,16 @@ test('the demo really sticks at the chosen offset', async ({ page }) => {
     el.scrollTop = 160
   })
   await expect(scroller(page).locator('[data-sticky-header][data-stuck="true"]').first()).toBeVisible()
-  const gap = await scroller(page).evaluate((el) => {
-    const top = el.getBoundingClientRect().top
-    const stuck = [...el.querySelectorAll<HTMLElement>('[data-sticky-header]')].map((h) => h.getBoundingClientRect().top - top)
-    return Math.min(...stuck.map((d) => Math.abs(d - 8)))
-  })
-  expect(gap).toBeLessThanOrEqual(1)
+  // The stuck flag follows an IntersectionObserver, so it can trail the scroll by a frame or two.
+  await expect
+    .poll(() =>
+      scroller(page).evaluate((el) => {
+        const top = el.getBoundingClientRect().top
+        const stuck = [...el.querySelectorAll<HTMLElement>('[data-sticky-header][data-stuck="true"]')].map((h) => h.getBoundingClientRect().top - top)
+        return Math.min(...stuck.map((d) => Math.abs(d - 8)))
+      }),
+    )
+    .toBeLessThanOrEqual(1)
 })
 
 test('scrolling the demo takes over; replay hands it back', async ({ page }) => {
@@ -72,11 +76,16 @@ test('scrolling the demo takes over; replay hands it back', async ({ page }) => 
 test('rapid replay never stacks animations', async ({ page }) => {
   await page.goto('/terms/sticky')
   const replay = page.getByRole('button', { name: 'Replay' })
-  for (let i = 0; i < 5; i++) await replay.click()
+  for (let i = 0; i < 5; i++) {
+    await replay.click()
+    await expect(scroller(page)).toHaveAttribute('data-active', '1')
+  }
   await expect(scroller(page)).toHaveAttribute('data-active', '1')
 })
 
 test('drafts have no page and are never linked as prev/next', async ({ page }) => {
+  const published = await page.goto('/terms/sticky')
+  expect(published?.status()).toBe(200)
   const response = await page.goto('/terms/parallax')
   expect(response?.status()).toBe(404)
   await page.goto('/terms/sticky')

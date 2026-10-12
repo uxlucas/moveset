@@ -14,13 +14,16 @@ import { isFull, type FullTerm, type Values } from '@/lib/term-types'
 import { getTerm, terms } from '@/lib/terms'
 import { CodeTabs } from './code-tabs'
 
-const nameOf = (slug: string) => getTerm(slug).name
+const resolve = (slug: string) => {
+  const t = getTerm(slug)
+  return { name: t.name, visible: isVisible(t) }
+}
 const h2 = 'text-[15px] font-medium text-ink'
 
 export function EntryView({ slug }: { slug: string }) {
   const term = getTerm(slug)
   if (!isFull(term)) throw new Error(`"${slug}" is a draft and has no entry page.`)
-  return <Entry term={term} />
+  return <Entry key={term.slug} term={term} />
 }
 
 function Entry({ term }: { term: FullTerm }) {
@@ -54,10 +57,10 @@ function Entry({ term }: { term: FullTerm }) {
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className="text-2xl font-medium tracking-[-0.015em]">{term.name}</h1>
           <div className="flex flex-wrap gap-1 text-sm">
-            <CopyButton text={() => buildPromptText(term, values)} label="Copy as prompt" className="rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
+            <CopyButton text={() => buildPromptText(term, values)} label="Copy as prompt" className="hit rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
               Copy as prompt
             </CopyButton>
-            <CopyButton text={() => buildMarkdown(term, values, nameOf)} label="Copy as markdown" className="rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
+            <CopyButton text={() => buildMarkdown(term, values, resolve)} label="Copy as markdown" className="hit rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
               Copy as markdown
             </CopyButton>
           </div>
@@ -85,11 +88,11 @@ function Entry({ term }: { term: FullTerm }) {
       <section aria-labelledby="prompt" className="mt-12">
         <h2 id="prompt" className={h2}>Prompt</h2>
         <div className="relative mt-3 rounded-2xl bg-surface shadow-card">
-          <pre className="whitespace-pre-wrap p-5 pr-14 font-mono text-[13px] leading-relaxed text-ink">
-            <code>{term.prompt(values)}</code>
+          <pre className="whitespace-pre-wrap break-words p-5 pr-14 font-mono text-[13px] leading-relaxed text-ink">
+            <code>{term.prompt(values).trim()}</code>
           </pre>
           <div className="absolute right-3 top-3">
-            <CopyButton text={() => buildPromptText(term, values)} label="Copy prompt" className="size-8 justify-center rounded-lg text-ink-muted hover:text-ink" />
+            <CopyButton text={() => buildPromptText(term, values)} label="Copy prompt" className="hit size-8 justify-center rounded-lg text-ink-muted hover:text-ink" />
           </div>
         </div>
         <h3 className="mt-6 text-sm font-medium">Acceptance checklist</h3>
@@ -155,10 +158,12 @@ function Entry({ term }: { term: FullTerm }) {
         </section>
       )}
 
-      <nav aria-label="Previous and next" className="mt-16 flex justify-between gap-4 border-t border-line pt-6 text-sm">
-        {prev ? <Link href={`/terms/${prev.slug}`} className="text-ink-muted hover:text-ink">← {prev.name}</Link> : <span />}
-        {next ? <Link href={`/terms/${next.slug}`} className="text-ink-muted hover:text-ink">{next.name} →</Link> : <span />}
-      </nav>
+      {(prev || next) && (
+        <nav aria-label="Previous and next" className="mt-16 flex justify-between gap-4 border-t border-line pt-6 text-sm">
+          {prev ? <Link href={`/terms/${prev.slug}`} className="hit text-ink-muted hover:text-ink">← {prev.name}</Link> : <span />}
+          {next ? <Link href={`/terms/${next.slug}`} className="hit text-ink-muted hover:text-ink">{next.name} →</Link> : <span />}
+        </nav>
+      )}
     </article>
   )
 }

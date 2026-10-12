@@ -58,9 +58,12 @@ test.describe('search', () => {
   test('slash focuses search and Escape clears it', async ({ page, isMobile }) => {
     test.skip(isMobile, 'keyboard shortcut')
     await page.goto('/')
-    await page.keyboard.press('/')
     const box = page.getByRole('searchbox', { name: 'Search terms' })
-    await expect(box).toBeFocused()
+    // The shortcut listener attaches on hydration, which can lag behind `load` when workers are busy.
+    await expect(async () => {
+      await page.keyboard.press('/')
+      await expect(box).toBeFocused({ timeout: 500 })
+    }).toPass()
     await box.fill('toast')
     await box.press('Escape')
     await expect(box).toHaveValue('')

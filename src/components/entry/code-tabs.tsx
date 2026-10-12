@@ -36,14 +36,14 @@ export function CodeTabs({ code }: { code: CodeRef }) {
                 tabIndex={selected ? 0 : -1}
                 onClick={() => setActive(a.key)}
                 onKeyDown={(e) => onKeyDown(e, i)}
-                className={`px-3 py-2.5 text-sm ${selected ? 'text-ink shadow-[inset_0_-1px_0_var(--ink)]' : 'text-ink-muted hover:text-ink'}`}
+                className={`hit px-3 py-2.5 text-sm ${selected ? 'text-ink shadow-[inset_0_-1px_0_var(--ink)]' : 'text-ink-muted hover:text-ink'}`}
               >
                 {a.label}
               </button>
             )
           })}
         </div>
-        <CopyButton text={src} label={`Copy ${current.label} code`} className="size-8 justify-center rounded-lg text-ink-muted hover:text-ink" />
+        <CopyButton text={src} label={`Copy ${current.label} code`} className="hit size-8 justify-center rounded-lg text-ink-muted hover:text-ink" />
       </div>
       <pre id="code-panel" role="tabpanel" aria-labelledby={`tab-${current.key}`} tabIndex={0} className="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed text-ink">
         <code>{src}</code>

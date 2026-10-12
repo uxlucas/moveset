@@ -74,6 +74,18 @@ export function confusedPairs(
   return [...pairs.values()]
 }
 
+/** Pairs whose two sides are both visible, so the compare page can exist. */
+export function visibleConfusedPairs(
+  terms: readonly { slug: string; status: TermStatus; confusedWith?: readonly { slug: string; difference: string }[] }[],
+  showReview?: boolean,
+): ConfusedPair[] {
+  const visible = (slug: string) => {
+    const t = terms.find((x) => x.slug === slug)
+    return Boolean(t && isVisible(t, showReview))
+  }
+  return confusedPairs(terms).filter((p) => visible(p.a) && visible(p.b))
+}
+
 export function defaultValues(controls: readonly Control[] = []): Values {
   return Object.fromEntries(controls.map((c) => [c.id, c.default]))
 }
