@@ -133,7 +133,7 @@ export function Sidebar() {
     <aside className="hidden lg:block">
       <div
         ref={scrollerRef}
-        className="sticky top-0 max-h-[calc(100dvh-var(--header-h))] scroll-pb-[72px] overflow-y-auto overscroll-contain pb-14 pl-[26px] pr-[18px] pt-10 text-[12px] leading-4 [mask-image:linear-gradient(to_bottom,#000_calc(100%-56px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="sticky top-0 max-h-dvh scroll-pb-[72px] overflow-y-auto overscroll-contain pb-14 pl-[26px] pr-[18px] pt-10 text-[12px] leading-4 [mask-image:linear-gradient(to_bottom,#000_calc(100%-56px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <div ref={railRef} className="relative isolate">
           <div

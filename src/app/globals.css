@@ -27,8 +27,6 @@
   --duration-2: 200ms;
   --duration-3: 250ms;
   --duration-4: 300ms;
-  /* desktop header height; the sidebar rail is capped to what's left of the viewport */
-  --header-h: 5rem;
   color-scheme: light;
 }
 
