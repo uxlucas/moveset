@@ -437,7 +437,7 @@ export default defineTerm({
   name: 'Scroll-triggered',
   category: 'scroll',
   order: 1,
-  status: 'review',
+  status: 'published',
   definition: 'An animation that plays once when an element scrolls into view.',
   aliases: [
     'reveal on scroll',

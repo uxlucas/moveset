@@ -477,7 +477,7 @@ export default defineTerm({
   name: 'Scroll-linked',
   category: 'scroll',
   order: 2,
-  status: 'review',
+  status: 'published',
   definition: 'An animation whose progress is tied directly to the scroll position, moving forward and backward as you scroll.',
   aliases: [
     'scroll-driven animation',

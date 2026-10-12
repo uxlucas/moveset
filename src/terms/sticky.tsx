@@ -165,7 +165,7 @@ export default defineTerm({
   name: 'Sticky',
   category: 'scroll',
   order: 4,
-  status: 'review',
+  status: 'published',
   definition: 'An element scrolls with the page until it hits an edge, then stays pinned while the rest of its section scrolls underneath.',
   aliases: [
     'sticky header',
