@@ -14,15 +14,21 @@ type Options = {
   durationMs?: number
   /** scroll position (0–1) shown as the still frame */
   stillAt?: number
+  /** scroll back up after a short hold at the bottom, for demos that must be seen running backwards */
+  returnTrip?: boolean
 }
 
 const EASE_IN_OUT = [0.77, 0, 0.175, 1] as const
+// Down, a short hold at the bottom, back up. A softer curve keeps the pace steady through the middle,
+// where effects tied to the scroll position play out and need to be readable.
+const RETURN_TIMES = [0, 0.44, 0.56, 1]
+const EASE_IN_OUT_SOFT = [0.37, 0, 0.63, 1] as const
 const TAKEOVER_EVENTS = ['wheel', 'pointerdown', 'touchstart', 'keydown'] as const
 
-// Scrolls a container top to bottom once per cycle. Writes scrollTop directly; no React state per frame.
+// Scrolls a container top to bottom (and back, with returnTrip) once per cycle. Writes scrollTop directly; no React state per frame.
 export function useAutoScroll(
   ref: RefObject<HTMLElement | null>,
-  { playing, replayKey, timeScale, onCycleEnd, interactive, durationMs = 3200, stillAt = 0.4 }: Options,
+  { playing, replayKey, timeScale, onCycleEnd, interactive, durationMs = 3200, stillAt = 0.4, returnTrip = false }: Options,
 ) {
   const [takenOver, setTakenOver] = useState(false)
   const onCycleEndRef = useRef(onCycleEnd)
@@ -46,14 +52,16 @@ export function useAutoScroll(
 
     el.dataset.active = String(Number(el.dataset.active ?? 0) + 1)
     el.scrollTop = 0
-    const controls = animate(0, max, {
+    const options = {
       duration: scaled(durationMs, timeScale) / 1000,
-      ease: EASE_IN_OUT,
-      onUpdate: (v) => {
+      onUpdate: (v: number) => {
         el.scrollTop = v
       },
       onComplete: () => onCycleEndRef.current(),
-    })
+    }
+    const controls = returnTrip
+      ? animate(0, [0, max, max, 0], { ...options, times: RETURN_TIMES, ease: [EASE_IN_OUT_SOFT, 'linear', EASE_IN_OUT_SOFT] })
+      : animate(0, max, { ...options, ease: EASE_IN_OUT })
     const takeOver = () => {
       controls.stop()
       setTakenOver(true)
@@ -65,5 +73,5 @@ export function useAutoScroll(
       el.dataset.active = String(Number(el.dataset.active ?? 1) - 1)
       if (interactive) TAKEOVER_EVENTS.forEach((e) => el.removeEventListener(e, takeOver))
     }
-  }, [ref, playing, replayKey, timeScale, takenOver, interactive, durationMs, stillAt])
+  }, [ref, playing, replayKey, timeScale, takenOver, interactive, durationMs, stillAt, returnTrip])
 }
