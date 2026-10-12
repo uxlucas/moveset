@@ -11,6 +11,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: skills/ is committed up to date
+        run: git diff --exit-code -- skills/ && test -z "$(git ls-files --others --exclude-standard -- skills/)"
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
