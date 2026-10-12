@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { BrowserFrame } from '@/components/demo/browser-frame'
-import { useAutoScroll } from '@/components/demo/use-auto-scroll'
+import { useAutoScroll, type Bezier, type TrackPoint } from '@/components/demo/use-auto-scroll'
 import { GlyphSvg } from '@/components/site/glyph'
 import { defineTerm, type Control, type ControlValues, type DemoProps, type GlyphProps } from '@/lib/term-types'
 
@@ -30,8 +30,43 @@ const SECTIONS = [
   { letter: 'E', rows: 4 },
 ]
 const LINE_WIDTHS = ['w-24', 'w-20', 'w-28', 'w-16']
-// Milder than the house ease-in-out, so the scroll is not at full speed through each handoff.
+// Used until the track is measured.
 const SCROLL_EASE = [0.45, 0, 0.55, 1] as const
+const PUSH_MS = 400
+const CYCLE_MS = 5800
+
+// Cruises between handoffs and slows to a steady pace through each push (the next header pushing the pinned one out),
+// timed from the measured section tops. Cruise curves leave and meet each push at the push's speed, so the pace
+// changes without a jolt; the first starts from rest and the last comes to rest.
+function buildTrack(el: HTMLElement, offset: number): TrackPoint[] | undefined {
+  const max = el.scrollHeight - el.clientHeight
+  const sections = [...el.querySelectorAll<HTMLElement>('[data-section]')]
+  const h = sections[0]?.querySelector<HTMLElement>('[data-sticky-header]')?.offsetHeight ?? 0
+  const pushes = sections
+    .slice(1)
+    .map((s) => [s.offsetTop - offset - h, s.offsetTop - offset] as const)
+    .filter(([from, to]) => from > 0 && to <= max)
+  if (max <= 0 || h <= 0 || pushes.length === 0) return undefined
+  const pushSpeed = h / PUSH_MS
+  // Each cruise segment's end slope, relative to its average speed, chosen so the whole cycle lands on CYCLE_MS.
+  const slope = Math.min(1.5, ((CYCLE_MS - pushes.length * PUSH_MS) * pushSpeed) / (max - pushes.length * h))
+  const k = 0.4 * slope
+  const fromRest: Bezier = [0.5, 0, 0.6, 1 - k]
+  const cruise: Bezier = [0.4, k, 0.6, 1 - k]
+  const toRest: Bezier = [0.4, k, 0.5, 1]
+  const track: TrackPoint[] = [[0, 0]]
+  let t = 0
+  let at = 0
+  pushes.forEach(([from, to], i) => {
+    t += (slope * (from - at)) / pushSpeed
+    track.push([Math.round(t), from / max, i === 0 ? fromRest : cruise])
+    t += PUSH_MS
+    track.push([Math.round(t), to / max, 'linear'])
+    at = to
+  })
+  if (max - at >= 1) track.push([Math.round(t + (slope * (max - at)) / pushSpeed), 1, toRest])
+  return track
+}
 
 // Watches the headers themselves. A header is stuck while the line `offset + 1`px below the top clips its top edge.
 // Pushed fully out by the next header, it is not stuck. isIntersecting, not ratio > 0: a header exactly touching the
@@ -61,15 +96,20 @@ function StickyDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
   const offset = Number(values.offset)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [stillPx, setStillPx] = useState<number>()
+  const [track, setTrack] = useState<TrackPoint[]>()
 
-  // Still frame: B pinned with about a row and a half passing under it, so the shadow shows.
   useLayoutEffect(() => {
-    const b = scrollRef.current?.querySelector<HTMLElement>('[data-section="B"]')
+    const el = scrollRef.current
+    const b = el?.querySelector<HTMLElement>('[data-section="B"]')
     const row = b?.querySelector<HTMLElement>('[data-row]')
-    if (b && row) setStillPx(Math.round(b.offsetTop - offset + row.offsetHeight * 1.5))
+    if (!el || !b || !row) return
+    // Still frame: B pinned with about a row and a half passing under it, so the shadow shows.
+    setStillPx(Math.round(b.offsetTop - offset + row.offsetHeight * 1.5))
+    const next = buildTrack(el, offset)
+    setTrack((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
   }, [offset])
 
-  useAutoScroll(scrollRef, { playing, replayKey, timeScale, onCycleEnd, interactive: size === 'detail', durationMs: 4400, stillPx, ease: SCROLL_EASE })
+  useAutoScroll(scrollRef, { playing, replayKey, timeScale, onCycleEnd, interactive: size === 'detail', durationMs: 4400, stillPx, ease: SCROLL_EASE, track })
   useStuckHeaders(scrollRef, offset)
 
   return (

@@ -20,9 +20,16 @@ type Options = {
   ease?: Bezier
   /** scroll back up after a short hold at the bottom, for demos that must be seen running backwards */
   returnTrip?: boolean
+  /**
+   * waypoints for the one-way scroll, replacing the single eased run: [timeMs, progress 0–1, ease?].
+   * Starts at [0, 0]; the cycle lasts until the last waypoint (durationMs is ignored).
+   * A waypoint's ease is the curve of the segment arriving at it, defaulting to `ease`.
+   */
+  track?: readonly TrackPoint[]
 }
 
-type Bezier = readonly [number, number, number, number]
+export type Bezier = readonly [number, number, number, number]
+export type TrackPoint = readonly [timeMs: number, progress: number, ease?: Bezier | 'linear']
 
 const EASE_IN_OUT: Bezier = [0.77, 0, 0.175, 1]
 // Down, a short hold at the bottom, back up. A softer curve keeps the pace steady through the middle,
@@ -34,7 +41,7 @@ const TAKEOVER_EVENTS = ['wheel', 'pointerdown', 'touchstart', 'keydown'] as con
 // Scrolls a container top to bottom (and back, with returnTrip) once per cycle. Writes scrollTop directly; no React state per frame.
 export function useAutoScroll(
   ref: RefObject<HTMLElement | null>,
-  { playing, replayKey, timeScale, onCycleEnd, interactive, durationMs = 3200, stillAt = 0.4, stillPx, ease = EASE_IN_OUT, returnTrip = false }: Options,
+  { playing, replayKey, timeScale, onCycleEnd, interactive, durationMs = 3200, stillAt = 0.4, stillPx, ease = EASE_IN_OUT, returnTrip = false, track }: Options,
 ) {
   const [takenOver, setTakenOver] = useState(false)
   const onCycleEndRef = useRef(onCycleEnd)
@@ -67,9 +74,21 @@ export function useAutoScroll(
       },
       onComplete: () => onCycleEndRef.current(),
     }
+    const end = track?.[track.length - 1]?.[0] ?? 0
     const controls = returnTrip
       ? animate(0, [0, max, max, 0], { ...options, times: RETURN_TIMES, ease: [EASE_IN_OUT_SOFT, 'linear', EASE_IN_OUT_SOFT] })
-      : animate(0, max, { ...options, ease })
+      : track && end > 0
+        ? animate(
+            0,
+            track.map(([, p]) => p * max),
+            {
+              ...options,
+              duration: scaled(end, timeScale) / 1000,
+              times: track.map(([t]) => t / end),
+              ease: track.slice(1).map(([, , e]) => e ?? ease),
+            },
+          )
+        : animate(0, max, { ...options, ease })
     const takeOver = () => {
       controls.stop()
       setTakenOver(true)
@@ -81,7 +100,7 @@ export function useAutoScroll(
       el.dataset.active = String(Number(el.dataset.active ?? 1) - 1)
       if (interactive) TAKEOVER_EVENTS.forEach((e) => el.removeEventListener(e, takeOver))
     }
-  }, [ref, playing, replayKey, timeScale, takenOver, interactive, durationMs, stillAt, ease, returnTrip])
+  }, [ref, playing, replayKey, timeScale, takenOver, interactive, durationMs, stillAt, ease, returnTrip, track])
 
   // A measured still frame can arrive after mount; move to it without restarting a cycle in flight.
   useEffect(() => {
