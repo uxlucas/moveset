@@ -35,7 +35,8 @@ const PEEK = 48
 const GAP = 8
 // The demo's: the same idea scaled to the small window, plus an inset at the top (scroll-padding-top and a spacer of
 // the same height) so a resting panel doesn't sit flush against the toolbar. It equals the gap, so all that shows
-// above a resting panel is the gap, never a sliver of the panel before it.
+// above a resting panel is the gap, never a sliver of the panel before it. Start only: centered panels already sit
+// clear of the edges, and an inset would make the two neighbours show unequally.
 const INSET = GAP
 const DEMO = { card: { peek: 36 }, detail: { peek: 56 } }
 
@@ -100,7 +101,7 @@ const SNAP_CLASS = {
     takeover: '[&_[data-scroller][data-taken-over=true]]:[scroll-snap-type:y_proximity]',
   },
 } as const
-const PADDING_CLASS = '[&_[data-scroller]]:[scroll-padding-top:8px]'
+const START_PADDING_CLASS = '[&_[data-scroller]]:[scroll-padding-top:8px]'
 
 function ScrollSnapDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }: DemoProps<V>) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -115,22 +116,22 @@ function ScrollSnapDemo({ values, playing, replayKey, size, timeScale, onCycleEn
   })
   const detail = size === 'detail'
   const { peek } = DEMO[size]
-  const inset = INSET
   const center = values.align === 'center'
+  const inset = center ? 0 : INSET
   // Same rules as the prompt: the top inset first, then room so the first and last panels can rest like the others
   // (below the last for start, half on each end for center).
   const before = inset + (center ? peek / 2 : 0)
   const after = center ? peek / 2 : peek
 
   return (
-    <div className={`h-full ${PADDING_CLASS} ${SNAP_CLASS[values.strictness][playing ? 'takeover' : 'still']}`}>
+    <div className={`h-full ${center ? '' : START_PADDING_CLASS} ${SNAP_CLASS[values.strictness][playing ? 'takeover' : 'still']}`}>
       <BrowserFrame scrollRef={scrollRef} size={size} label="Numbered panels that snap into place as the page scrolls">
         <div aria-hidden style={{ height: before }} />
         {Array.from({ length: PANELS }, (_, i) => (
           <div
             key={i}
             data-panel={i + 1}
-            style={{ height: `calc(100% - ${inset + peek}px)`, marginBottom: i < PANELS - 1 ? GAP : 0 }}
+            style={{ height: `calc(100% - ${inset + peek}px)`, marginTop: i > 0 ? GAP : 0 }}
             className={`flex items-center justify-center rounded-lg bg-demo ${center ? 'snap-center' : 'snap-start'} ${detail ? 'mx-4' : 'mx-3'}`}
           >
             <span className={`font-medium tabular-nums tracking-[-0.02em] text-demo-subject ${detail ? 'text-5xl' : 'text-3xl'}`}>{i + 1}</span>
@@ -195,13 +196,12 @@ function cssCode(v: V): string {
     `  /* The snap area (viewport minus header) less ${PEEK}px: the ${GAP}px gap and the`,
     `     edge of ${center ? 'each neighbour' : 'the next panel'} show. Never taller than the snap area. */`,
     `  height: calc(100svh - var(--header) - ${PEEK}px);`,
-    `  margin-bottom: ${GAP}px;`,
     '  /* normal lets a fast fling pass panels. always: none can be skipped. */',
     '  scroll-snap-stop: normal;',
     '}',
     '',
-    '.panel:last-child {',
-    '  margin-bottom: 0;',
+    '.panel + .panel {',
+    `  margin-top: ${GAP}px;`,
     '}',
     '',
     '/* Nested scroller only: the page behind stays put at either end.',
@@ -241,6 +241,9 @@ function jsCode(v: V): string {
     '  show(target)',
     '  // block matches scroll-snap-align; scrollIntoView respects scroll-padding.',
     '  // Snapping stays under reduced motion; only the glide goes.',
+    '  // Nested scroller: scrollIntoView would scroll the page too. Call',
+    "  // scroller.scrollTo with the panel's offsetTop minus the scroller's",
+    '  // padding-top instead (the scroller is position: relative).',
     `  panels[target].scrollIntoView({ block: '${v.align}', behavior: reduce.matches ? 'instant' : 'smooth' })`,
     '}',
     '',
@@ -266,7 +269,8 @@ function jsCode(v: V): string {
     '',
     "if ('onscrollsnapchange' in window) {",
     '  // Chromium 129+: fires when a scroll comes to rest on a different snap target.',
-    '  // The page fires it on document; a nested scroller fires it on itself.',
+    '  // The page fires it on document; a nested scroller fires it on itself, so',
+    '  // listen on the scroller there.',
     '  // The target is null when a scroll rests between two panels (proximity).',
     "  document.addEventListener('scrollsnapchange', (e) => {",
     '    show(e.snapTargetBlock ? panels.indexOf(e.snapTargetBlock) : nearest())',
@@ -317,17 +321,17 @@ export default defineTerm({
     const center = v.align === 'center'
     const room = ROOM[v.align]
     return [
-      'Make this page snap to whole panels as it scrolls.',
+      'Make this page snap to whole panels.',
       '',
       `- Container (\`html\` for the whole page, or a nested scroller with a fixed height and \`overflow-y: auto\`): \`scroll-snap-type: y ${v.strictness}\`${v.strictness === 'proximity' ? ' (rests on a panel only when released near one)' : ''}.`,
       `- H = a fixed header's height (e.g. 56px), else 0. Container: \`scroll-padding-top: H\`, \`padding-top: ${room.top}\`, \`padding-bottom: ${room.bottom}px\` (${center ? 'half of ' : ''}snap area height, viewport − H, minus panel height). Page: \`body { margin: 0 }\`.`,
-      `- Panels: \`scroll-snap-align: ${v.align}\`, \`height: calc(100svh - H - ${PEEK}px)\` (nested: the scroller's height for \`100svh\`), \`margin-bottom: ${GAP}px\`, none on the last.`,
-      '- Panels that must not be skipped (steps, onboarding): `scroll-snap-stop: always`; otherwise `normal`.',
+      `- Panels: \`scroll-snap-align: ${v.align}\`, \`height: calc(100svh - H - ${PEEK}px)\` (${PEEK}px short: ${center ? 'neighbours peek in' : 'next panel peeks in'}; nested: the scroller's height for \`100svh\`); \`.panel + .panel { margin-top: ${GAP}px }\`.`,
+      '- `scroll-snap-stop: always` on panels that must not be skipped (steps); else `normal`.',
       '- Nested scroller: `overscroll-behavior-y: contain`, `tabindex="0"`, `role="region"`, an `aria-label`, so arrow keys and PageDown scroll it.',
-      `- Prev/next buttons: \`panel.scrollIntoView({ block: '${v.align}', behavior })\`, \`behavior: 'smooth'\`, \`'instant'\` under reduced motion; set the current index on click; disabled at the ends.`,
-      `- Current panel: where \`'onscrollsnapchange' in window\`, \`event.snapTargetBlock\` (\`null\` between panels: use the nearest); else on \`scrollend\` (or 100ms after the last \`scroll\`), the nearest. Nearest: ${center ? "middle closest to the snap area's middle" : "top closest to the snap area's top"}.`,
-      '- No wheel or touch listeners, no `preventDefault`: the browser snaps.',
-      '- Reduced motion: keep snapping (a resting position, not an animation); `scroll-behavior: auto` on the container.',
+      `- Prev/next buttons: page \`panel.scrollIntoView({ block: '${v.align}', behavior })\`; nested \`scroller.scrollTo({ top: panel.offsetTop - paddingTop, behavior })\`. \`behavior: 'smooth'\`, \`'instant'\` under reduced motion; set the current index on click; disabled at the ends.`,
+      `- Current panel: \`scrollsnapchange\` on \`document\` (page) or the scroller (nested) where \`'onscrollsnapchange' in window\`, \`event.snapTargetBlock\` (\`null\` between panels: use the nearest); else on \`scrollend\` (or 100ms after the last \`scroll\`), the nearest. Nearest: ${center ? "middle closest to the snap area's middle" : "top closest to the snap area's top"}.`,
+      '- No wheel/touch listeners or `preventDefault`.',
+      '- Reduced motion: keep snapping (a position, not an animation); container `scroll-behavior: auto`.',
     ].join('\n')
   },
   acceptance: (v) => {

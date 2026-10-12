@@ -181,6 +181,23 @@ test.describe('Scroll Snap', () => {
     await expect(el).toHaveCSS('scroll-snap-type', 'y')
   })
 
+  test('centered panels show both neighbours equally', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/terms/scroll-snap')
+    await option(page, 'Align', 'Center').click()
+    const el = scroller(page, 'scroll-snap')
+    const peeks = () =>
+      el.evaluate((s) => {
+        const view = s.getBoundingClientRect()
+        const panel = (n: number) => s.querySelector<HTMLElement>(`[data-panel="${n}"]`)!.getBoundingClientRect()
+        return [panel(2).bottom - view.top, view.bottom - panel(4).top]
+      })
+    await expect.poll(async () => {
+      const [above, below] = await peeks()
+      return Math.abs(above - below)
+    }).toBeLessThanOrEqual(1)
+  })
+
   test('snapping is off while the demo drives the scroll and on once the visitor takes over', async ({ page }) => {
     await page.goto('/terms/scroll-snap')
     await expect(demo(page, 'scroll-snap')).toHaveAttribute('data-playing', 'true')
