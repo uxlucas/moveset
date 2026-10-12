@@ -32,7 +32,7 @@ export function CodeTabs({ code }: { code: CodeRef }) {
                 type="button"
                 role="tab"
                 aria-selected={selected}
-                aria-controls="code-panel"
+                aria-controls={`panel-${a.key}`}
                 tabIndex={selected ? 0 : -1}
                 onClick={() => setActive(a.key)}
                 onKeyDown={(e) => onKeyDown(e, i)}
@@ -45,9 +45,25 @@ export function CodeTabs({ code }: { code: CodeRef }) {
         </div>
         <CopyButton text={src} label={`Copy ${current.label} code`} className="hit size-8 justify-center rounded-lg text-ink-muted hover:text-ink" />
       </div>
-      <pre id="code-panel" role="tabpanel" aria-labelledby={`tab-${current.key}`} tabIndex={0} className="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed text-ink">
-        <code>{src}</code>
-      </pre>
+      {/* Every panel is in the server HTML so agents and no-JS readers get all approaches. Tailwind's
+          preflight hides [hidden] with !important inside @layer base; an important rule only beats it
+          from an earlier layer, hence @layer theme. */}
+      <noscript>
+        <style>{'@layer theme{[role=tabpanel][hidden]{display:block!important}}'}</style>
+      </noscript>
+      {available.map((a) => (
+        <pre
+          key={a.key}
+          id={`panel-${a.key}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${a.key}`}
+          hidden={a.key !== current.key}
+          tabIndex={0}
+          className="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed text-ink"
+        >
+          <code>{code[a.key]}</code>
+        </pre>
+      ))}
     </div>
   )
 }
