@@ -17,7 +17,13 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params
   const term = terms.find((t) => t.slug === slug)
-  return term ? { title: term.name, description: term.definition } : {}
+  if (!term) return {}
+  return {
+    title: term.name,
+    description: term.definition,
+    // Published entries have a markdown twin for agents (see scripts/generate.ts).
+    alternates: term.status === 'published' ? { types: { 'text/markdown': `/terms/${slug}.md` } } : undefined,
+  }
 }
 
 export default async function TermPage({ params }: Params) {
