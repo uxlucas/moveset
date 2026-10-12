@@ -40,9 +40,11 @@ const shift = (ratio: number) => +((1 - ratio) * 100).toFixed(1)
 
 // Demo geometry in px: the blocks' top and height, where the front panel starts, the far slab, and the hero's
 // height in windows. The travel is short enough that at the bottom of the scroll, at 0.2× (where the panel covers
-// the blocks soonest), about a third of a block still shows, so the turn of the return trip is on screen.
+// the blocks soonest), about a third of a block still shows, so the turn of the return trip is on screen. The card
+// always runs at the default 0.4×, so it is tuned for that: a lower panel buys about 90px of travel, enough that the
+// scroll moves on most frames instead of creeping a pixel every two or three.
 const GEOMETRY = {
-  card: { top: 28, block: 48, panel: 88, farTop: 14, farHeight: 90, hero: '135%', margin: 4 },
+  card: { top: 24, block: 64, panel: 110, farTop: 10, farHeight: 104, hero: '158%', margin: 4 },
   detail: { top: 56, block: 120, panel: 200, farTop: 30, farHeight: 190, hero: '140%', margin: 6 },
 }
 
@@ -90,7 +92,7 @@ function ParallaxDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
     timeScale,
     onCycleEnd,
     interactive: size === 'detail',
-    durationMs: 7600,
+    durationMs: size === 'card' ? 4000 : 7600,
     stillPx: stillPx(size, back),
     returnTrip: true,
   })
@@ -329,7 +331,6 @@ export default defineTerm({
   useWhen: [
     'A hero or editorial opener, where a sense of depth sets the tone before the reading starts.',
     'Decorative backgrounds on marketing pages: shapes, illustration, photography behind a headline.',
-    'A product shot or illustration that should feel layered as the page opens.',
   ],
   avoidWhen: [
     'Content people read or act on, like text, forms and controls. Anything that drifts out of step with the scroll is harder to follow and to hit.',
@@ -347,21 +348,24 @@ export default defineTerm({
   prompt: (v) => {
     const { back, far } = ratios(v)
     const three = far !== undefined
+    // One word for the layer count, used the same way in every line.
+    const layers = three ? 'layers' : 'layer'
     return [
-      'Add parallax to the hero at the top of this page.',
+      "Add parallax to this page's top hero.",
       '',
-      '- Hero: `position: relative; overflow: clip; padding-top: 40vh` (the open top, where the layers show).',
-      '- Content: one in-flow panel after the padding, `position: relative`, opaque, full speed; it slides over the layers.',
-      `- ${three ? 'Two layers' : 'One layer'}: \`position: absolute; inset: 0\` (the hero's height), \`pointer-events: none\`, \`aria-hidden\`, before the content${three ? ', far first' : ''}.`,
+      '- Hero: `position: relative; overflow: clip; padding-top: 40vh`.',
+      `- Content: one opaque in-flow panel, \`position: relative\`, full speed, sliding over the ${layers}.`,
+      `- ${three ? 'Two layers, far first' : 'One layer'}: \`position: absolute; inset: 0\` (hero height), \`pointer-events: none\`, \`aria-hidden\`, before the content.`,
       three
         ? `- Ratios, set once as \`--ratio\` per layer: far \`${far}\`, back \`${back}\` (${back}px per 1px scrolled).`
         : `- Ratio, set once as \`--ratio\` on the layer: \`${back}\` (${back}px per 1px scrolled).`,
       "- Progress: 0 when the hero's top is at the viewport top, 1 when its bottom is; clamped.",
-      `- Layer: \`translate3d(0, progress × (1 − ratio) × 100%, 0)\` (${three ? `${shift(far)}% far, ${shift(back)}% back` : `${shift(back)}%`}), so n × (1 − ratio) px after n px. Linear, transform only, no \`background-attachment: fixed\`; \`will-change: transform\` in CSS, never toggled.`,
-      '- CSS route: `.hero { view-timeline: --hero block }`; layers `animation: parallax linear both`, then `animation-timeline: --hero; animation-range: exit-crossing` (shorthand first); `@keyframes parallax` to `translate3d(0, calc((1 - var(--ratio)) * 100%), 0)`.',
-      "- Feature-test `CSS.supports('animation-timeline', 'scroll()')` before first paint; if false, set `data-fallback` on `<html>`, JS route. Scope the CSS animation to `html:not([data-fallback])` inside `@supports (animation-timeline: scroll())`.",
-      '- JS route: passive `scroll` and `resize` listeners, one requestAnimationFrame; read the hero rect every frame; ratio from `--ratio`.',
-      '- Reduced motion: no animation, no transform. JS: while it matches, clear inline transforms and remove listeners; re-arm on `change`.',
+      `- ${three ? 'Each layer' : 'Layer'}: \`translate3d(0, progress × (1 − ratio) × 100%, 0)\` (${three ? `${shift(far)}% far, ${shift(back)}% back` : `${shift(back)}%`}), so n × (1 − ratio) px after n px. Linear; transform only; no \`background-attachment: fixed\`; static \`will-change: transform\`.`,
+      `- Visible while the ${layers} ${three ? 'peek' : 'peeks'} above the panel (first 40vh of scroll); more padding, longer window.`,
+      `- CSS route: \`.hero { view-timeline: --hero block }\`; \`animation: parallax linear both\`, then \`animation-timeline: --hero; animation-range: exit-crossing\` (shorthand first); \`@keyframes parallax\` to \`translate3d(0, calc((1 - var(--ratio)) * 100%), 0)\`.`,
+      "- Feature-test `CSS.supports('animation-timeline', 'scroll()')` before first paint; false: `data-fallback` on `<html>`, JS route. CSS animation only under `html:not([data-fallback])` in `@supports (animation-timeline: scroll())`.",
+      '- JS route (after the DOM exists: end of `<body>`, or after mount): passive `scroll`/`resize`, one requestAnimationFrame, hero rect per frame, ratio from `--ratio`.',
+      '- Reduced motion: no animation or transform; JS clears inline transforms and removes listeners while it matches, re-arming on `change`.',
     ].join('\n')
   },
   acceptance: (v) => {

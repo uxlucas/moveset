@@ -32,7 +32,7 @@ test.describe('Parallax', () => {
     await page.goto('/terms/parallax')
     await expect(prompt(page)).toContainText('Ratio, set once as `--ratio` on the layer: `0.4` (0.4px per 1px scrolled)')
     await expect(prompt(page)).toContainText('(60%), so n × (1 − ratio) px after n px')
-    await expect(prompt(page)).toContainText('padding-top: 40vh` (the open top, where the layers show)')
+    await expect(prompt(page)).toContainText('Visible while the layer peeks above the panel (first 40vh of scroll)')
     await expect(prompt(page)).not.toContainText('far')
     await option(page, 'Back layer speed', '0.2×').click()
     await expect(prompt(page)).toContainText('(80%), so n × (1 − ratio) px')
@@ -116,6 +116,26 @@ test.describe('Parallax', () => {
       return a - panel.getBoundingClientRect().top
     })
     expect(Math.abs(front - 100)).toBeLessThanOrEqual(1)
+  })
+
+  test("no text line straddles the hero's bottom edge, on the card or the entry page", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    // At the bottom of the scroll the hero's bottom edge is the window's bottom edge; the panel text is clipped there.
+    const straddling = (el: ReturnType<typeof scroller>) =>
+      el.evaluate(async (s) => {
+        s.scrollTop = s.scrollHeight
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        const edge = s.querySelector<HTMLElement>('[data-hero]')!.getBoundingClientRect().bottom
+        return [...s.querySelectorAll<HTMLElement>('[data-layer="front"] .rounded-full')]
+          .map((line) => line.getBoundingClientRect())
+          .filter((r) => r.top < edge && r.bottom > edge).length
+      })
+    await page.goto('/')
+    const cardScroller = card(page, 'parallax').locator('[data-scroller]')
+    await cardScroller.scrollIntoViewIfNeeded()
+    expect(await straddling(cardScroller)).toBe(0)
+    await page.goto('/terms/parallax')
+    expect(await straddling(scroller(page, 'parallax'))).toBe(0)
   })
 })
 
