@@ -1,0 +1,142 @@
+import { expect, test, type Page } from '@playwright/test'
+import { expectNoHorizontalOverflow, trackErrors } from './helpers'
+
+const card = (page: Page, slug: string) => page.locator(`[data-testid="term-card"][data-slug="${slug}"]`)
+const demo = (page: Page, slug: string) => page.locator(`main [data-demo="${slug}"]`)
+const scroller = (page: Page, slug: string) => demo(page, slug).locator('[data-scroller]')
+const prompt = (page: Page) => page.getByRole('main').locator('pre').first()
+const option = (page: Page, control: string, name: string) =>
+  page.getByRole('group', { name: control }).getByRole('button', { name, exact: true })
+
+for (const { slug, name } of [
+  { slug: 'parallax', name: 'Parallax' },
+  { slug: 'scroll-snap', name: 'Scroll Snap' },
+]) {
+  test(`${name}: the card links to its entry`, async ({ page }) => {
+    await page.goto('/')
+    await expect(card(page, slug).getByRole('link', { name })).toHaveAttribute('href', `/terms/${slug}`)
+  })
+
+  test(`${name}: the entry page renders`, async ({ page }) => {
+    const errors = trackErrors(page)
+    await page.goto(`/terms/${slug}`)
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+    await expect(scroller(page, slug)).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    expect(errors).toEqual([])
+  })
+}
+
+test.describe('Parallax', () => {
+  test('controls rewrite the prompt', async ({ page }) => {
+    await page.goto('/terms/parallax')
+    await expect(prompt(page)).toContainText('back 0.4 (moves 0.4px per 1px scrolled)')
+    await expect(prompt(page)).toContainText('progress × 60%, 0)')
+    await expect(prompt(page)).not.toContainText('far')
+    await option(page, 'Back layer speed', '0.2×').click()
+    await expect(prompt(page)).toContainText('progress × 80%, 0)')
+    await expect(prompt(page)).not.toContainText('back 0.4')
+    await option(page, 'Layers', '3').click()
+    await expect(prompt(page)).toContainText('Speed ratios: far 0.1, back 0.2')
+    await expect(prompt(page)).toContainText('progress × 90% (far) or 80% (back), 0)')
+    await expect(prompt(page)).not.toContainText('One layer')
+  })
+
+  test('the back layer moves scroll × ratio on screen, both ways', async ({ page }) => {
+    // Reduced motion keeps the demo on its still frame, so the scroll position is ours to set.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/terms/parallax')
+    await expect(demo(page, 'parallax')).toHaveAttribute('data-playing', 'false')
+    const el = scroller(page, 'parallax')
+    const measure = (layer: string, top: number) =>
+      el.evaluate(
+        async (s, [layer, top]) => {
+          const box = s.querySelector<HTMLElement>(`[data-layer="${layer}"]`)!
+          s.scrollTop = top as number
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+          const m = new DOMMatrix(getComputedStyle(box).transform)
+          return { screen: box.getBoundingClientRect().top - s.getBoundingClientRect().top, translate: m.f }
+        },
+        [layer, top] as const,
+      )
+
+    for (const [speed, layers, checks] of [
+      ['0.4×', '2', [['back', 0.4]]],
+      ['0.2×', '3', [['back', 0.2], ['far', 0.1]]],
+    ] as const) {
+      await option(page, 'Back layer speed', speed).click()
+      await option(page, 'Layers', layers).click()
+      for (const [layer, ratio] of checks) {
+        const start = await measure(layer, 0)
+        const down = await measure(layer, 100)
+        // On screen it has moved up 100 × ratio; its transform pushes it down the rest of the way.
+        expect(Math.abs(down.screen - start.screen - -100 * ratio)).toBeLessThanOrEqual(1)
+        expect(Math.abs(down.translate - 100 * (1 - ratio))).toBeLessThanOrEqual(1)
+        const back = await measure(layer, 0)
+        expect(Math.abs(back.screen - start.screen)).toBeLessThanOrEqual(1)
+      }
+    }
+    // The front panel moves at full speed.
+    const front = await el.evaluate(async (s) => {
+      const panel = s.querySelector<HTMLElement>('[data-layer="front"]')!
+      s.scrollTop = 0
+      await new Promise((r) => requestAnimationFrame(r))
+      const a = panel.getBoundingClientRect().top
+      s.scrollTop = 100
+      await new Promise((r) => requestAnimationFrame(r))
+      return a - panel.getBoundingClientRect().top
+    })
+    expect(Math.abs(front - 100)).toBeLessThanOrEqual(1)
+  })
+})
+
+test.describe('Scroll Snap', () => {
+  test('controls rewrite the prompt', async ({ page }) => {
+    await page.goto('/terms/scroll-snap')
+    await expect(prompt(page)).toContainText('`scroll-snap-type: y mandatory`; `padding-bottom: 48px`')
+    await expect(prompt(page)).toContainText("block: 'start'")
+    await option(page, 'Strictness', 'Proximity').click()
+    await expect(prompt(page)).toContainText('`scroll-snap-type: y proximity` (rests on a panel only when released near one)')
+    await expect(prompt(page)).not.toContainText('y mandatory')
+    await option(page, 'Align', 'Center').click()
+    await expect(prompt(page)).toContainText('`scroll-snap-align: center`')
+    await expect(prompt(page)).toContainText('`padding-block: 24px`, so the first and last panels can center')
+    await expect(prompt(page)).not.toContainText('padding-bottom')
+  })
+
+  test('the still frame rests on panel 3, and a stop at 1.4 panels settles on panel 2', async ({ page }) => {
+    // Reduced motion keeps the demo still, and while it is still the scroller snaps with real CSS.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/terms/scroll-snap')
+    await expect(demo(page, 'scroll-snap')).toHaveAttribute('data-playing', 'false')
+    const el = scroller(page, 'scroll-snap')
+    const offsetOf = (n: number) =>
+      el.evaluate((s, n) => {
+        const panel = s.querySelector<HTMLElement>(`[data-panel="${n}"]`)!
+        return panel.getBoundingClientRect().top - s.getBoundingClientRect().top
+      }, n)
+    await expect.poll(() => offsetOf(3)).toBe(0)
+    await expect(el).toHaveCSS('scroll-snap-type', 'y mandatory')
+    await el.evaluate((s) => {
+      const stride = s.querySelector<HTMLElement>('[data-panel="2"]')!.offsetTop - s.querySelector<HTMLElement>('[data-panel="1"]')!.offsetTop
+      s.scrollTop = 1.4 * stride
+      s.dispatchEvent(new Event('scrollend'))
+    })
+    await expect.poll(() => offsetOf(2).then(Math.abs)).toBeLessThanOrEqual(1)
+
+    await option(page, 'Strictness', 'Proximity').click()
+    // proximity is the default strictness, so the computed value drops it.
+    await expect(el).toHaveCSS('scroll-snap-type', 'y')
+  })
+
+  test('snapping is off while the demo drives the scroll and on once the visitor takes over', async ({ page }) => {
+    await page.goto('/terms/scroll-snap')
+    await expect(demo(page, 'scroll-snap')).toHaveAttribute('data-playing', 'true')
+    const el = scroller(page, 'scroll-snap')
+    await expect(el).toHaveCSS('scroll-snap-type', 'none')
+    await el.hover()
+    await page.mouse.wheel(0, 60)
+    await expect(el).toHaveAttribute('data-taken-over', 'true')
+    await expect(el).toHaveCSS('scroll-snap-type', 'y mandatory')
+  })
+})
