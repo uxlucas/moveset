@@ -61,6 +61,28 @@ test.describe('Scroll-triggered', () => {
     await page.waitForTimeout(300)
     expect(await states()).toEqual(Array(12).fill('true'))
   })
+
+  test('a control change restarts the cycle like Replay, leaving nothing scrolled past hidden', async ({ page }) => {
+    await page.goto('/terms/scroll-triggered')
+    await expect(demo(page, 'scroll-triggered')).toHaveAttribute('data-playing', 'true')
+    const el = scroller(page, 'scroll-triggered')
+    await el.hover()
+    await page.mouse.wheel(0, 40)
+    await expect(el).toHaveAttribute('data-taken-over', 'true')
+    await el.evaluate((s) => {
+      s.scrollTop = s.scrollHeight
+    })
+    await option(page, 'Easing', 'Ease-in-out').click()
+    await expect(el).toHaveAttribute('data-taken-over', 'false')
+    const hiddenAbove = () =>
+      el.evaluate((s) => {
+        const top = s.getBoundingClientRect().top
+        return [...s.querySelectorAll<HTMLElement>('[data-tile]')].filter((t) => t.getBoundingClientRect().bottom < top && t.dataset.in !== 'true').length
+      })
+    expect(await hiddenAbove()).toBe(0)
+    await page.waitForTimeout(2500)
+    expect(await hiddenAbove()).toBe(0)
+  })
 })
 
 test.describe('Scroll-linked', () => {
@@ -69,7 +91,7 @@ test.describe('Scroll-linked', () => {
     await expect(prompt(page)).toContainText('Add a reading progress bar that follows the scroll position of the page.')
     await option(page, 'Effect', 'Fade').click()
     await expect(prompt(page)).toContainText('Fade this figure in as the page scrolls')
-    await option(page, 'Range', 'Own section').click()
+    await option(page, 'Range', 'Element in view').click()
     await expect(prompt(page)).toContainText('`animation-range: entry`')
   })
 
@@ -93,6 +115,15 @@ test.describe('Scroll-linked', () => {
     await expect.poll(scaleX).toBeCloseTo(0.5, 1)
     await scrollTo(0)
     await expect.poll(scaleX).toBe(0)
+  })
+
+  test('the still frame shows a figure half way through its own range', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/terms/scroll-linked')
+    await option(page, 'Effect', 'Fade').click()
+    await option(page, 'Range', 'Element in view').click()
+    const figure = scroller(page, 'scroll-linked').locator('[data-figure]')
+    await expect.poll(() => figure.evaluate((f) => Number(getComputedStyle(f).opacity))).toBeCloseTo(0.5, 1)
   })
 })
 
