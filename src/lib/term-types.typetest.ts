@@ -42,3 +42,15 @@ defineTerm({ slug: 'x', name: 'X', category: 'misc', order: 1, status: 'draft', 
 
 // @ts-expect-error demo needs a label
 defineTerm({ slug: 'x', name: 'X', category: 'scroll', order: 1, status: 'draft', definition: 'X.', demo: { component: Demo } })
+
+// @ts-expect-error unknown slug
+defineTerm({ slug: 'x', name: 'X', category: 'scroll', order: 1, status: 'draft', definition: 'X.', demo: { component: Demo, label: 'x' }, confusedWith: [{ slug: 'not-a-term', difference: 'x' }] })
+
+defineTerm({
+  slug: 'x', name: 'X', category: 'scroll', order: 1, status: 'review', definition: 'X.',
+  demo: { component: Demo, label: 'x', controls },
+  aliases: [], description: 'd', useWhen: [], avoidWhen: [], a11y: 'a', related: ['sticky'],
+  prompt: () => 'p',
+  acceptance: () => [],
+  code: () => ({}),
+})
