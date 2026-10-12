@@ -42,6 +42,7 @@ function ControlField({ control, value, onChange }: { control: Control; value: C
           max={control.max}
           step={control.step}
           value={Number(value)}
+          aria-valuetext={`${value}${control.unit ?? ''}`}
           onChange={(e) => onChange(Number(e.target.value))}
           className="w-28 accent-[var(--ink)] pointer-coarse:h-11"
         />
