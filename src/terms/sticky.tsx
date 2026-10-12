@@ -28,7 +28,7 @@ function useStuckHeaders(rootRef: RefObject<HTMLElement | null>, offset: number)
         for (const entry of entries) {
           const header = entry.target.nextElementSibling as HTMLElement | null
           if (!header) continue
-          const above = entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0) + offset + 1
+          const above = entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0)
           header.dataset.stuck = String(!entry.isIntersecting && above)
         }
       },
@@ -47,6 +47,7 @@ function StickyDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
   return (
     <BrowserFrame scrollRef={scrollRef} size={size} label="Contact list with sticky letter headers">
       <div>
+        {values.offset > 0 && <div className="sticky top-0 z-20 border-b border-line bg-surface" style={{ height: values.offset }} />}
         {SECTIONS.map((section) => (
           <div key={section.letter}>
             <div data-sentinel="" className="h-px" />
@@ -54,7 +55,7 @@ function StickyDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
               data-sticky-header=""
               data-stuck="false"
               style={{ top: values.offset }}
-              className={`sticky z-10 border-b border-line bg-surface px-3 py-1 text-[10px] font-medium text-ink-muted transition-shadow duration-150 ease-[ease] ${values.shadow ? 'data-[stuck=true]:shadow-[0_1px_0_var(--line),0_4px_12px_oklch(0_0_0/0.06)]' : ''}`}
+              className={`sticky z-10 bg-surface px-3 py-1 text-[10px] font-medium text-ink-muted transition-shadow duration-150 ease-[ease] motion-reduce:transition-none ${values.shadow ? 'data-[stuck=true]:shadow-[0_1px_0_var(--line),0_4px_12px_oklch(0_0_0/0.06)]' : ''}`}
             >
               {section.letter}
             </div>
@@ -86,6 +87,11 @@ export default defineTerm({
     'header that stays at the top',
     'position sticky',
     'sticky table header',
+    'stuck header',
+    'header stays while scrolling',
+    'content scrolls under the header',
+    'sticky nav',
+    'section headers push each other',
   ],
   description:
     'Sticky is CSS position: sticky. The element sits in the normal flow until scrolling brings it to the offset you set, then it holds there until the end of its parent pushes it out. That last part is why section headers hand off to each other: each header only sticks inside its own section.',
@@ -104,67 +110,73 @@ export default defineTerm({
     [
       'Make the section headers in this list sticky.',
       '',
-      `- Give each section header \`position: sticky; top: ${v.offset}px;\` inside the list's own scroll container. Each header should only stick within its own section, so the next header pushes it up instead of overlapping it.`,
+      "- Wrap each header and its rows in their own element, with the header as that element's first child. Sticky only holds inside its parent, which is what lets the next header push the current one away instead of stacking on it.",
+      `- Give each section header \`position: sticky; top: ${v.offset}px;\`${v.offset > 0 ? ` (${v.offset}px is the height of the bar that stays above the list)` : ''} inside the list's own scroll container. Each header should only stick within its own section, so the next header pushes it up instead of overlapping it.`,
       '- Give headers an opaque background that matches the list, and a z-index above the rows, so rows never show through.',
-      '- Check every ancestor between the header and the scroll container: `overflow: hidden` or `overflow: auto` on any of them silently breaks sticky.',
+      '- Check every ancestor between the header and the scroll container: `overflow: hidden`, `overflow-x: hidden`, `overflow: auto` or `overflow: scroll` on any of them silently breaks sticky. Use `overflow: clip` when you need clipping.',
       `- Set \`scroll-padding-top\` on the scroll container to the header height plus ${v.offset}px, so rows focused with the keyboard are never hidden behind a stuck header.`,
       ...(v.shadow
         ? [
-            '- While a header is stuck, show a soft shadow under it: `box-shadow: 0 1px 0 var(--border), 0 4px 12px rgb(0 0 0 / 0.06)`, transitioned over 150ms with `ease`. Detect "stuck" with an IntersectionObserver watching a 1px sentinel element placed just above each header, not with a scroll listener.',
+            `- While a header is stuck, show a soft shadow under it: \`box-shadow: 0 1px 0 var(--border, rgb(0 0 0 / 0.08)), 0 4px 12px rgb(0 0 0 / 0.06)\`, transitioned over 150ms with \`ease\`. Detect "stuck" with an IntersectionObserver whose root is the list's scroll container and whose rootMargin is '-${v.offset + 1}px 0px 0px 0px', watching a 1px sentinel element placed just above each header. A header is stuck when its sentinel is not intersecting and sits above the root's top edge. Do not use a scroll listener.`,
             '- Under `prefers-reduced-motion: reduce`, drop the shadow transition so the shadow just appears.',
           ]
         : ["- Don't change the header's style when it is stuck."]),
       '- Keep the headers as real headings (h2 or h3) in DOM order.',
     ].join('\n'),
   acceptance: (v) => [
-    `While scrolling, each header pins ${v.offset}px from the top of the scroll container.`,
+    v.offset > 0
+      ? `While scrolling, each header pins directly under the ${v.offset}px bar at the top of the scroll container.`
+      : 'While scrolling, each header pins to the top of the scroll container.',
     'The next header pushes the current one up; they never overlap.',
     'No row content is visible through a stuck header.',
     v.shadow
       ? 'The shadow appears only while a header is stuck and goes away when it scrolls back into place.'
       : 'A stuck header looks the same as one in its normal place.',
-    'It works inside a nested scroll container, not only when the whole page scrolls.',
-    'Tabbing through rows never leaves the focused row hidden behind a stuck header.',
+    "Headers pin to the top of the list's own scroll area, not to the page.",
+    'Tabbing through rows, including Shift+Tab back up, never leaves the focused row hidden behind a stuck header.',
     'Screen readers read each header before its rows.',
   ],
   code: (v) => ({
     css: [
       '.list {',
       '  overflow-y: auto;',
-      `  scroll-padding-top: calc(var(--header-height) + ${v.offset}px);`,
+      `  scroll-padding-top: calc(32px + ${v.offset}px); /* header height + offset */`,
       '}',
       '',
       '.section-header {',
       '  position: sticky;',
       `  top: ${v.offset}px;`,
       '  z-index: 1;',
-      '  background: var(--surface); /* opaque, so rows never show through */',
+      '  background: var(--surface, #fff); /* opaque, so rows never show through */',
       ...(v.shadow
         ? [
             '  transition: box-shadow 150ms ease;',
             '}',
             '',
             '.section-header[data-stuck="true"] {',
-            '  box-shadow: 0 1px 0 var(--border), 0 4px 12px rgb(0 0 0 / 0.06);',
+            '  box-shadow: 0 1px 0 var(--border, rgb(0 0 0 / 0.08)), 0 4px 12px rgb(0 0 0 / 0.06);',
             '}',
             '',
             '@media (prefers-reduced-motion: reduce) {',
             '  .section-header { transition: none; }',
             '}',
+            '',
+            '.sentinel { height: 1px; }',
           ]
         : ['}']),
     ].join('\n'),
     ...(v.shadow
       ? {
           js: [
-            '// A 1px .sentinel sits just above each header.',
+            '// A 1px .sentinel (see the CSS) sits just above each header.',
             '// When it scrolls out of view, the header below it is stuck.',
+            '// A header pushed away by the next one keeps stuck=true; harmless for a shadow.',
             "const list = document.querySelector('.list')",
             'const io = new IntersectionObserver(',
             '  (entries) => {',
             '    for (const entry of entries) {',
             '      const header = entry.target.nextElementSibling',
-            `      const above = entry.boundingClientRect.top < entry.rootBounds.top + ${v.offset + 1}`,
+            '      const above = entry.boundingClientRect.top < entry.rootBounds.top',
             '      header.dataset.stuck = String(!entry.isIntersecting && above)',
             '    }',
             '  },',
@@ -184,6 +196,6 @@ export default defineTerm({
     },
   ],
   sources: [
-    { label: 'MDN — position: sticky', url: 'https://developer.mozilla.org/en-US/docs/Web/CSS/position#sticky_positioning' },
+    { label: 'MDN: position: sticky', url: 'https://developer.mozilla.org/en-US/docs/Web/CSS/position#sticky_positioning' },
   ],
 })

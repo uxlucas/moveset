@@ -25,3 +25,20 @@ test('reduced motion: nothing plays until asked', async ({ page }) => {
   await stickyCard(page).getByRole('button', { name: 'Play Sticky demo' }).click()
   await expect(demo).toHaveAttribute('data-playing', 'true')
 })
+
+test('headers report stuck state', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  const demo = stickyCard(page).locator('[data-demo="sticky"]')
+  await demo.scrollIntoViewIfNeeded()
+  const setScroll = (top: number) =>
+    demo.evaluate((el, y) => {
+      const scroller = [...el.querySelectorAll<HTMLElement>('*')].find((n) => n.scrollHeight > n.clientHeight && getComputedStyle(n).overflowY !== 'visible')
+      if (!scroller) throw new Error('no scroll container in demo')
+      scroller.scrollTop = y
+    }, top)
+  await setScroll(0)
+  await expect(demo.locator('[data-sticky-header]').first()).toHaveAttribute('data-stuck', 'false')
+  await setScroll(160)
+  await expect(demo.locator('[data-sticky-header][data-stuck="true"]').first()).toBeVisible()
+})
