@@ -35,10 +35,8 @@ const controls = [
 type V = ControlValues<typeof controls>
 type Easing = V['easing']
 
-// The observer measures the translated box, which sits 14px below the layout box while a card is
-// hidden, so a 0.1 threshold reveals a card when roughly 15% of it is visible.
-const THRESHOLD = 0.1
-const THRESHOLD_SEEN = 15
+// The observed card never moves (only its inner box does), so this is the share of the card on screen.
+const THRESHOLD = 0.15
 const TRAVEL = 14
 const STAGGER_MS = 60
 // Cards entering together step 60ms apart, at most 4 steps, so a fast jump never queues a long wave.
@@ -91,10 +89,12 @@ function visibleRatio(tile: HTMLElement, view: DOMRect) {
   return Math.max(0, Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top)) / r.height
 }
 
-// Reveals each tile once, when the observer sees 10% of its translated box (about 15% of the tile). The observer writes data-in on the
-// DOM node; no React state per tile. Tiles already in view when a cycle starts are shown without animating,
+// Reveals each tile once, the first time 15% of it is inside the scroller. The observer watches the outer
+// tile, which never moves, and writes data-in on it; the inner box animates. No React state per tile; no React state per tile. Tiles already in view when a cycle starts are shown without animating,
 // like cards on first paint. Off the play path (reduced motion before play, off-screen), it paints a still:
 // tiles in the upper part of the window are in, the ones below show as outlines of what comes next.
+const inner = (tile: HTMLElement) => tile.firstElementChild as HTMLElement
+
 function useReveals(
   rootRef: RefObject<HTMLDivElement | null>,
   pageRef: RefObject<HTMLDivElement | null>,
@@ -111,7 +111,7 @@ function useReveals(
     page.style.setProperty('--d', '0ms')
     for (const tile of tiles) {
       tile.dataset.ghost = 'false'
-      tile.style.transitionDelay = ''
+      inner(tile).style.transitionDelay = ''
     }
 
     if (!playing) {
@@ -141,7 +141,7 @@ function useReveals(
         const entering = entries.filter((e) => e.isIntersecting && e.intersectionRatio >= THRESHOLD)
         entering.forEach((entry, i) => {
           const tile = entry.target as HTMLElement
-          if (stagger) tile.style.transitionDelay = `${scaled(Math.min(i, MAX_STEPS) * STAGGER_MS, timeScale)}ms`
+          if (stagger) inner(tile).style.transitionDelay = `${scaled(Math.min(i, MAX_STEPS) * STAGGER_MS, timeScale)}ms`
           tile.dataset.in = 'true'
           io.unobserve(tile)
         })
@@ -186,10 +186,12 @@ function ScrollTriggeredDemo({ values, playing, replayKey, size, timeScale, onCy
               data-tile=""
               data-in="false"
               data-ghost="false"
-              className={`group relative rounded-md bg-demo-2 opacity-0 [transform:translateY(14px)] transition-[opacity,transform] duration-(--d) ease-(--e) data-[ghost=true]:bg-transparent data-[ghost=true]:opacity-100 data-[ghost=true]:shadow-[inset_0_0_0_1px_var(--demo-2)] data-[ghost=true]:[transform:none] data-[in=true]:opacity-100 data-[in=true]:[transform:none] ${detail ? 'h-24' : 'h-14'}`}
+              className={`group relative ${detail ? 'h-24' : 'h-14'}`}
             >
-              <span className={`absolute left-3 h-1.5 w-2/5 rounded-full bg-demo-subject group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-5' : 'bottom-4'}`} />
-              <span className={`absolute left-3 h-1.5 w-1/4 rounded-full bg-demo group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-2.5' : 'bottom-2'}`} />
+              <div className="absolute inset-0 rounded-md bg-demo-2 opacity-0 [transform:translateY(14px)] transition-[opacity,transform] duration-(--d) ease-(--e) group-data-[ghost=true]:bg-transparent group-data-[ghost=true]:opacity-100 group-data-[ghost=true]:shadow-[inset_0_0_0_1px_var(--demo-2)] group-data-[ghost=true]:[transform:none] group-data-[in=true]:opacity-100 group-data-[in=true]:[transform:none]">
+                <span className={`absolute left-3 h-1.5 w-2/5 rounded-full bg-demo-subject group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-5' : 'bottom-4'}`} />
+                <span className={`absolute left-3 h-1.5 w-1/4 rounded-full bg-demo group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-2.5' : 'bottom-2'}`} />
+              </div>
             </div>
           ))}
         </div>
@@ -216,15 +218,17 @@ function cssCode(v: V): string {
   const easing = EASING[v.easing]
   return [
     ...(easing.token ? [`:root { ${easing.token}: ${TOKENS[easing.token]}; }`, ''] : []),
-    '/* The JS tab adds .js only after marking the cards already in view, so the',
+    '/* Markup: <div class="reveal"><div class="reveal-inner">…</div></div>',
+    '   The observer watches .reveal, which never moves; .reveal-inner animates.',
+    '   The JS tab adds .js only after marking the cards already in view, so the',
     '   first screen is never hidden, and with JavaScript off nothing is. */',
-    '.js .reveal:not([data-in="true"]) {',
+    '.js .reveal:not([data-in="true"]) > .reveal-inner {',
     '  opacity: 0;',
     `  transform: translateY(${TRAVEL}px);`,
     '}',
     '',
     '/* The transition lives on the revealed state only, so hiding is instant. */',
-    '.js .reveal[data-in="true"] {',
+    '.js .reveal[data-in="true"] > .reveal-inner {',
     '  transition-property: opacity, transform;',
     `  transition-duration: ${v.duration}ms;`,
     ...(v.easing === 'spring'
@@ -239,16 +243,16 @@ function cssCode(v: V): string {
     '}',
     '',
     '@media (prefers-reduced-motion: reduce) {',
-    '  .js .reveal:not([data-in="true"]) { transform: none; }',
-    '  .js .reveal[data-in="true"] {',
+    '  .js .reveal:not([data-in="true"]) > .reveal-inner { transform: none; }',
+    '  .js .reveal[data-in="true"] > .reveal-inner {',
     '    transition-property: opacity;',
     '    transition-duration: 150ms;',
     '  }',
     '}',
     '',
     '@media print {',
-    '  .js .reveal:not([data-in="true"]) { opacity: 1; transform: none; }',
-    '  .js .reveal { transition: none !important; }',
+    '  .js .reveal:not([data-in="true"]) > .reveal-inner { opacity: 1; transform: none; }',
+    '  .js .reveal-inner { transition: none !important; }',
     '}',
   ].join('\n')
 }
@@ -262,19 +266,20 @@ function jsCode(v: V): string {
       ? ["const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches"]
       : ['// Under prefers-reduced-motion the CSS drops the movement.']),
     '',
+    '// The card is observed and gets data-in; its .reveal-inner is what animates.',
     'function show(card, delay = 0) {',
     '  if (delay) {',
-    '    card.style.transitionDelay = `${delay}ms`',
+    "    const inner = card.querySelector('.reveal-inner')",
+    '    inner.style.transitionDelay = `${delay}ms`',
     "    // Clear it afterwards, so later transitions on the card don't inherit it.",
-    "    const clear = () => (card.style.transitionDelay = '')",
-    "    card.addEventListener('transitionend', clear, { once: true })",
+    "    const clear = () => (inner.style.transitionDelay = '')",
+    "    inner.addEventListener('transitionend', clear, { once: true })",
     '  }',
     "  card.dataset.in = 'true'",
     '  io.unobserve(card) // once',
     '}',
     '',
-    `// threshold ${THRESHOLD}: the observer measures the translated box (${TRAVEL}px lower),`,
-    `// so a card reveals when roughly ${THRESHOLD_SEEN}% of it is visible.`,
+    `// The card itself never moves, so threshold ${THRESHOLD} means ${THRESHOLD * 100}% of it on screen.`,
     'const io = new IntersectionObserver(',
     '  (entries) => {',
     '    // The first callback reports every observed card; later ones only the',
@@ -299,12 +304,11 @@ function jsCode(v: V): string {
     'function showOnScreen() {',
     "  const cards = [...document.querySelectorAll('.reveal:not([data-in=\"true\"])')]",
     '  const onScreen = cards.filter((card) => card.getBoundingClientRect().top < innerHeight)',
-    '  for (const card of onScreen) {',
-    "    card.style.transition = 'none'",
-    '    show(card)',
-    '  }',
+    "  const inners = onScreen.map((card) => card.querySelector('.reveal-inner'))",
+    "  for (const inner of inners) inner.style.transition = 'none'",
+    '  for (const card of onScreen) show(card)',
     '  document.body.offsetWidth // commit the shown state before transitions come back',
-    "  for (const card of onScreen) card.style.transition = ''",
+    "  for (const inner of inners) inner.style.transition = ''",
     '}',
     '',
     'showOnScreen()',
@@ -334,13 +338,13 @@ function motionCode(v: V): string {
     `// and after ${FAILSAFE_MS / 1000}s if the bundle never hydrates. If hydration takes longer`,
     `// than ${FAILSAFE_MS / 1000}s, the failsafe stays on: cards show without animating.`,
     '//   <noscript>',
-    '//     <style>.reveal { opacity: 1 !important; transform: none !important; }</style>',
+    '//     <style>.reveal-inner { opacity: 1 !important; transform: none !important; }</style>',
     '//   </noscript>',
     '//   <style>',
-    '//     .reveal-failsafe .reveal { opacity: 1 !important; transform: none !important; }',
+    '//     .reveal-failsafe .reveal-inner { opacity: 1 !important; transform: none !important; }',
     '//     @media print {',
-    '//       .reveal { opacity: 1 !important; transform: none !important;',
-    '//                 transition: none !important; }',
+    '//       .reveal-inner { opacity: 1 !important; transform: none !important;',
+    '//                       transition: none !important; }',
     '//     }',
     '//   </style>',
     '//   <script>',
@@ -406,14 +410,13 @@ function motionCode(v: V): string {
     ...(v.stagger ? ['  const delay = useRef<number>(undefined)'] : []),
     '  const [focused, setFocused] = useState(false)',
     '  return (',
+    `    // The outer div is observed and never moves, so amount ${THRESHOLD} is ${THRESHOLD * 100}% of the`,
+    '    // card on screen. Its variant labels pass down to the inner div, which animates.',
     '    <motion.div',
     '      className="reveal"',
-    '      variants={variants}',
-    ...(v.stagger ? ['      custom={delay}'] : []),
     "      initial={above ? false : 'hidden'}",
     "      whileInView={above ? undefined : 'shown'}",
     "      animate={focused ? 'shown' : undefined}",
-    `      // amount ${THRESHOLD}: Motion measures the translated box, so about ${THRESHOLD_SEEN}% visible.`,
     `      viewport={{ once: true, amount: ${THRESHOLD} }}`,
     '      // Focus can land in a card before it reaches that line: reveal it now.',
     ...(v.stagger
@@ -425,7 +428,9 @@ function motionCode(v: V): string {
         ]
       : ['      onFocus={() => setFocused(true)}']),
     '    >',
-    '      {children}',
+    `      <motion.div className="reveal-inner" variants={variants}${v.stagger ? ' custom={delay}' : ''}>`,
+    '        {children}',
+    '      </motion.div>',
     '    </motion.div>',
     '  )',
     '}',
@@ -474,27 +479,27 @@ export default defineTerm({
         ? `${ms === 800 ? 'an' : 'a'} ${ms}ms${DURATION_TAG[v.duration]} spring, bounce 0.2 (CSS: \`${SPRING_LINEAR}\`; ${compare})`
         : `${ms}ms${DURATION_TAG[v.duration]} \`${EASING[v.easing].css}\`${v.easing === 'out' ? '' : ` (${compare})`}`
     return [
-      'Reveal the cards in this grid as they scroll into view, once each.',
+      'Reveal each card in this grid once, as it scrolls into view.',
       '',
-      `- Reveal: \`opacity: 0\` to \`1\`, \`translateY(${TRAVEL}px)\` to \`none\`, ${timing}. Transition only those two, named. Once.`,
-      '- One IntersectionObserver, `threshold: 0.1` (the observer measures the translated box, so cards reveal at roughly 15% visible), no scroll listener. On intersect: set `data-in="true"`, `unobserve`.',
+      `- Reveal: \`opacity: 0\` to \`1\`, \`translateY(${TRAVEL}px)\` to \`none\`, ${timing}. Transition only those two.`,
+      '- Observe the card itself with `threshold: 0.15` and animate an inner wrapper, so the observed box never moves. No scroll listener; on intersect, set `data-in="true"` and `unobserve`.',
       v.stagger
         ? `- Each callback: keep \`isIntersecting\` entries not yet revealed (by focus or first paint), in DOM order; delay = min(index, ${MAX_STEPS}) × ${STAGGER_MS}ms. Set at reveal; clear on \`transitionend\`.`
         : '- Each callback: keep `isIntersecting` entries not yet revealed (by focus or first paint). No stagger.',
-      '- First paint: cards with any pixel on screen at load (also after a `#hash` jump) show without animating. Run the first-paint pass at DOMContentLoaded and again at `load` (hash jumps apply at `load`), writing `data-in` with `transition: none` inline for that pass.',
-      '- Observer script (end of <body> or deferred): first set `data-in="true"` on those and on cards scrolled past, then add `js` to <html>. Hidden state: `.js .reveal:not([data-in="true"])`; transition on the revealed state only.',
-      '- Cards stay in the initial HTML (server-rendered or static markup) and keep their space while hidden.',
+      '- First paint: cards with any pixel on screen at load (also after a `#hash` jump) show without animating: run the pass at DOMContentLoaded and again at `load`, setting `data-in` with inline `transition: none`.',
+      '- Observer script (end of <body> or deferred): mark those and cards scrolled past with `data-in="true"`, then add `js` to <html>. Hidden state: `.js .reveal:not([data-in="true"]) > .reveal-inner`; transition on the revealed state only.',
+      '- Cards are in the initial HTML (server-rendered or static markup), keeping their space.',
       '- `focusin` on an unrevealed card: reveal now, no delay.',
       '- `@media print`: all cards visible, no transition.',
       v.stagger
-        ? '- Reduced motion: no transform, opacity over 150ms, no JS delays (read the media query in the callback).'
+        ? '- Reduced motion: no transform, opacity over 150ms, no JS delays (media query read per callback).'
         : '- Reduced motion: no transform, opacity over 150ms.',
     ].join('\n')
   },
 
   acceptance: (v) => [
     'Cards in view when the page loads are visible from the first frame and do not animate.',
-    'Each card below animates the first time it is about 15% inside the viewport (within 5 points; the observer measures the translated box), then stays.',
+    'Each card below animates the first time it is about 15% inside the viewport, then stays.',
     'Scrolling back up never replays a card that has already revealed.',
     `One card takes ${v.duration}ms from hidden to rest.`,
     v.stagger

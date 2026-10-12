@@ -90,7 +90,7 @@ test.describe('Scroll-triggered', () => {
       return [...s.querySelectorAll<HTMLElement>('[data-tile]')].filter((t) => {
         const r = t.getBoundingClientRect()
         const seen = Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top)
-        return seen >= r.height * 0.15 && (t.dataset.in !== 'true' || t.style.transitionDelay !== '')
+        return seen >= r.height * 0.15 && (t.dataset.in !== 'true' || (t.firstElementChild as HTMLElement).style.transitionDelay !== '')
       }).length
     })
     expect(waitingInView).toBe(0)
