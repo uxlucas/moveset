@@ -177,6 +177,11 @@
     animation-name: g-eout;
     animation-duration: 2s;
   }
+  /* A to B and back, accelerating and braking each way. */
+  .gl[data-glyph='ease-in-out'][data-active='true'] .m {
+    animation-name: g-eio;
+    animation-timing-function: var(--ease-in-out);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .gl .m {
@@ -218,6 +223,11 @@
   92% { transform: translateX(3px); opacity: 0; }
   93% { transform: translateX(-3px); opacity: 0; }
   100% { transform: translateX(-3px); opacity: 1; }
+}
+@keyframes g-eio {
+  0%, 10% { transform: translateX(-2.5px); }
+  45%, 60% { transform: translateX(2.5px); }
+  95%, 100% { transform: translateX(-2.5px); }
 }
 
 /* Site chrome goes still under reduced motion. Demos handle it themselves (play on request). */
