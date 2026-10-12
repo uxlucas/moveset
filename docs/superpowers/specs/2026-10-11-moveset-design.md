@@ -145,7 +145,7 @@ The site owns playback. A demo only has to respect these props.
 
 ### Layout (desktop)
 - Left sidebar, centered content column (~680px), quiet header: lowercase "moveset" placeholder wordmark on the left, text theme toggle on the right (System → Light → Dark).
-- Sidebar: categories in order, each with a small icon in its own hue and its terms below. Published terms link, the current one is marked. Drafts are muted, not clickable, with a "Soon" pill.
+- Sidebar: an Index row, then categories in order, each a label with a written count ("1 / 8") and its terms below. Every term has a 12px wireframe glyph that loops only on the current term; a highlight slides to the current row, and on the index it follows the card being read (scroll-spy). Drafts are muted and not clickable, with a dashed glyph. About and GitHub live in the footer. See `docs/decisions/2026-10-12-sidebar.md`.
 - Mobile: the sidebar goes away. Filter pills plus search take over navigation. The pill row scrolls sideways with a scroll fade on the edge that has more content.
 
 ### Index (`/`)
@@ -203,7 +203,7 @@ These are starting defaults. Lucas reviews the first milestone in the browser an
 - Hover motion only under `@media (hover: hover) and (pointer: fine)`.
 
 ### Site chrome motion (the full list)
-Copy → check icon swap, press feedback on buttons, 150ms hover color changes, card hover darkens the border (no lift). No page transitions, no scroll reveals.
+Copy → check icon swap, press feedback on buttons, 150ms hover color changes, card hover darkens the border (no lift), the sidebar highlight sliding to the current item (300ms ease-out) and the current term's 12px glyph loop. No page transitions, no scroll reveals.
 
 ### Interface basics (from Rauno's guidelines)
 Focus rings via `outline` with offset (it follows radius in current browsers); hit areas ≥ 44px on touch; search input ≥ 16px; `pointer-events: none` on decorative layers; `::selection` styled; icon-only buttons have `aria-label`; looping animation paused off-screen.
