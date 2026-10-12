@@ -45,3 +45,8 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 !.env.development
+
+# generated agent outputs (skills/ is committed)
+/public/llms.txt
+/public/terms/
+/public/api/
