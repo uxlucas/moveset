@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { expectNoHorizontalOverflow, trackErrors } from './helpers'
 
 const scroller = (page: Page) => page.locator('main [data-demo="sticky"] [data-scroller]')
+const offsetOption = (page: Page, label: string) => page.getByRole('group', { name: 'Top offset' }).getByRole('button', { name: label })
 
 test('entry sections appear in the specified order', async ({ page }) => {
   const errors = trackErrors(page)
@@ -17,12 +18,9 @@ test('controls rewrite the prompt and the checklist', async ({ page }) => {
   await page.goto('/terms/sticky')
   const prompt = page.getByRole('main').locator('pre').first()
   await expect(prompt).toContainText('top: 0px')
-  const slider = page.getByLabel('Top offset')
-  await slider.focus()
-  await slider.press('ArrowRight')
-  await slider.press('ArrowRight')
-  await expect(prompt).toContainText('top: 8px')
-  await expect(page.getByText('each header pins directly under the 8px bar')).toBeVisible()
+  await offsetOption(page, '24px').click()
+  await expect(prompt).toContainText('top: 24px')
+  await expect(page.getByText('each header pins directly under the 24px bar')).toBeVisible()
   await page.getByRole('switch', { name: 'Shadow when stuck' }).click()
   await expect(prompt).toContainText("Don't change the header's style when it is stuck.")
 })
@@ -39,9 +37,7 @@ test('copy as prompt copies prompt, checklist and link', async ({ page, context 
 
 test('the demo really sticks at the chosen offset', async ({ page }) => {
   await page.goto('/terms/sticky')
-  await page.getByLabel('Top offset').focus()
-  await page.getByLabel('Top offset').press('ArrowRight')
-  await page.getByLabel('Top offset').press('ArrowRight')
+  await offsetOption(page, '24px').click()
   // Takeover listeners attach only while the demo is playing.
   await expect(page.locator('main [data-demo="sticky"]')).toHaveAttribute('data-playing', 'true')
   await scroller(page).hover()
@@ -57,10 +53,43 @@ test('the demo really sticks at the chosen offset', async ({ page }) => {
       scroller(page).evaluate((el) => {
         const top = el.getBoundingClientRect().top
         const stuck = [...el.querySelectorAll<HTMLElement>('[data-sticky-header][data-stuck="true"]')].map((h) => h.getBoundingClientRect().top - top)
-        return Math.min(...stuck.map((d) => Math.abs(d - 8)))
+        return Math.min(...stuck.map((d) => Math.abs(d - 24)))
       }),
     )
     .toBeLessThanOrEqual(1)
+})
+
+test('stuck state follows one-step jumps both ways', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/terms/sticky')
+  const header = (letter: string) => scroller(page).locator(`[data-section="${letter}"] [data-sticky-header]`)
+  const jump = (y: number) =>
+    scroller(page).evaluate((el, top) => {
+      el.scrollTop = top
+    }, y)
+  await jump(0)
+  await expect(header('A')).toHaveAttribute('data-stuck', 'false')
+  await expect(header('B')).toHaveAttribute('data-stuck', 'false')
+  // One write from the top to past B's natural top: B pins, A is pushed fully out.
+  const pastB = await scroller(page).evaluate((el) => el.querySelector<HTMLElement>('[data-section="B"]')!.offsetTop + 40)
+  await jump(pastB)
+  await expect(header('B')).toHaveAttribute('data-stuck', 'true')
+  await expect(header('A')).toHaveAttribute('data-stuck', 'false')
+  await jump(0)
+  await expect(header('B')).toHaveAttribute('data-stuck', 'false')
+  await expect(header('A')).toHaveAttribute('data-stuck', 'false')
+  // From out of view below straight to pinned: the case a sentinel never sees.
+  const pastD = await scroller(page).evaluate((el) => el.querySelector<HTMLElement>('[data-section="D"]')!.offsetTop + 40)
+  await jump(pastD)
+  await expect(header('D')).toHaveAttribute('data-stuck', 'true')
+  // From half under the bottom edge straight to pinned.
+  const straddle = await scroller(page).evaluate((el) => el.querySelector<HTMLElement>('[data-section="C"]')!.offsetTop - el.clientHeight + 10)
+  const pastC = await scroller(page).evaluate((el) => el.querySelector<HTMLElement>('[data-section="C"]')!.offsetTop + 40)
+  await jump(straddle)
+  await expect(header('C')).toHaveAttribute('data-stuck', 'false')
+  await jump(pastC)
+  await expect(header('C')).toHaveAttribute('data-stuck', 'true')
+  await expect(header('D')).toHaveAttribute('data-stuck', 'false')
 })
 
 test('scrolling the demo takes over; replay hands it back', async ({ page }) => {
