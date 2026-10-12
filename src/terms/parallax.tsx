@@ -30,16 +30,28 @@ const controls = [
 
 type V = ControlValues<typeof controls>
 
-// Still frame: the panel has slid over about a third of the blocks, which have moved up but are still whole.
-const STILL_PX = { card: 50, detail: 92 }
-
 // The far layer, when there is one, moves at half the back layer's speed.
 const ratios = (v: V) => {
   const back = Number(v.depth)
   return { back, far: v.layers === '3' ? back / 2 : undefined }
 }
-// Each layer scrolls with the hero; pushing it down by (1 - ratio) of the scroll leaves it moving ratio × the scroll.
+// Each layer scrolls with the hero; pushing it down (1 - ratio) of the scroll leaves it moving ratio × the scroll.
 const shift = (ratio: number) => +((1 - ratio) * 100).toFixed(1)
+
+// Demo geometry in px: the blocks' top and height, where the front panel starts, the far slab, and the hero's
+// height in windows. The travel is short enough that at the bottom of the scroll, at 0.2× (where the panel covers
+// the blocks soonest), about a third of a block still shows, so the turn of the return trip is on screen.
+const GEOMETRY = {
+  card: { top: 28, block: 48, panel: 88, farTop: 14, farHeight: 90, hero: '135%', margin: 4 },
+  detail: { top: 56, block: 120, panel: 200, farTop: 30, farHeight: 190, hero: '140%', margin: 6 },
+}
+
+// Still frame: the panel covers about a third of the blocks, unless that would push the blocks' top out of view
+// (at 0.6× the panel catches up slowly); then the blocks rest just inside the top edge.
+function stillPx(size: DemoProps['size'], ratio: number) {
+  const g = GEOMETRY[size]
+  return Math.round(Math.min((g.panel - g.top - 0.65 * g.block) / (1 - ratio), (g.top - g.margin) / ratio))
+}
 
 // Line widths (%) per paragraph of the front panel.
 const PARAGRAPHS = [
@@ -71,6 +83,7 @@ function useParallax(rootRef: RefObject<HTMLDivElement | null>, { depth, layers 
 
 function ParallaxDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }: DemoProps<V>) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const { back, far } = ratios(values)
   useAutoScroll(scrollRef, {
     playing,
     replayKey,
@@ -78,32 +91,34 @@ function ParallaxDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
     onCycleEnd,
     interactive: size === 'detail',
     durationMs: 7600,
-    stillPx: STILL_PX[size],
+    stillPx: stillPx(size, back),
     returnTrip: true,
   })
   useParallax(scrollRef, values)
-  const { back, far } = ratios(values)
   const detail = size === 'detail'
+  const g = GEOMETRY[size]
   const layer = 'pointer-events-none absolute inset-0 will-change-transform'
 
   return (
     <BrowserFrame scrollRef={scrollRef} size={size} label="Page whose background blocks scroll slower than the text panel in front">
-      {/* The page is the hero: 1.85 windows tall, so the front panel slides most of the way over the blocks. */}
-      <div data-hero="" className="relative flex min-h-[185%] flex-col overflow-clip">
+      {/* The page is the hero, a fixed share of the window so the travel stays short. Its top is open, so the layers
+          show until the panel slides over them; the panel's text runs on past the hero's bottom edge, clipped. */}
+      <div data-hero="" style={{ height: g.hero }} className="relative flex flex-col overflow-clip">
         {far !== undefined && (
           <div data-layer="far" data-ratio={far} aria-hidden className={layer}>
-            <div className={`rounded-lg bg-demo ${detail ? 'mx-5 mt-7 h-[200px]' : 'mx-3 mt-3 h-24'}`} />
+            <div style={{ marginTop: g.farTop, height: g.farHeight }} className={`rounded-lg bg-demo ${detail ? 'mx-5' : 'mx-3'}`} />
           </div>
         )}
         <div data-layer="back" data-ratio={back} aria-hidden className={layer}>
-          <div className={`grid grid-cols-2 ${detail ? 'gap-4 px-10 pt-12' : 'gap-2.5 px-5 pt-6'}`}>
-            <div className={`rounded-md bg-demo-subject ${detail ? 'h-28' : 'h-[52px]'}`} />
-            <div className={`rounded-md bg-demo-subject ${detail ? 'h-28' : 'h-[52px]'}`} />
+          <div style={{ paddingTop: g.top }} className={`grid grid-cols-2 ${detail ? 'gap-4 px-10' : 'gap-2.5 px-5'}`}>
+            <div style={{ height: g.block }} className="rounded-md bg-demo-subject" />
+            <div style={{ height: g.block }} className="rounded-md bg-demo-subject" />
           </div>
         </div>
         <div
           data-layer="front"
-          className={`relative flex-1 rounded-t-xl bg-surface shadow-[0_-1px_0_var(--line),0_-8px_20px_oklch(0_0_0/0.06)] ${detail ? 'mt-[176px] px-6 pt-5' : 'mt-[88px] px-3.5 pt-3'}`}
+          style={{ marginTop: g.panel }}
+          className={`relative flex-1 rounded-t-xl bg-surface shadow-[0_-1px_0_var(--line),0_-8px_20px_oklch(0_0_0/0.06)] ${detail ? 'px-6 pt-5' : 'px-3.5 pt-3'}`}
         >
           <div className={`w-1/2 rounded-full bg-demo-2 ${detail ? 'mb-4 h-3' : 'mb-2.5 h-2'}`} />
           {PARAGRAPHS.map((widths, i) => (
@@ -128,7 +143,7 @@ function ParallaxGlyph({ active }: GlyphProps) {
   )
 }
 
-const HOUSE_RULE = 'House rule: decorative scroll-linked motion goes flat under reduced motion.'
+const HOUSE_RULE = 'House rule: parallax drops the speed difference under reduced motion.'
 
 function cssCode(v: V): string {
   const { back, far } = ratios(v)
@@ -142,29 +157,31 @@ function cssCode(v: V): string {
     '  position: relative;',
     '  /* Moved layers never paint below the hero or make the page taller. */',
     '  overflow: clip;',
+    '  /* The open top, where the layers show above the content. */',
+    '  padding-top: 40vh;',
     '  view-timeline: --hero block;',
     '}',
     '',
     '.layer {',
     '  position: absolute;',
-    '  inset: 0;',
+    '  inset: 0; /* the hero\'s height, so 100% in the keyframes is the hero too */',
     '  pointer-events: none;',
-    '  will-change: transform; /* set once: the layers move for the whole hero */',
+    '  will-change: transform; /* set here once, never toggled */',
     '}',
     '',
-    '/* A layer scrolls with the hero; pushing it down (1 - ratio) of the scroll',
-    '   leaves it moving ratio x the scroll. % is of its own height: the hero. */',
-    ...(far !== undefined ? [`.layer-far { --shift: ${shift(far)}%; } /* ratio ${far} */`] : []),
-    `.layer-back { --shift: ${shift(back)}%; } /* ratio ${back} */`,
+    '/* Speed ratio: the layer moves ratio x the scroll. Set only here;',
+    '   the JS tab reads it back. */',
+    ...(far !== undefined ? [`.layer-far { --ratio: ${far}; }`] : []),
+    `.layer-back { --ratio: ${back}; }`,
     '',
-    '/* In front, at full speed. Opaque, so the layers pass behind it. */',
+    '/* In front, at full speed. Opaque, so it slides over the layers. */',
     '.hero-content {',
     '  position: relative;',
     '  background: var(--surface, #fff);',
     '}',
     '',
     `/* ${HOUSE_RULE}`,
-    '   For parallax that means no speed difference: no animation at all. */',
+    '   Every layer moves with the content: no animation at all. */',
     '@media (prefers-reduced-motion: no-preference) {',
     '  /* Same test as the JS tab, which sets data-fallback when it takes over. */',
     '  @supports (animation-timeline: scroll()) {',
@@ -179,50 +196,62 @@ function cssCode(v: V): string {
     '  }',
     '}',
     '',
+    '/* The layer scrolls with the hero; pushing it down (1 - ratio) of the',
+    '   scroll leaves it moving ratio x the scroll on screen. */',
     '@keyframes parallax {',
     '  from { transform: translate3d(0, 0, 0); }',
-    '  to { transform: translate3d(0, var(--shift), 0); }',
+    '  to { transform: translate3d(0, calc((1 - var(--ratio)) * 100%), 0); }',
     '}',
   ].join('\n')
 }
 
-function jsCode(v: V): string {
-  const { back, far } = ratios(v)
+function jsCode(): string {
   return [
     '// Load at the end of `<body>`: the hero exists, and the test runs before it paints.',
     '// Same test as the CSS @supports, so the two routes never both run.',
     "const supported = CSS.supports('animation-timeline', 'scroll()')",
-    `// ${HOUSE_RULE}`,
-    "const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches",
     "const hero = document.querySelector('.hero')",
     '',
-    'if (hero && !supported && !reduce) {',
+    'if (hero && !supported) {',
     "  document.documentElement.dataset.fallback = ''",
-    '  // [layer, speed ratio]',
-    '  const layers = [',
-    ...(far !== undefined ? [`    [hero.querySelector('.layer-far'), ${far}],`] : []),
-    `    [hero.querySelector('.layer-back'), ${back}],`,
-    '  ]',
+    "  const layers = [...hero.querySelectorAll('.layer')]",
+    '  // The ratio lives in the CSS (--ratio), so both routes share one value.',
+    '  const ratios = layers.map((l) => parseFloat(getComputedStyle(l).getPropertyValue(\'--ratio\')))',
+    `  // ${HOUSE_RULE}`,
+    "  const reduce = matchMedia('(prefers-reduced-motion: reduce)')",
     '  let frame = 0',
     '',
     '  const render = () => {',
     '    frame = 0',
-    '    // Pixels the hero has scrolled past the viewport top, 0 to its height.',
+    '    // Read every frame, never cached: resizes and late content change it.',
     '    const box = hero.getBoundingClientRect()',
+    '    // Pixels the hero has scrolled past the viewport top, 0 to its height.',
     '    const n = Math.min(Math.max(-box.top, 0), box.height)',
-    '    // The layer scrolls n with the hero; pushing it down n x (1 - ratio)',
-    '    // leaves it moving n x ratio on screen.',
-    '    for (const [layer, ratio] of layers) {',
-    '      layer.style.transform = `translate3d(0, ${n * (1 - ratio)}px, 0)`',
-    '    }',
+    '    layers.forEach((layer, i) => {',
+    '      layer.style.transform = `translate3d(0, ${n * (1 - ratios[i])}px, 0)`',
+    '    })',
     '  }',
     '  const schedule = () => {',
     '    if (!frame) frame = requestAnimationFrame(render)',
     '  }',
     '',
-    "  addEventListener('scroll', schedule, { passive: true })",
-    "  addEventListener('resize', schedule)",
-    '  render()',
+    '  // Armed while motion is allowed; flat (no listeners, no transform) while',
+    '  // reduced motion is on. Follows the setting live.',
+    '  const arm = () => {',
+    '    if (reduce.matches) {',
+    "      removeEventListener('scroll', schedule)",
+    "      removeEventListener('resize', schedule)",
+    '      cancelAnimationFrame(frame)',
+    '      frame = 0',
+    "      for (const layer of layers) layer.style.transform = ''",
+    '    } else {',
+    "      addEventListener('scroll', schedule, { passive: true })",
+    "      addEventListener('resize', schedule)",
+    '      render()',
+    '    }',
+    '  }',
+    "  reduce.addEventListener('change', arm)",
+    '  arm()',
     '}',
   ].join('\n')
 }
@@ -234,6 +263,12 @@ function motionCode(v: V): string {
     "import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'",
     "import { useRef, type ReactNode } from 'react'",
     '',
+    '// Speed ratios: a layer moves ratio x the scroll; the content moves 1x.',
+    ...(three ? [`const FAR = ${far}`] : []),
+    `const BACK = ${back}`,
+    '// The layer scrolls with the hero; pushing it down (1 - ratio) of its height,',
+    "// which is the hero's, leaves it moving ratio x the scroll on screen.",
+    'const shift = (ratio: number) => `${(1 - ratio) * 100}%`',
     "const layer = 'pointer-events-none absolute inset-0 will-change-transform'",
     '',
     'type Props = {',
@@ -249,14 +284,13 @@ function motionCode(v: V): string {
     '    target: ref,',
     "    offset: ['start start', 'end start'],",
     '  })',
-    '  // A layer scrolls with the hero; pushing it down (1 - ratio) of its height',
-    '  // leaves it moving ratio x the scroll on screen.',
-    ...(three ? [`  const farY = useTransform(scrollYProgress, [0, 1], ['0%', '${shift(far)}%']) // ratio ${far}`] : []),
-    `  const backY = useTransform(scrollYProgress, [0, 1], ['0%', '${shift(back)}%']) // ratio ${back}`,
+    ...(three ? ["  const farY = useTransform(scrollYProgress, [0, 1], ['0%', shift(FAR)])"] : []),
+    "  const backY = useTransform(scrollYProgress, [0, 1], ['0%', shift(BACK)])",
     `  // ${HOUSE_RULE}`,
     '  const reduce = useReducedMotion()',
     '  return (',
-    '    <section ref={ref} className="relative overflow-clip">',
+    '    // pt-[40vh]: the open top, where the layers show above the content.',
+    '    <section ref={ref} className="relative overflow-clip pt-[40vh]">',
     ...(three
       ? [
           '      <motion.div aria-hidden className={layer} style={reduce ? undefined : { y: farY }}>',
@@ -267,8 +301,8 @@ function motionCode(v: V): string {
     '      <motion.div aria-hidden className={layer} style={reduce ? undefined : { y: backY }}>',
     '        {back}',
     '      </motion.div>',
-    '      {/* In front, at full speed: opaque, so the layers pass behind it. */}',
-    '      <div className="relative bg-white">{children}</div>',
+    '      {/* In front, at full speed: opaque, so it slides over the layers. */}',
+    '      <div className="relative bg-[var(--surface,#fff)]">{children}</div>',
     '    </section>',
     '  )',
     '}',
@@ -295,54 +329,61 @@ export default defineTerm({
   useWhen: [
     'A hero or editorial opener, where a sense of depth sets the tone before the reading starts.',
     'Decorative backgrounds on marketing pages: shapes, illustration, photography behind a headline.',
-    'Sparingly: one section per page, so it stays a moment instead of a texture.',
+    'A product shot or illustration that should feel layered as the page opens.',
   ],
   avoidWhen: [
     'Content people read or act on, like text, forms and controls. Anything that drifts out of step with the scroll is harder to follow and to hit.',
     'Large layers with big speed differences, or effects across the whole page. Motion out of step with the scroll can make people with vestibular disorders unwell.',
+    'More than one parallax section per page. It stops being a moment and becomes a texture.',
     'Pages where reduced motion cannot simply flatten the layers. If the layout only works with the offset, it is not decoration.',
   ],
   demo: {
     component: ParallaxDemo,
     label:
-      'A wireframe page scrolls down and back up inside a small browser window. Two dark blocks at the top drift up at a fraction of the scroll speed while a panel of text lines in front scrolls at full speed and slides over them. The controls change how fast the blocks move and add a third, slower layer behind them.',
+      'A wireframe page scrolls down and back up inside a small browser window. Two solid blocks at the top drift up at a fraction of the scroll speed while a panel of text lines in front scrolls at full speed and slides over them. The controls change how fast the blocks move and add a third, slower layer behind them.',
     controls,
     glyph: ParallaxGlyph,
   },
   prompt: (v) => {
     const { back, far } = ratios(v)
-    const shifts = far !== undefined ? `${shift(far)}% (far) or ${shift(back)}% (back)` : `${shift(back)}%`
+    const three = far !== undefined
     return [
-      'Add parallax to the hero at the top of this page: layers behind the content move slower than the scroll, the content at full speed.',
+      'Add parallax to the hero at the top of this page.',
       '',
-      '- Hero: `position: relative; overflow: clip`. Content: in flow, `position: relative`, opaque background, above the layers.',
-      `- ${far !== undefined ? 'Two layers' : 'One layer'}: \`position: absolute; inset: 0\`, \`pointer-events: none\`, \`aria-hidden\`, before the content in the DOM${far !== undefined ? ', far first' : ''}.`,
-      `- Speed ratios: ${far !== undefined ? `far ${far}, ` : ''}back ${back} (moves ${back}px per 1px scrolled), content 1.`,
+      '- Hero: `position: relative; overflow: clip; padding-top: 40vh` (the open top, where the layers show).',
+      '- Content: one in-flow panel after the padding, `position: relative`, opaque, full speed; it slides over the layers.',
+      `- ${three ? 'Two layers' : 'One layer'}: \`position: absolute; inset: 0\` (the hero's height), \`pointer-events: none\`, \`aria-hidden\`, before the content${three ? ', far first' : ''}.`,
+      three
+        ? `- Ratios, set once as \`--ratio\` per layer: far \`${far}\`, back \`${back}\` (${back}px per 1px scrolled).`
+        : `- Ratio, set once as \`--ratio\` on the layer: \`${back}\` (${back}px per 1px scrolled).`,
       "- Progress: 0 when the hero's top is at the viewport top, 1 when its bottom is; clamped.",
-      `- Layer: \`transform: translate3d(0, progress × ${shifts}, 0)\`, (1 − ratio) × its own height. Linear, no smoothing. \`will-change: transform\` once, in CSS.`,
-      '- Transform only; no `background-attachment: fixed`, no per-frame framework state.',
-      `- CSS route: \`.hero { view-timeline: --hero block }\`; layers \`animation: parallax linear both\`, then \`animation-timeline: --hero; animation-range: exit-crossing\` (shorthand first, it resets the timeline); \`@keyframes parallax\` to \`translate3d(0, var(--shift), 0)\`, \`--shift\` per layer.`,
-      "- Feature-test `CSS.supports('animation-timeline', 'scroll()')` before first paint; if false, set `data-fallback` on `<html>` and use the JS route. Scope the CSS animation to `html:not([data-fallback])` inside `@supports (animation-timeline: scroll())`.",
-      '- JS route: passive scroll listener, one requestAnimationFrame; n = clamp(−hero top, 0, hero height); write `translate3d(0, n × (1 − ratio)px, 0)` per layer. Also on `resize`.',
-      '- Reduced motion: no animation; layers move with the content.',
+      `- Layer: \`translate3d(0, progress × (1 − ratio) × 100%, 0)\` (${three ? `${shift(far)}% far, ${shift(back)}% back` : `${shift(back)}%`}), so n × (1 − ratio) px after n px. Linear, transform only, no \`background-attachment: fixed\`; \`will-change: transform\` in CSS, never toggled.`,
+      '- CSS route: `.hero { view-timeline: --hero block }`; layers `animation: parallax linear both`, then `animation-timeline: --hero; animation-range: exit-crossing` (shorthand first); `@keyframes parallax` to `translate3d(0, calc((1 - var(--ratio)) * 100%), 0)`.',
+      "- Feature-test `CSS.supports('animation-timeline', 'scroll()')` before first paint; if false, set `data-fallback` on `<html>`, JS route. Scope the CSS animation to `html:not([data-fallback])` inside `@supports (animation-timeline: scroll())`.",
+      '- JS route: passive `scroll` and `resize` listeners, one requestAnimationFrame; read the hero rect every frame; ratio from `--ratio`.',
+      '- Reduced motion: no animation, no transform. JS: while it matches, clear inline transforms and remove listeners; re-arm on `change`.',
     ].join('\n')
   },
   acceptance: (v) => {
     const { back, far } = ratios(v)
     const moved = (ratio: number) => +(100 * ratio).toFixed(1)
-    const pushed = (ratio: number) => +(100 * (1 - ratio)).toFixed(1)
+    const matrix = (ratio: number) => `\`matrix(1, 0, 0, 1, 0, ${+(100 * (1 - ratio)).toFixed(1)})\``
     return [
-      `Scrolled 100px into the hero, the content has moved 100px up, the back layer ${moved(back)}px (its transform is \`translateY(${pushed(back)}px)\`)${far !== undefined ? ` and the far layer ${moved(far)}px (\`translateY(${pushed(far)}px)\`)` : ''}.`,
+      'At the top of the hero, the layers are visible above the content panel.',
+      `Scrolled 100px into the hero, the content has moved 100px up and the back layer ${moved(back)}px; its computed transform is ${matrix(back)}${far !== undefined ? `. The far layer has moved ${moved(far)}px (${matrix(far)})` : ''}.`,
       'Scrolling back up reverses it exactly: the same scroll position always gives the same offsets, with no transition or lag.',
-      'The content slides over the layers; nothing in a layer can be clicked or selected.',
-      'Only transform changes while scrolling. The hero keeps its height, nothing below it moves, and the page is no taller than without the effect.',
-      'A DevTools Performance recording of a scroll shows no layout and no long tasks per frame.',
-      'With reduced motion on, the layers move with the content: no offset at any scroll position.',
+      'The content panel slides over the layers; nothing in a layer can be clicked.',
+      "Only the layers' transforms change: the hero's height and the page's `scrollHeight` are the same at every scroll position, and the same as with the layers removed.",
+      'With reduced motion on, the layers move with the content at every scroll position; switching the setting while the page is open flattens or restores them without a reload.',
       "In a browser where `CSS.supports('animation-timeline', 'scroll()')` is false (Firefox today), the JS route gives the same offsets. To check in Chromium, stub `CSS.supports` to return false before the page loads.",
     ]
   },
-  code: (v) => ({ css: cssCode(v), js: jsCode(v), motion: motionCode(v) }),
-  a11y: 'Parallax is decoration, and motion out of step with the scroll can make people with vestibular disorders unwell. Under reduced motion, remove the speed difference entirely so every layer moves with the content (a house rule for decorative scroll-linked effects). Keep the layers out of the reading order with aria-hidden and pointer-events: none, and never put text people need in a moving layer.',
+  code: (v) => ({ css: cssCode(v), js: jsCode(), motion: motionCode(v) }),
+  a11y: 'Parallax is decoration, and motion out of step with the scroll can make people with vestibular disorders unwell. Under reduced motion, remove the speed difference entirely so every layer moves with the content (a house rule). Keep the layers out of the reading order with aria-hidden and pointer-events: none, and never put text people need in a moving layer.',
   related: ['scroll-linked', 'layered-shadows', 'scroll-triggered'],
-  sources: [{ label: 'MDN: CSS scroll-driven animations', url: 'https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_scroll-driven_animations' }],
+  sources: [
+    { label: 'MDN: CSS scroll-driven animations', url: 'https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_scroll-driven_animations' },
+    { label: 'Motion: useScroll', url: 'https://motion.dev/docs/react-use-scroll' },
+    { label: 'WCAG 2.3.3: Animation from Interactions', url: 'https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html' },
+  ],
 })
