@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties, type RefObject } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { BrowserFrame } from '@/components/demo/browser-frame'
 import { scaled } from '@/components/demo/playback'
 import { useAutoScroll } from '@/components/demo/use-auto-scroll'
@@ -41,6 +41,7 @@ const STAGGER_MS = 60
 // Cards entering together step 60ms apart, at most 4 steps, so a fast jump never queues a long wave.
 const MAX_STEPS = 4
 const TILES = 12
+const FAILSAFE_MS = 3000
 
 // CSS has no spring. These are Motion's { type: 'spring', duration: 0.5, bounce: 0.2 } sampled at even steps.
 // A duration-based spring keeps its shape at any duration, so the curve pairs with whichever one is picked.
@@ -53,75 +54,106 @@ const wrapList = (values: readonly number[], perRow: number) =>
     (row, i, rows) => (i < rows.length - 1 ? `${row},` : row),
   )
 
-const EASING: Record<Easing, { token?: string; css: string; words: string; motion: (seconds: number) => string }> = {
-  out: { token: '--ease-out', css: 'var(--ease-out)', words: '`var(--ease-out)`', motion: (s) => `{ duration: ${s}, ease: [0.23, 1, 0.32, 1] }` },
-  inout: { token: '--ease-in-out', css: 'var(--ease-in-out)', words: '`var(--ease-in-out)`', motion: (s) => `{ duration: ${s}, ease: [0.77, 0, 0.175, 1] }` },
-  spring: {
-    css: SPRING_LINEAR,
-    words: 'a spring with bounce 0.2',
-    motion: (s) => `{ type: 'spring', duration: ${s}, bounce: 0.2 }`,
-  },
+const EASING: Record<Easing, { token?: string; css: string; motion: (seconds: number) => string }> = {
+  out: { token: '--ease-out', css: 'var(--ease-out)', motion: (s) => `{ duration: ${s}, ease: [0.23, 1, 0.32, 1]` },
+  inout: { token: '--ease-in-out', css: 'var(--ease-in-out)', motion: (s) => `{ duration: ${s}, ease: [0.77, 0, 0.175, 1]` },
+  spring: { css: SPRING_LINEAR, motion: (s) => `{ type: 'spring', duration: ${s}, bounce: 0.2` },
+}
+
+// Bumps on Replay and on every control change, so both restart the cycle from the top in the same way.
+function useCycleKey(replayKey: number, values: V) {
+  const signature = `${replayKey}|${values.duration}|${values.easing}|${values.stagger}`
+  const [seen, setSeen] = useState(signature)
+  const [cycle, setCycle] = useState(0)
+  if (signature !== seen) {
+    setSeen(signature)
+    setCycle((c) => c + 1)
+  }
+  return cycle
+}
+
+// Fraction of the tile inside the scroller, 0 to 1.
+function visibleRatio(tile: HTMLElement, view: DOMRect) {
+  const r = tile.getBoundingClientRect()
+  return Math.max(0, Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top)) / r.height
 }
 
 // Reveals each tile once, the first time it is 15% inside the scroller. The observer writes data-in on the
-// DOM node; no React state per tile. Off the play path (reduced motion before play, off-screen), it paints a
-// still: tiles in the upper part of the window are in, the ones below show as outlines of what comes next.
+// DOM node; no React state per tile. Tiles already in view when a cycle starts are shown without animating,
+// like cards on first paint. Off the play path (reduced motion before play, off-screen), it paints a still:
+// tiles in the upper part of the window are in, the ones below show as outlines of what comes next.
 function useReveals(
   rootRef: RefObject<HTMLDivElement | null>,
   pageRef: RefObject<HTMLDivElement | null>,
-  { playing, replayKey, timeScale, duration, stagger }: { playing: boolean; replayKey: number; timeScale: number; duration: number; stagger: boolean },
+  { playing, cycle, timeScale, duration, stagger }: { playing: boolean; cycle: number; timeScale: number; duration: number; stagger: boolean },
 ) {
   useEffect(() => {
     const root = rootRef.current
     const page = pageRef.current
     if (!root || !page) return
     const tiles = [...root.querySelectorAll<HTMLElement>('[data-tile]')]
+    const view = root.getBoundingClientRect()
 
-    // Reset with transitions off, so hidden tiles snap back instead of fading out.
+    // Reset with transitions off, so tiles snap to their start state instead of fading.
     page.style.setProperty('--d', '0ms')
     for (const tile of tiles) {
-      tile.dataset.in = 'false'
       tile.dataset.ghost = 'false'
       tile.style.transitionDelay = ''
     }
 
     if (!playing) {
-      const top = root.getBoundingClientRect().top
       const line = root.clientHeight * 0.55
       for (const tile of tiles) {
-        const above = tile.getBoundingClientRect().top - top < line
+        const above = tile.getBoundingClientRect().top - view.top < line
         tile.dataset.in = String(above)
         tile.dataset.ghost = String(!above)
       }
       return
     }
 
-    void page.offsetHeight // commit the hidden state before transitions come back
+    const waiting: HTMLElement[] = []
+    for (const tile of tiles) {
+      const inView = visibleRatio(tile, view) >= THRESHOLD
+      tile.dataset.in = String(inView)
+      if (!inView) waiting.push(tile)
+    }
+    void page.offsetHeight // commit the start state before transitions come back
     page.style.setProperty('--d', `${scaled(duration, timeScale)}ms`)
+
     const io = new IntersectionObserver(
       (entries) => {
-        let step = 0
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue
+        const entering = entries.filter((e) => e.isIntersecting && e.intersectionRatio >= THRESHOLD)
+        entering.forEach((entry, i) => {
           const tile = entry.target as HTMLElement
-          if (stagger) tile.style.transitionDelay = `${scaled(Math.min(step++, MAX_STEPS) * STAGGER_MS, timeScale)}ms`
+          if (stagger) tile.style.transitionDelay = `${scaled(Math.min(i, MAX_STEPS) * STAGGER_MS, timeScale)}ms`
           tile.dataset.in = 'true'
           io.unobserve(tile)
-        }
+        })
       },
       { root, threshold: THRESHOLD },
     )
-    tiles.forEach((tile) => io.observe(tile))
+    waiting.forEach((tile) => io.observe(tile))
     return () => io.disconnect()
-  }, [rootRef, pageRef, playing, replayKey, timeScale, duration, stagger])
+  }, [rootRef, pageRef, playing, cycle, timeScale, duration, stagger])
 }
 
 function ScrollTriggeredDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }: DemoProps<V>) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef<HTMLDivElement>(null)
-  // Order matters: the auto-scroll sets the scroll position first, then the reveals read it.
-  useAutoScroll(scrollRef, { playing, replayKey, timeScale, onCycleEnd, interactive: size === 'detail', durationMs: 5200, stillAt: 0.42 })
-  useReveals(scrollRef, pageRef, { playing, replayKey, timeScale, duration: Number(values.duration), stagger: values.stagger })
+  const cycle = useCycleKey(replayKey, values)
+  // Down, hold, back up: the way up shows that nothing replays. The auto-scroll sets the scroll position
+  // before the reveals read it, so the order of these two hooks matters.
+  useAutoScroll(scrollRef, {
+    playing,
+    replayKey: cycle,
+    timeScale,
+    onCycleEnd,
+    interactive: size === 'detail',
+    durationMs: 8000,
+    stillAt: 0.42,
+    returnTrip: true,
+  })
+  useReveals(scrollRef, pageRef, { playing, cycle, timeScale, duration: Number(values.duration), stagger: values.stagger })
   const detail = size === 'detail'
 
   return (
@@ -139,10 +171,10 @@ function ScrollTriggeredDemo({ values, playing, replayKey, size, timeScale, onCy
               data-tile=""
               data-in="false"
               data-ghost="false"
-              className={`group relative rounded-md bg-demo opacity-0 [transform:translateY(14px)] transition-[opacity,transform] duration-(--d) ease-(--e) data-[ghost=true]:bg-transparent data-[ghost=true]:opacity-100 data-[ghost=true]:shadow-[inset_0_0_0_1px_var(--demo-2)] data-[ghost=true]:[transform:none] data-[in=true]:opacity-100 data-[in=true]:[transform:none] ${detail ? 'h-24' : 'h-14'}`}
+              className={`group relative rounded-md bg-demo-2 opacity-0 [transform:translateY(14px)] transition-[opacity,transform] duration-(--d) ease-(--e) data-[ghost=true]:bg-transparent data-[ghost=true]:opacity-100 data-[ghost=true]:shadow-[inset_0_0_0_1px_var(--demo-2)] data-[ghost=true]:[transform:none] data-[in=true]:opacity-100 data-[in=true]:[transform:none] ${detail ? 'h-24' : 'h-14'}`}
             >
-              <span className={`absolute left-3 h-1.5 w-1/2 rounded-full bg-demo-2 group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-5' : 'bottom-4'}`} />
-              <span className={`absolute left-3 h-1.5 w-1/3 rounded-full bg-demo-2 group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-2.5' : 'bottom-2'}`} />
+              <span className={`absolute left-3 h-1.5 w-2/5 rounded-full bg-demo-subject group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-5' : 'bottom-4'}`} />
+              <span className={`absolute left-3 h-1.5 w-1/4 rounded-full bg-demo group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-2.5' : 'bottom-2'}`} />
             </div>
           ))}
         </div>
@@ -162,6 +194,19 @@ function ScrollTriggeredGlyph({ active }: GlyphProps) {
 
 const seconds = (ms: string) => Number(ms) / 1000
 
+function timingLine(v: V): string {
+  const ms = Number(v.duration)
+  const timing =
+    v.easing === 'spring'
+      ? `- Timing: a spring with bounce 0.2 over ${ms}ms on both properties (Motion: \`{ type: 'spring', duration: ${seconds(v.duration)}, bounce: 0.2 }\`; CSS has no spring, so use \`transition-duration: ${ms}ms\` with \`transition-timing-function: ${SPRING_LINEAR}\`, which samples it). What the spring adds over ease-out is a softer start.`
+      : `- Timing: ${ms}ms with \`${EASING[v.easing].css}\` on both properties.`
+  const notes = [
+    ...(v.easing === 'out' ? [] : ['Note: this is for comparison; ease-out is the house choice.']),
+    ...(ms > 500 ? [`${ms}ms is above the 300ms UI budget; use it for editorial pacing only.`] : []),
+  ]
+  return [timing, ...notes].join(' ')
+}
+
 export default defineTerm({
   slug: 'scroll-triggered',
   name: 'Scroll-triggered',
@@ -171,14 +216,14 @@ export default defineTerm({
   definition: 'An animation that plays once when an element scrolls into view.',
   aliases: [
     'reveal on scroll',
-    'animate on enter',
+    'animate on scroll',
     'in-view animation',
     'scroll reveal',
     'fade in when scrolled to',
     'appear as you scroll',
   ],
   description:
-    'The element waits just out of sight. When enough of it enters the viewport, it plays an ordinary timed transition, with its own duration and easing, and finishes no matter what the scroll does next. It plays once: scrolling back up leaves it where it is, which is what separates it from scroll-linked motion. Most reveal-on-scroll effects on marketing pages are this.',
+    'The element waits just out of sight. When enough of it enters the viewport, it plays an ordinary timed transition, with its own duration and easing, and finishes no matter what the scroll does next. It plays once: scrolling back up leaves it where it is, which is what separates it from scroll-linked motion. Ease-out at 300 to 500ms is right for an entrance; the other easing options are there so you can feel why.',
   useWhen: [
     'Marketing and editorial pages, where sections arriving one after another set the pace of the story.',
     'A grid of features or cards further down a long page, with a short stagger so each row arrives as a group.',
@@ -192,43 +237,40 @@ export default defineTerm({
   demo: {
     component: ScrollTriggeredDemo,
     label:
-      'A page of gray tiles scrolls inside a small browser window. Each tile fades in and rises 14px the first time it is 15% in view, tiles in the same row start a moment apart, and every tile stays visible after it has appeared.',
+      'A page of gray tiles scrolls down inside a small browser window, then back up. Tiles already in view are simply there. Each tile below fades in and rises 14px the first time it is 15% in view, tiles entering together start a moment apart, and on the way back up every tile stays where it is.',
     controls,
     glyph: ScrollTriggeredGlyph,
   },
-  prompt: (v) => {
-    const ms = Number(v.duration)
-    const easing = EASING[v.easing]
-    return [
+  prompt: (v) =>
+    [
       'Reveal the cards in this grid as they scroll into view, once each.',
       '',
       `- When a card is 15% inside the viewport, fade it from \`opacity: 0\` to \`1\` and move it from \`translateY(${TRAVEL}px)\` to \`none\`. It plays once and stays. Scrolling back up never replays it.`,
-      v.easing === 'spring'
-        ? `- Timing: a spring with bounce 0.2 over ${ms}ms, on both properties. In Motion: \`transition={{ type: "spring", duration: ${seconds(v.duration)}, bounce: 0.2 }}\`. CSS has no real spring, so in CSS use \`transition-duration: ${ms}ms\` with \`transition-timing-function: ${SPRING_LINEAR}\`, which samples the same spring.`
-        : `- Timing: ${ms}ms with ${easing.words} on both properties.`,
+      timingLine(v),
       v.stagger
-        ? `- Cards that enter in the same observer callback start ${STAGGER_MS}ms apart, in DOM order, capped at ${MAX_STEPS} steps (${MAX_STEPS * STAGGER_MS}ms) so a fast jump never queues a long wave. Set the delay on the card when it reveals, not up front.`
-        : '- Cards that enter together all start at the same moment. No stagger.',
-      `- Detect entry with one IntersectionObserver, \`threshold: ${THRESHOLD}\`. On intersect, set \`data-in="true"\` on the card (the CSS keys off it) and \`unobserve\` it. Don't use a scroll listener.`,
-      '- Hide cards only once JavaScript is running: an inline script in <head> adds a `js` class to <html>, and the hidden state is scoped under `.js`. With Motion, add a <noscript> style that forces the cards visible. Content must never be stuck invisible because a script failed.',
-      '- States to handle: before reveal (invisible but holding its space, so nothing shifts); revealing; revealed (opacity 1, no transform left); jumped past with End, an anchor link or a fast fling (every card that has been in view ends fully visible); keyboard focus landing in a card that has not revealed yet (reveal it at once on `focusin`).',
-      '- Under `prefers-reduced-motion: reduce`, drop the movement and the stagger: show cards immediately, or fade opacity only over 150ms.',
-      '- Transition only `opacity` and `transform`, and name them; never `transition: all`. Never animate top, margin or height.',
-      "- Don't tie the animation's progress to the scroll position (that is scroll-linked), and don't replay it when a card leaves and comes back.",
-    ].join('\n')
-  },
+        ? `- Each observer callback reports every observed card (the first one reports all of them), so filter to entries that are intersecting before staggering. Start those ${STAGGER_MS}ms apart in DOM order, capped at ${MAX_STEPS} steps (${MAX_STEPS * STAGGER_MS}ms) so a fast jump never queues a long wave. Set the delay on the card when it reveals, and clear it once the transition ends.`
+        : '- Cards that enter together all start at the same moment. No stagger. Filter each observer callback to entries that are intersecting (the first one reports every card).',
+      `- Detect entry with one IntersectionObserver, \`threshold: ${THRESHOLD}\` (with Motion: \`whileInView\` and \`viewport={{ once: true, amount: ${THRESHOLD} }}\`). On intersect, set \`data-in="true"\` on the card (the CSS keys off it) and \`unobserve\` it. Don't use a scroll listener.`,
+      `- Hide cards only once JavaScript is running: an inline script in <head> adds a \`js\` class to <html>, and the hidden state is scoped under \`.js\`. The same head script starts a failsafe, \`setTimeout(() => html.classList.remove('js'), ${FAILSAFE_MS})\`, and the observer script clears it when it starts. If that script never runs, the cards show after ${FAILSAFE_MS / 1000}s instead of staying hidden.`,
+      '- States to handle: in view on first paint (visible, no animation: in the first observer callback, set `data-in` with transitions off); before reveal (invisible but holding its space, so nothing shifts); revealing; revealed (opacity 1, no transform left); after an instant jump such as an anchor link (cards in view end fully visible; cards never in view reveal when reached); keyboard focus landing in a card that has not revealed (on `focusin` it starts revealing immediately, with the same transition and no stagger delay); printing (`@media print` shows every card).',
+      '- Under `prefers-reduced-motion: reduce`: no movement and no stagger. In CSS, drop the transform and fade opacity only, over 150ms. In JS, set no delays, and read the media query inside the callback so a change mid-session counts.',
+      '- Transition only `opacity` and `transform`, and name them; never `transition: all`.',
+      "- Don't tie the animation's progress to the scroll position; that is scroll-linked.",
+    ].join('\n'),
   acceptance: (v) => [
-    'Each card animates the first time it is 15% inside the viewport, then stays.',
+    'Cards in view when the page loads are visible right away and do not animate.',
+    'Each card below animates the first time it is 15% inside the viewport, then stays.',
     'Scrolling back up never replays a card that has already revealed.',
-    `One card takes ${v.duration}ms from hidden to rest${v.easing === 'spring' ? ', settling with a slight overshoot' : ''}.`,
+    `One card takes ${v.duration}ms from hidden to rest.`,
     v.stagger
       ? `Cards that enter together start ${STAGGER_MS}ms apart in reading order, and none waits more than ${MAX_STEPS * STAGGER_MS}ms.`
       : 'Cards that enter together start at the same moment.',
-    'After pressing End or following an anchor link, every card in view is fully visible; nothing is stuck half-faded.',
+    'After an instant jump (anchor link or `scrollTo` without smooth), every card in view is fully visible.',
     'Cards hold their space before they reveal; nothing below them moves.',
-    'With JavaScript turned off, every card is visible.',
-    'Tabbing to a link inside a card that has not revealed yet shows the card at once.',
-    'With reduced motion on, cards appear without moving: at once, or with a 150ms opacity fade.',
+    `With JavaScript off, every card is visible (the cards must be in the initial HTML). If the observer script fails to run, every card shows within ${FAILSAFE_MS / 1000}s.`,
+    'Moving focus into a card that has not revealed starts its reveal immediately, with no stagger delay.',
+    'With reduced motion on, cards appear without moving and without a stagger, over at most 150ms.',
+    'Printing the page shows every card.',
   ],
   code: (v) => {
     const ms = Number(v.duration)
@@ -236,8 +278,8 @@ export default defineTerm({
     return {
       css: [
         ...(easing.token ? [`:root { ${easing.token}: ${TOKENS[easing.token]}; }`, ''] : []),
-        '/* Hidden only once JS has run (see the JS tab),',
-        '   so content is never stuck invisible. */',
+        '/* Hidden only once JS has run (see the JS tab), so with',
+        '   JavaScript off every card is visible. */',
         '.js .reveal {',
         '  opacity: 0;',
         `  transform: translateY(${TRAVEL}px);`,
@@ -266,43 +308,76 @@ export default defineTerm({
         '    transition-duration: 150ms;',
         '  }',
         '}',
+        '',
+        '@media print {',
+        '  .js .reveal { opacity: 1; transform: none; }',
+        '}',
       ].join('\n'),
       js: [
-        '// In <head>, before the cards render, so they never flash:',
-        "//   <script>document.documentElement.classList.add('js')</script>",
+        '// In <head>, before the cards render. If the observer script below',
+        `// never runs, the failsafe shows every card after ${FAILSAFE_MS / 1000}s.`,
+        '//   <script>',
+        "//     document.documentElement.classList.add('js')",
+        '//     window.revealFailsafe = setTimeout(() => {',
+        "//       document.documentElement.classList.remove('js')",
+        `//     }, ${FAILSAFE_MS})`,
+        '//   </script>',
         '',
-        ...(v.stagger ? ["const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches", ''] : []),
-        'function show(card, delay = 0) {',
-        "  card.style.transitionDelay = delay ? `${delay}ms` : ''",
+        'clearTimeout(window.revealFailsafe)',
+        '',
+        ...(v.stagger
+          ? ["const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches", '']
+          : ['// Under prefers-reduced-motion the CSS drops the movement.', '']),
+        'function show(card, { delay = 0, instant = false } = {}) {',
+        "  if (instant) card.style.transition = 'none'",
+        '  if (delay) {',
+        '    card.style.transitionDelay = `${delay}ms`',
+        "    // Clear it afterwards, so later transitions on the card don't inherit it.",
+        "    const clear = () => (card.style.transitionDelay = '')",
+        "    card.addEventListener('transitionend', clear, { once: true })",
+        '  }',
         "  card.dataset.in = 'true'",
         '  io.unobserve(card) // once',
+        '  if (instant) {',
+        '    card.offsetWidth // commit the shown state before the transition comes back',
+        "    card.style.transition = ''",
+        '  }',
         '}',
         '',
+        'let first = true',
         'const io = new IntersectionObserver(',
         '  (entries) => {',
+        '    // Each callback reports every observed card; keep the ones really in view.',
+        '    const entering = entries.filter(',
+        `      (e) => e.isIntersecting && e.intersectionRatio >= ${THRESHOLD},`,
+        '    )',
+        '    if (first) {',
+        '      // Cards in view on first paint are already there: no animation.',
+        '      first = false',
+        '      entering.forEach((e) => show(e.target, { instant: true }))',
+        '      return',
+        '    }',
         ...(v.stagger
           ? [
-              '    let step = 0',
-              '    for (const entry of entries) {',
-              '      if (!entry.isIntersecting) continue',
-              `      // Cards entering together start ${STAGGER_MS}ms apart, at most ${MAX_STEPS} steps.`,
-              `      show(entry.target, reduce ? 0 : Math.min(step++, ${MAX_STEPS}) * ${STAGGER_MS})`,
-              '    }',
+              `    // Cards entering together start ${STAGGER_MS}ms apart, at most ${MAX_STEPS} steps.`,
+              '    entering.forEach((e, i) => {',
+              `      show(e.target, { delay: reduced() ? 0 : Math.min(i, ${MAX_STEPS}) * ${STAGGER_MS} })`,
+              '    })',
             ]
-          : ['    for (const entry of entries) {', '      if (entry.isIntersecting) show(entry.target)', '    }']),
+          : ['    entering.forEach((e) => show(e.target))']),
         '  },',
         `  { threshold: ${THRESHOLD} },`,
         ')',
         "document.querySelectorAll('.reveal').forEach((card) => io.observe(card))",
         '',
-        '// Keyboard focus can land in a card before it has scrolled into view.',
+        `// Focus can land in a card before it is ${THRESHOLD * 100}% in view: start its reveal now.`,
         "document.addEventListener('focusin', (e) => {",
         `  const card = e.target.closest('.reveal:not([data-in="true"])')`,
         '  if (card) show(card)',
         '})',
       ].join('\n'),
       motion: [
-        "import { motion, useReducedMotion, type Transition } from 'motion/react'",
+        "import { motion, type Variants } from 'motion/react'",
         "import type { ReactNode } from 'react'",
         '',
         '// Motion writes `initial` into the server HTML. So the cards still show',
@@ -313,23 +388,44 @@ export default defineTerm({
         '',
         ...(v.stagger
           ? [
-              "// step: the card's position in its row (0, 1, …), so cards entering",
-              `// together start ${STAGGER_MS}ms apart.`,
-              'type RevealProps = { children: ReactNode; step?: number }',
-              'export function Reveal({ children, step = 0 }: RevealProps) {',
+              `// Cards that enter view in the same frame start ${STAGGER_MS}ms apart, at most`,
+              `// ${MAX_STEPS} steps: the same rule as the CSS and JS version.`,
+              'let step = 0',
+              'let frame = 0',
+              'function nextDelay() {',
+              '  if (!frame) frame = requestAnimationFrame(() => (step = frame = 0))',
+              `  return Math.min(step++, ${MAX_STEPS}) * ${STAGGER_MS / 1000}`,
+              '}',
+              '',
             ]
-          : ['export function Reveal({ children }: { children: ReactNode }) {']),
-        '  const reduce = useReducedMotion()',
-        '  const transition: Transition = reduce',
-        '    ? { duration: 0.15 }',
-        `    : ${v.stagger ? easing.motion(seconds(v.duration)).replace(/ }$/, `, delay: step * ${STAGGER_MS / 1000} }`) : easing.motion(seconds(v.duration))}`,
+          : []),
+        'const variants: Variants = {',
+        `  hidden: { opacity: 0, y: ${TRAVEL} },`,
+        '  // Resolved on the client when the card reveals, so the server HTML never',
+        '  // depends on the reduced-motion setting and hydration stays clean.',
+        '  shown: () => {',
+        "    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches",
+        '    return {',
+        '      opacity: 1,',
+        '      y: 0,',
+        '      transition: reduce',
+        '        ? { duration: 0.15, y: { duration: 0 } }',
+        `        : ${easing.motion(seconds(v.duration))}${v.stagger ? ', delay: nextDelay()' : ''} },`,
+        '    }',
+        '  },',
+        '}',
+        '',
+        '// Pass `above` for cards in the first screen: they render visible and',
+        '// never animate.',
+        'type RevealProps = { children: ReactNode; above?: boolean }',
+        'export function Reveal({ children, above = false }: RevealProps) {',
         '  return (',
         '    <motion.div',
         '      className="reveal"',
-        `      initial={{ opacity: 0, y: reduce ? 0 : ${TRAVEL} }}`,
-        '      whileInView={{ opacity: 1, y: 0 }}',
+        '      variants={variants}',
+        "      initial={above ? false : 'hidden'}",
+        '      whileInView="shown"',
         `      viewport={{ once: true, amount: ${THRESHOLD} }}`,
-        '      transition={transition}',
         '    >',
         '      {children}',
         '    </motion.div>',
@@ -338,8 +434,7 @@ export default defineTerm({
       ].join('\n'),
     }
   },
-
-  a11y: 'Content must be visible without JavaScript, so hide it only once a script has run. A card that can take keyboard focus must never sit invisible: reveal it on focus. Under reduced motion, show content at once or with a 150ms opacity fade and no movement.',
+  a11y: `With JavaScript off, every card must be visible, so hide cards only once a script has run, and add a failsafe that shows them if the observer never starts. Focus moving into a card that has not revealed starts its reveal at once. Under reduced motion, show content with a 150ms opacity fade, without movement or stagger.`,
   related: ['scroll-linked', 'stagger', 'enter-and-exit'],
   confusedWith: [
     {
