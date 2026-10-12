@@ -57,8 +57,9 @@ const AFTER = [
 const PARAGRAPHS = { card: { bar: 3, figure: 2, after: 4 }, detail: { bar: 5, figure: 3, after: 5 } }
 
 // The figure's own entry range is as long as the figure is tall, so a tall figure gives the
-// fade and scale enough scroll to read as scrubbing rather than a quick entrance.
-const FIGURE_HEIGHT = { card: 'h-32', detail: 'h-80' }
+// fade and scale enough scroll to read as scrubbing rather than a quick entrance. The bar's figure
+// stays short; its two extra paragraphs keep the scroll length close to the figure layouts.
+const FIGURE_HEIGHT = { card: { bar: 'h-32', figure: 'h-32' }, detail: { bar: 'h-36', figure: 'h-80' } }
 
 const isFigureEntry = (v: V) => v.effect !== 'bar' && v.range === 'section'
 
@@ -180,7 +181,7 @@ function ScrollLinkedDemo({ values, playing, replayKey, size, timeScale, onCycle
           <figure
             ref={figureRef}
             data-figure=""
-            className={`rounded-lg ${isBar ? 'bg-demo-2' : 'bg-demo-subject'} ${FIGURE_HEIGHT[size]} ${detail ? 'mb-4' : 'mb-2.5'}`}
+            className={`rounded-lg ${isBar ? 'bg-demo-2' : 'bg-demo-subject'} ${FIGURE_HEIGHT[size][isBar ? 'bar' : 'figure']} ${detail ? 'mb-4' : 'mb-2.5'}`}
           />
           <Paragraph widths={SECTION_BOTTOM} detail={detail} />
         </section>
@@ -526,7 +527,7 @@ export default defineTerm({
       `- Progress: ${RANGE_WORDS[range]}.`,
       effectLine,
       `- CSS route: define \`@keyframes ${fx.name}\` from \`${fx.from}\` to \`${fx.to}\`, and apply it with \`animation: ${fx.name} linear both\` followed by ${TIMELINE_WORDS[range]}. The shorthand resets \`animation-timeline\`, so it must come first. \`linear\` keeps progress 1:1 (the default is ease), and \`both\` holds the start and end states outside the range.`,
-      "- Feature-test once in JS with `CSS.supports('animation-timeline', 'scroll()')`. When it is false, set `data-fallback` on <html> and take the JS route. Scope the CSS animation under `html:not([data-fallback])` inside `@supports (animation-timeline: scroll())`, so the two routes never both drive the element.",
+      "- Feature-test once in JS with `CSS.supports('animation-timeline', 'scroll()')`. When it is false, set `data-fallback` on `<html>` and take the JS route. Scope the CSS animation under `html:not([data-fallback])` inside `@supports (animation-timeline: scroll())`, so the two routes never both drive the element.",
       '- JS route: a passive scroll listener that schedules one requestAnimationFrame, reads the scroll position, clamps progress to 0..1 and writes the style. Also recompute on `resize` and when content changes size (a `ResizeObserver` on `document.body`); a scroll listener alone goes stale. The CSS route needs none of this.',
       bar
         ? `- With Motion (only if the project already uses it): \`useScroll\`${MOTION_OFFSET[range]}, and bind \`scrollYProgress\` straight to \`scaleX\`.`

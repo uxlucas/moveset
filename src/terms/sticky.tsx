@@ -68,11 +68,12 @@ function buildTrack(el: HTMLElement, offset: number): TrackPoint[] | undefined {
   return track
 }
 
-// Watches the headers themselves. A header is stuck while the line `offset + 1`px below the top clips its top edge.
-// Pushed fully out by the next header, it is not stuck. isIntersecting, not ratio > 0: a header exactly touching the
-// line reports ratio 0 and would get no further callback as it slides back in. The large bottom margin stretches the root far below
-// the list, so the stuck line is the only edge that can clip a header: a header half under the bottom edge that jumps
-// straight to the pinned spot would otherwise stay between thresholds and never get a callback.
+// Watches the headers themselves. A header is stuck while the line `offset + 1`px below the top cuts through it:
+// clipped at the top, still showing below the line. Pushed fully out, or with its bottom exactly on the line, it is not.
+// The large bottom margin stretches the root far below the list, so the stuck line is the only edge that can clip a
+// header; otherwise a header half under the bottom edge that jumps straight to the pinned spot stays between thresholds
+// and never gets a callback. The 0.01 threshold gives a callback when a header that exactly touched the line (ratio 0)
+// starts sliding back in; with [0, 1] alone it would stay unflagged while pinned.
 function useStuckHeaders(rootRef: RefObject<HTMLElement | null>, offset: number) {
   useEffect(() => {
     const root = rootRef.current
@@ -80,12 +81,13 @@ function useStuckHeaders(rootRef: RefObject<HTMLElement | null>, offset: number)
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
+          const { top, bottom } = entry.boundingClientRect
+          const line = entry.rootBounds?.top ?? 0
           const clipped = entry.isIntersecting && entry.intersectionRatio < 1
-          const atTop = entry.boundingClientRect.top <= (entry.rootBounds?.top ?? 0)
-          ;(entry.target as HTMLElement).dataset.stuck = String(clipped && atTop)
+          ;(entry.target as HTMLElement).dataset.stuck = String(clipped && top <= line && bottom > line)
         }
       },
-      { root, rootMargin: `-${offset + 1}px 0px 100000px 0px`, threshold: [0, 1] },
+      { root, rootMargin: `-${offset + 1}px 0px 100000px 0px`, threshold: [0, 0.01, 1] },
     )
     root.querySelectorAll('[data-sticky-header]').forEach((h) => io.observe(h))
     return () => io.disconnect()
@@ -114,15 +116,15 @@ function StickyDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
 
   return (
     <BrowserFrame scrollRef={scrollRef} size={size} label="Contact list with sticky letter headers">
-      {/* 1px above the first header, so at rest it sits below the stuck line instead of on it. */}
-      <div className="mt-px dark:[--stuck-shadow:0_1px_0_var(--line-strong),0_4px_12px_rgb(0_0_0/0.4)]">
+      <div className="dark:[--stuck-shadow:0_1px_0_var(--line-strong),0_4px_12px_rgb(0_0_0/0.4)]">
         {offset > 0 && (
           <div className="sticky top-0 z-20 flex items-center border-b border-line bg-surface px-3" style={{ height: offset }}>
             <span className="h-2 w-14 rounded-full bg-demo-2" />
           </div>
         )}
-        {SECTIONS.map((section) => (
-          <div key={section.letter} data-section={section.letter}>
+        {SECTIONS.map((section, index) => (
+          // 1px above the first section, so at rest its header sits below the stuck line instead of on it.
+          <div key={section.letter} data-section={section.letter} className={index === 0 ? 'mt-px' : undefined}>
             <div
               data-sticky-header=""
               data-stuck="false"
@@ -197,16 +199,18 @@ export default defineTerm({
     return [
       'Make the section headers in this list sticky.',
       '',
-      '- Wrap each header and its rows in their own element, with the header at the top of that element. Sticky only holds inside its parent, which is what lets the next header push the current one away instead of stacking on it.',
+      '- Wrap each header and its rows in their own element, header first. Sticky only holds inside its parent, which lets the next header push the current one away instead of stacking on it.',
       `- Give each section header \`position: sticky; top: ${offset}px;\`${offset > 0 ? ` (${offset}px is the height of a bar pinned with \`position: sticky; top: 0\` inside the same scroll container. If your bar sits outside the scroll container, use \`top: 0\`.)` : ''} inside the list's own scroll container.`,
       '- Give headers an opaque background that matches the list, and a z-index above the rows, so rows never show through.',
-      '- Check every ancestor between the header and the scroll container: `overflow: hidden`, `overflow-x: hidden`, `overflow: auto` or `overflow: scroll` on any of them silently breaks sticky. Use `overflow: clip` when you need clipping.',
-      `- Set \`scroll-padding-top\` on the scroll container to the header height${offset > 0 ? ` plus ${offset}px` : ''} (replace 32px with yours): \`scroll-padding-top: ${padding}\`. Shift+Tab is the case that needs it: moving focus up scrolls the row in at the top edge, where a stuck header would cover it.`,
+      '- Check every ancestor between the header and the scroll container: `overflow: hidden`, `auto` or `scroll` on any of them (either axis) silently breaks sticky. Use `overflow: clip` for clipping.',
+      `- Set \`scroll-padding-top\` on the scroll container to the header height${offset > 0 ? ` plus ${offset}px` : ''} (replace 32px with yours): \`scroll-padding-top: ${padding}\`. Shift+Tab is the case that needs it: moving focus up scrolls the row in under a stuck header.`,
       ...(v.shadow
         ? [
-            `- While a header is stuck, show a soft shadow under it: \`box-shadow: var(--stuck-shadow, 0 1px 0 var(--border, rgb(0 0 0 / 0.08)), 0 4px 12px rgb(0 0 0 / 0.06))\`, transitioned over 150ms with \`ease\`. Tune \`--stuck-shadow\` per theme: on a dark surface the 6% black disappears, so use a stronger line and a darker shadow there, for example \`0 1px 0 rgb(255 255 255 / 0.12), 0 4px 12px rgb(0 0 0 / 0.4)\`.`,
-            `- Detect "stuck" with one IntersectionObserver on the headers themselves: root is the list's scroll container, rootMargin is '-${offset + 1}px 0px 100000px 0px', threshold is [0, 1]. A header is stuck when \`entry.isIntersecting && entry.intersectionRatio < 1 && entry.boundingClientRect.top <= entry.rootBounds.top\`: partly clipped by the line 1px below its \`top\`. A header pushed fully out by the next one is not stuck. The large bottom margin keeps the bottom edge from ever clipping a header, so a header that jumps from below straight into the pinned spot (a scrollbar drag, an anchor link, scrollTop set in code) still crosses a threshold. Use \`isIntersecting\`, not \`intersectionRatio > 0\`: a header that exactly touches the line reports a ratio of 0 and gets no further callback as it slides back in. Write the result to a \`data-stuck\` attribute on the header. Do not use a scroll listener.`,
-            "- Give the scroll container's first child `margin-top: 1px`. Without it, the first header already sits on the stuck line before any scrolling and shows the shadow at rest.",
+            '- While a header is stuck, show a soft shadow under it: `box-shadow: var(--stuck-shadow, 0 1px 0 var(--border, rgb(0 0 0 / 0.08)), 0 4px 12px rgb(0 0 0 / 0.06))`, transitioned over 150ms with `ease`. In dark mode set `--stuck-shadow: 0 1px 0 rgb(255 255 255 / 0.12), 0 4px 12px rgb(0 0 0 / 0.4)`.',
+            `- Detect "stuck" with one IntersectionObserver on the headers themselves: root is the list's scroll container, rootMargin is '-${offset + 1}px 0px 100000px 0px', threshold is [0, 0.01, 1]. A header is stuck when \`entry.isIntersecting && entry.intersectionRatio < 1 && entry.boundingClientRect.top <= entry.rootBounds.top && entry.boundingClientRect.bottom > entry.rootBounds.top\`. Write the result to a \`data-stuck\` attribute on the header. Do not use a scroll listener.`,
+            '- Keep the 100000px bottom margin, `isIntersecting` and the 0.01 threshold as given; they cover one-step jumps and headers that land exactly on the line.',
+            "- The scroll container must have no padding of its own (put it on a wrapper): `top` counts from inside the padding but the observer's root from its edge, so `rootMargin` would stop lining up with `top`.",
+            '- Apply `margin-top: 1px` to the first section wrapper.',
             '- Under `prefers-reduced-motion: reduce`, drop the shadow transition so the shadow just appears.',
           ]
         : ["- Don't change the header's style when it is stuck."]),
@@ -216,9 +220,11 @@ export default defineTerm({
   acceptance: (v) => {
     const offset = Number(v.offset)
     return [
-      offset > 0
-        ? `While scrolling, each header pins directly under the ${offset}px bar, which itself stays pinned at the top of the scroll container.`
-        : 'While scrolling, each header pins to the top of the scroll container.',
+      `${
+        offset > 0
+          ? `While scrolling, each header pins directly under the ${offset}px bar, which itself stays pinned at the top of the scroll container`
+          : 'While scrolling, each header pins to the top of the scroll container'
+      } (a last section shorter than the container never pins; that is expected).`,
       'The next header pushes the current one up; they never overlap.',
       'No row content is visible through a stuck header.',
       v.shadow
@@ -235,6 +241,7 @@ export default defineTerm({
       css: [
         '.list {',
         '  overflow-y: auto;',
+        '  padding: 0; /* put padding on a wrapper, so rootMargin lines up with top */',
         offset > 0 ? `  scroll-padding-top: calc(32px + ${offset}px); /* your header height + offset */` : '  scroll-padding-top: 32px; /* your header height */',
         '}',
         '',
@@ -258,7 +265,7 @@ export default defineTerm({
               '}',
               '',
               '/* The first header starts 1px below the stuck line, so it is not flagged stuck at rest. */',
-              '.list > :first-child {',
+              '.list > section:first-of-type {',
               '  margin-top: 1px;',
               '}',
               '',
@@ -272,20 +279,30 @@ export default defineTerm({
         ? {
             js: [
               '// Watch the headers themselves. A header is stuck while the line',
-              `// ${offset + 1}px below the top of the list clips its top edge.`,
-              '// Pushed fully out by the next header, it is not stuck.',
-              '// The large bottom margin keeps the bottom edge from clipping headers,',
-              '// so a one-step jump into the pinned spot always crosses a threshold.',
+              `// ${offset + 1}px below the top of the list cuts through it: clipped at the top,`,
+              '// still showing below the line. Pushed fully out, or with its bottom exactly',
+              '// on the line, it is not stuck.',
+              '//',
+              '// Why the details matter:',
+              '// - The 100000px bottom margin keeps the bottom edge from ever clipping a',
+              '//   header. Otherwise a header half under the bottom edge that jumps straight',
+              '//   into the pinned spot (scrollbar drag, anchor link, scrollTop set in code)',
+              '//   stays between thresholds, gets no callback and keeps a stale state.',
+              '// - bottom > line: a header pushed out until its bottom exactly touches the',
+              '//   line still counts as intersecting (ratio 0), with at most 1px showing.',
+              '// - The 0.01 threshold: from that touching state, a header sliding back in',
+              '//   stays inside the same [0, 1] band and would get no callback.',
               "const list = document.querySelector('.list')",
               'const io = new IntersectionObserver(',
               '  (entries) => {',
               '    for (const entry of entries) {',
+              '      const { top, bottom } = entry.boundingClientRect',
+              '      const line = entry.rootBounds.top',
               '      const clipped = entry.isIntersecting && entry.intersectionRatio < 1',
-              '      const atTop = entry.boundingClientRect.top <= entry.rootBounds.top',
-              '      entry.target.dataset.stuck = String(clipped && atTop)',
+              '      entry.target.dataset.stuck = String(clipped && top <= line && bottom > line)',
               '    }',
               '  },',
-              `  { root: list, rootMargin: '-${offset + 1}px 0px 100000px 0px', threshold: [0, 1] },`,
+              `  { root: list, rootMargin: '-${offset + 1}px 0px 100000px 0px', threshold: [0, 0.01, 1] },`,
               ')',
               "list.querySelectorAll('.section-header').forEach((h) => io.observe(h))",
             ].join('\n'),
