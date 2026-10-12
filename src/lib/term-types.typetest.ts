@@ -1,6 +1,7 @@
-import { defineTerm, type Control, type ControlValues, type DemoProps } from './term-types'
+import { defineTerm, type Control, type ControlValues, type DemoProps, type GlyphProps } from './term-types'
 
 const Demo = (_: DemoProps<any>) => null
+const Glyph = (_: GlyphProps) => null
 
 const controls = [
   { id: 'offset', type: 'range', label: 'Offset', min: 0, max: 10, step: 1, default: 0 },
@@ -54,3 +55,5 @@ defineTerm({
   acceptance: () => [],
   code: () => ({}),
 })
+
+defineTerm({ slug: 'x', name: 'X', category: 'scroll', order: 1, status: 'draft', definition: 'X.', demo: { component: Demo, label: 'x', glyph: Glyph } })

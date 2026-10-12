@@ -61,6 +61,9 @@ export type DemoProps<V = Values> = {
   onCycleEnd: () => void
 }
 
+/** A 12px sidebar glyph. It animates only while `active` (the current term). */
+export type GlyphProps = { active: boolean }
+
 export type CodeRef = { css?: string; js?: string; motion?: string; gsap?: string }
 export type Source = { readonly label: string; readonly url: string }
 
@@ -75,6 +78,8 @@ type Base<C extends readonly Control[]> = {
     /** what the demo shows, for screen readers and agents */
     label: string
     controls?: C
+    /** 12px wireframe for the sidebar; terms without one get a generic glyph */
+    glyph?: ComponentType<GlyphProps>
   }
   aliases?: readonly string[]
   confusedWith?: readonly { slug: TermSlug; difference: string }[]

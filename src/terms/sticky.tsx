@@ -1,7 +1,8 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { BrowserFrame } from '@/components/demo/browser-frame'
 import { useAutoScroll } from '@/components/demo/use-auto-scroll'
-import { defineTerm, type Control, type ControlValues, type DemoProps } from '@/lib/term-types'
+import { GlyphSvg } from '@/components/site/glyph'
+import { defineTerm, type Control, type ControlValues, type DemoProps, type GlyphProps } from '@/lib/term-types'
 
 const controls = [
   { id: 'offset', type: 'range', label: 'Top offset', min: 0, max: 24, step: 4, unit: 'px', default: 0 },
@@ -73,6 +74,19 @@ function StickyDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
   )
 }
 
+function StickyGlyph({ active }: GlyphProps) {
+  return (
+    <GlyphSvg kind="sticky" active={active} clipped>
+      <g className="m">
+        {[5, 7.5, 10, 12.5].map((y) => (
+          <rect key={y} x="3" y={y} width="6" height="1" rx=".5" fill="currentColor" opacity=".5" />
+        ))}
+      </g>
+      <rect x="1.2" y="1.2" width="9.6" height="2.6" fill="currentColor" />
+    </GlyphSvg>
+  )
+}
+
 export default defineTerm({
   slug: 'sticky',
   name: 'Sticky',
@@ -105,7 +119,7 @@ export default defineTerm({
     'Stacking several sticky bars, which leaves little room to read.',
     'When the element must stay visible past the end of its parent. Sticky cannot leave its container, so use a fixed element instead.',
   ],
-  demo: { component: StickyDemo, label: 'A contact list scrolls inside a small browser window. Each letter header pins to the top while its section passes underneath, then the next header pushes it away.', controls },
+  demo: { component: StickyDemo, label: 'A contact list scrolls inside a small browser window. Each letter header pins to the top while its section passes underneath, then the next header pushes it away.', controls, glyph: StickyGlyph },
   prompt: (v) =>
     [
       'Make the section headers in this list sticky.',

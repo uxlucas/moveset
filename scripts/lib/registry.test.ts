@@ -32,11 +32,11 @@ describe('renderRegistry', () => {
 })
 
 describe('toTermData', () => {
-  test('keeps only serializable fields and fills defaults', () => {
+  test('keeps only serializable fields (no demo or glyph) and fills defaults', () => {
     const data = toTermData([
       {
         slug: 'a', name: 'A', category: 'scroll', order: 1, status: 'draft', definition: 'A.',
-        demo: { component: () => null, label: 'x' },
+        demo: { component: () => null, label: 'x', glyph: () => null },
       },
     ] as never)
     expect(data).toEqual([
