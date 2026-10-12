@@ -80,6 +80,20 @@ test('category pills filter the grid', async ({ page }) => {
   await expect(main.getByRole('heading', { level: 2, name: 'Scroll' })).toHaveCount(0)
 })
 
+test('every filter pill is fully visible on desktop (no clipping)', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'mobile scrolls the pills sideways')
+  await page.goto('/')
+  const mainBox = await page.getByRole('main').boundingBox()
+  const pills = page.getByRole('group', { name: 'Filter by category' }).getByRole('button')
+  await expect(pills).toHaveCount(8)
+  for (const pill of await pills.all()) {
+    const box = await pill.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x).toBeGreaterThanOrEqual(mainBox!.x)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(mainBox!.x + mainBox!.width)
+  }
+})
+
 test('about page loads', async ({ page }) => {
   await page.goto('/about')
   await expect(page.getByRole('heading', { level: 1, name: 'About' })).toBeVisible()

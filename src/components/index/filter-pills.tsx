@@ -13,15 +13,14 @@ const OPTIONS: { value: Filter; label: string }[] = [
 export function FilterPills({ value, onChange }: { value: Filter; onChange: (f: Filter) => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const { start, end } = useScrollEdges(ref)
-  // Scroll fade: fade only the edge that has more content.
-  const mask = `linear-gradient(to right, ${start ? 'transparent' : 'black'}, black 24px, black calc(100% - 24px), ${end ? 'transparent' : 'black'})`
   return (
     <div
       ref={ref}
       role="group"
       aria-label="Filter by category"
-      className="-mx-4 -my-0.5 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 py-1.5 [scrollbar-width:none] sm:mx-0 sm:px-0"
-      style={{ maskImage: mask, WebkitMaskImage: mask }}
+      data-fade-start={start}
+      data-fade-end={end}
+      className="scroll-fade-x -mx-4 -my-0.5 flex min-w-0 gap-1.5 overflow-x-auto px-4 py-1.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
     >
       {OPTIONS.map((o) => {
         const pressed = value === o.value

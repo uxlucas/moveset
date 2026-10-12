@@ -21,6 +21,7 @@
   --demo-subject: oklch(0.205 0 0);
   --shadow-color: oklch(0 0 0 / 0.04);
   --selection: oklch(0.205 0 0 / 0.12);
+  --cat-l: 0.58;
   --duration-1: 150ms;
   --duration-2: 200ms;
   --duration-3: 250ms;
@@ -41,6 +42,7 @@
   --demo-subject: oklch(0.95 0 0);
   --shadow-color: transparent;
   --selection: oklch(0.95 0 0 / 0.16);
+  --cat-l: 0.74;
   color-scheme: dark;
 }
 
@@ -81,6 +83,21 @@
     width: max(100%, 44px);
     height: max(100%, 44px);
     translate: -50% -50%;
+  }
+}
+
+/* Fades only the scroller edge that has more content (data attributes set by useScrollEdges). Mobile only: wider screens wrap. */
+@utility scroll-fade-x {
+  @media (width < 40rem) {
+    &[data-fade-start='true'] {
+      mask-image: linear-gradient(to right, transparent, black 24px);
+    }
+    &[data-fade-end='true'] {
+      mask-image: linear-gradient(to left, transparent, black 24px);
+    }
+    &[data-fade-start='true'][data-fade-end='true'] {
+      mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+    }
   }
 }
 
