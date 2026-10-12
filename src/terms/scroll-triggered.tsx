@@ -35,7 +35,10 @@ const controls = [
 type V = ControlValues<typeof controls>
 type Easing = V['easing']
 
-const THRESHOLD = 0.15
+// The observer measures the translated box, which sits 14px below the layout box while a card is
+// hidden, so a 0.1 threshold reveals a card when roughly 15% of it is visible.
+const THRESHOLD = 0.1
+const THRESHOLD_SEEN = 15
 const TRAVEL = 14
 const STAGGER_MS = 60
 // Cards entering together step 60ms apart, at most 4 steps, so a fast jump never queues a long wave.
@@ -88,7 +91,7 @@ function visibleRatio(tile: HTMLElement, view: DOMRect) {
   return Math.max(0, Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top)) / r.height
 }
 
-// Reveals each tile once, the first time it is 15% inside the scroller. The observer writes data-in on the
+// Reveals each tile once, when the observer sees 10% of its translated box (about 15% of the tile). The observer writes data-in on the
 // DOM node; no React state per tile. Tiles already in view when a cycle starts are shown without animating,
 // like cards on first paint. Off the play path (reduced motion before play, off-screen), it paints a still:
 // tiles in the upper part of the window are in, the ones below show as outlines of what comes next.
@@ -252,9 +255,9 @@ function cssCode(v: V): string {
 
 function jsCode(v: V): string {
   return [
-    '// Load at the end of <body>, or with defer. It marks the cards already in',
-    '// view before it hides anything, so the first screen never flashes or waits,',
-    '// and if it fails to load, every card stays visible.',
+    '// Load at the end of <body>, or with defer, so it runs by DOMContentLoaded. It',
+    '// shows the cards already on screen before it hides anything, so the first',
+    '// screen never flashes or waits, and if it fails to load, every card stays visible.',
     ...(v.stagger
       ? ["const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches"]
       : ['// Under prefers-reduced-motion the CSS drops the movement.']),
@@ -270,6 +273,8 @@ function jsCode(v: V): string {
     '  io.unobserve(card) // once',
     '}',
     '',
+    `// threshold ${THRESHOLD}: the observer measures the translated box (${TRAVEL}px lower),`,
+    `// so a card reveals when roughly ${THRESHOLD_SEEN}% of it is visible.`,
     'const io = new IntersectionObserver(',
     '  (entries) => {',
     '    // The first callback reports every observed card; later ones only the',
@@ -289,17 +294,27 @@ function jsCode(v: V): string {
     `  { threshold: ${THRESHOLD} },`,
     ')',
     '',
-    "for (const card of document.querySelectorAll('.reveal')) {",
-    '  const box = card.getBoundingClientRect()',
-    '  // Any part on screen, or already scrolled past: it stays visible as it is.',
-    `  // The ${THRESHOLD * 100}% rule is only for cards still to come (the observer).`,
-    "  if (box.top < innerHeight) card.dataset.in = 'true'",
-    '  else io.observe(card)',
+    '// First paint: any card with part of it on screen, or already scrolled past,',
+    '// is shown without animating. The threshold above is only for cards to come.',
+    'function showOnScreen() {',
+    "  const cards = [...document.querySelectorAll('.reveal:not([data-in=\"true\"])')]",
+    '  const onScreen = cards.filter((card) => card.getBoundingClientRect().top < innerHeight)',
+    '  for (const card of onScreen) {',
+    "    card.style.transition = 'none'",
+    '    show(card)',
+    '  }',
+    '  document.body.offsetWidth // commit the shown state before transitions come back',
+    "  for (const card of onScreen) card.style.transition = ''",
     '}',
+    '',
+    'showOnScreen()',
+    "document.querySelectorAll('.reveal:not([data-in=\"true\"])').forEach((card) => io.observe(card))",
     '// Only now hide the cards that are still to come.',
     "document.documentElement.classList.add('js')",
+    '// A #hash jump lands at load: run the pass again for the cards it brought on screen.',
+    "addEventListener('load', showOnScreen, { once: true })",
     '',
-    `// Focus can land in a card before it is ${THRESHOLD * 100}% in view: start its reveal now.`,
+    '// Focus can land in a card before it reaches the threshold: start its reveal now.',
     "document.addEventListener('focusin', (e) => {",
     `  const card = e.target.closest('.reveal:not([data-in="true"])')`,
     '  if (card) show(card)',
@@ -398,8 +413,9 @@ function motionCode(v: V): string {
     "      initial={above ? false : 'hidden'}",
     "      whileInView={above ? undefined : 'shown'}",
     "      animate={focused ? 'shown' : undefined}",
+    `      // amount ${THRESHOLD}: Motion measures the translated box, so about ${THRESHOLD_SEEN}% visible.`,
     `      viewport={{ once: true, amount: ${THRESHOLD} }}`,
-    `      // Focus can land in a card before it is ${THRESHOLD * 100}% in view: reveal it now.`,
+    '      // Focus can land in a card before it reaches that line: reveal it now.',
     ...(v.stagger
       ? [
           '      onFocus={() => {',
@@ -455,7 +471,7 @@ export default defineTerm({
     const compare = 'comparison only; ease-out is the default'
     const timing =
       v.easing === 'spring'
-        ? `${ms === 800 ? 'an' : 'a'} ${ms}ms${DURATION_TAG[v.duration]} spring, bounce 0.2 (CSS: \`linear(${SPRING_POINTS.join(',')})\`; ${compare})`
+        ? `${ms === 800 ? 'an' : 'a'} ${ms}ms${DURATION_TAG[v.duration]} spring, bounce 0.2 (CSS: \`${SPRING_LINEAR}\`; ${compare})`
         : `${ms}ms${DURATION_TAG[v.duration]} \`${EASING[v.easing].css}\`${v.easing === 'out' ? '' : ` (${compare})`}`
     return [
       'Reveal the cards in this grid as they scroll into view, once each.',

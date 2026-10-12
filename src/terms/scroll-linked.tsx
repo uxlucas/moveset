@@ -272,10 +272,17 @@ function cssCode(v: V): string {
       : range === 'barSection'
         ? ['/* 0: its top enters at the bottom. 1: its bottom leaves at the top. */', 'animation-timeline: --section;', 'animation-range: cover;']
         : ['/* 0: its top reaches the bottom edge. 1: its bottom does. */', 'animation-timeline: view();', 'animation-range: entry;']
+  const linkedPage = bar && range === 'page'
   const animated = [
     '/* Same test as the JS tab, which sets data-fallback when it takes over. */',
+    ...(linkedPage
+      ? [
+          '/* .is-linked is in the markup; the JS tab takes it off while the page cannot',
+          '   scroll, so the bar empties, and puts it back when it can. */',
+        ]
+      : []),
     '@supports (animation-timeline: scroll()) {',
-    `  html:not([data-fallback]) ${sel} {`,
+    `  html:not([data-fallback]) ${sel}${linkedPage ? '.is-linked' : ''} {`,
     '    /* The shorthand resets animation-timeline, so it comes first. linear maps',
     '       progress 1:1 (the default is ease); both holds the ends outside the range. */',
     `    animation: ${fx.name} linear both;`,
@@ -326,7 +333,43 @@ function cssCode(v: V): string {
   ].join('\n')
 }
 
+// Bar × page runs on both routes: the JS keeps .is-linked in step with whether the page can scroll,
+// and drives the bar itself only where scroll timelines are missing.
+const LINKED_PAGE_JS = [
+  '// Markup: <div class="progress is-linked" aria-hidden="true"></div>',
+  '// Same test as the CSS @supports, so the two routes never both drive the bar.',
+  "const supported = CSS.supports('animation-timeline', 'scroll()')",
+  ...['prefers-reduced-motion: no override.', ...HOUSE_RULE].map((l) => `// ${l}`),
+  '',
+  'const root = document.documentElement',
+  "const bar = document.querySelector('.progress')",
+  'const clamp = (n) => Math.min(Math.max(n, 0), 1)',
+  'let frame = 0',
+  '',
+  'const render = () => {',
+  '  frame = 0',
+  '  const max = root.scrollHeight - root.clientHeight',
+  '  // Both routes: while the page cannot scroll, .is-linked comes off and the',
+  '  // bar empties instead of holding its last value. It goes back on when it can.',
+  "  bar.classList.toggle('is-linked', max > 0)",
+  '  if (!supported) bar.style.transform = `scaleX(${max > 0 ? clamp(root.scrollTop / max) : 0})`',
+  '}',
+  'const schedule = () => {',
+  '  if (!frame) frame = requestAnimationFrame(render)',
+  '}',
+  '',
+  'if (!supported) {',
+  "  root.dataset.fallback = ''",
+  "  addEventListener('scroll', schedule, { passive: true })",
+  '}',
+  "addEventListener('resize', schedule)",
+  '// Content that loads or goes away changes the range without a scroll.',
+  'new ResizeObserver(schedule).observe(document.body)',
+  'render()',
+].join('\n')
+
 function jsCode(v: V): string {
+  if (v.effect === 'bar' && v.range === 'page') return LINKED_PAGE_JS
   const bar = v.effect === 'bar'
   const el = bar ? 'bar' : 'figure'
   const fx = EFFECT[v.effect]
