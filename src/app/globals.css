@@ -27,6 +27,8 @@
   --duration-2: 200ms;
   --duration-3: 250ms;
   --duration-4: 300ms;
+  /* desktop header height; the sidebar rail is capped to what's left of the viewport */
+  --header-h: 5rem;
   color-scheme: light;
 }
 
@@ -132,6 +134,7 @@
   flex: none;
   overflow: visible;
   color: var(--ink-faint);
+  transition: color 150ms ease;
 }
 .gl[data-active='true'] {
   color: var(--ink);
@@ -152,7 +155,7 @@
   }
   /* A slow bob between two positions, so ease-in-out on both ends. */
   .gl[data-glyph='parallax'][data-active='true'] .m {
-    animation-timing-function: ease-in-out;
+    animation-timing-function: var(--ease-in-out);
   }
   .gl[data-glyph='parallax'][data-active='true'] .m.b {
     animation-name: g-par-b;

@@ -37,6 +37,34 @@ test.describe('sidebar', () => {
     expect(animation).toBe('g-stick')
   })
 
+  test('the highlight appears in place on first paint, and slides only after that', async ({ page }) => {
+    // Records the highlight's transition at the moment it is first shown.
+    await page.addInitScript(() => {
+      const w = window as unknown as { firstTransition?: string }
+      new MutationObserver((_, observer) => {
+        const el = document.querySelector<HTMLElement>('[data-highlight]')
+        if (el?.style.opacity !== '1') return
+        w.firstTransition = getComputedStyle(el).transitionDuration
+        observer.disconnect()
+      }).observe(document, { attributes: true, attributeFilter: ['style'], subtree: true })
+    })
+    await page.goto('/terms/sticky')
+    await expect.poll(() => page.evaluate(() => (window as unknown as { firstTransition?: string }).firstTransition)).toBe('0s')
+    await expect
+      .poll(() => page.locator('[data-highlight]').evaluate((el) => getComputedStyle(el).transitionDuration))
+      .toMatch(/^0\.3s/)
+  })
+
+  test('a deep-linked term is scrolled into the visible part of the rail', async ({ page }) => {
+    // On a short window, Sticky's row starts out below the rail's visible part.
+    await page.setViewportSize({ width: 1280, height: 300 })
+    await page.goto('/terms/sticky')
+    const row = page.getByRole('navigation', { name: 'Terms' }).getByRole('link', { name: 'Sticky' })
+    await expect(row).toHaveAttribute('data-current', 'true')
+    await expect.poll(async () => (await row.boundingBox())!.y + 24).toBeLessThanOrEqual(300 - 56)
+    expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  })
+
   test('reduced motion stills the current glyph', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/terms/sticky')

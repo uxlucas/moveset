@@ -33,7 +33,8 @@ test('intro says what it is and who made it', async ({ page }) => {
 test('category headings show the written count and a one-line description', async ({ page }) => {
   await page.goto('/')
   const main = page.getByRole('main')
-  // Sticky is in review, which counts as written in dev.
+  // Relies on review mode (NEXT_PUBLIC_SHOW_REVIEW=1, set in .env.development): Sticky is in review and counts as
+  // written. A build without review mode shows "0 / 8".
   const scroll = main.getByRole('heading', { level: 2, name: 'Scroll' })
   await expect(scroll).toContainText('1 / 8')
   await expect(scroll).toHaveAccessibleName(/1 of 8 written/)

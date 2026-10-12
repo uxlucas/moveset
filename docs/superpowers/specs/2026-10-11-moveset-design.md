@@ -149,10 +149,12 @@ The site owns playback. A demo only has to respect these props.
 - Mobile: the sidebar goes away. Filter pills plus search take over navigation. The pill row scrolls sideways with a scroll fade on the edge that has more content.
 
 ### Index (`/`)
-- Intro: what it is, who made it, a copy block with `npx skills add uxlucas/moveset`, repo link.
+- Intro: what it is, who made it, a copy block with `npx skills add uxlucas/moveset` and a one-line caption under it, repo link.
+- Footer on every page (under the content column, hairline on top): About and GitHub links. The header holds only the wordmark and the theme toggle.
 - One row with filter pills (All + seven categories) and a search field.
 - Search matches name, aliases and definition. Results and filters update instantly with no animation. `/` focuses search. Empty result: "Nothing matches 'x'. Try describing what it does."
-- Two-column card grid under category headings. Card: demo on top, name and definition below. Draft cards are muted with a "Soon" pill and are not links, but their demo still plays.
+- Two-column card grid under category headings. Each heading is the category name, a hairline, and the written count ("1 / 8", or just the total once complete), with a one-line description of the category under it. Sections sit 52px apart.
+- Card: demo on top, name and definition below. Draft cards have no surface or shadow, only a dashed outline; their demo and caption sit at 45% opacity and the name is followed by a dashed "Soon" pill. They are not links, but their demo still plays.
 
 ### Entry (`/terms/[slug]`)
 In order:
@@ -186,7 +188,7 @@ These are starting defaults. Lucas reviews the first milestone in the browser an
 - Near-white page (`#fafafa`-ish), white cards with a hairline border and a soft layered shadow. Dark mode is near-black with surfaces separated by lightness, not shadow.
 - Color tokens defined in OKLCH; dark mode derived from the same scale. Theme follows the system by default.
 - Inter for text, Geist Mono for prompt and code blocks. Balanced wrapping on headings, tabular figures for numbers, antialiased text.
-- Color has one job: each category icon gets its own hue. Everything else is neutral.
+- Color has one job: each category icon gets its own hue. Category icons now appear only on entry pages (the sidebar and index headings are neutral). Everything else is neutral.
 - Demos are grayscale wireframes. The moving subject gets the strongest contrast.
 - Icons: Lucide at 16px (swappable for Keyline later).
 

@@ -22,9 +22,10 @@ export function Intro() {
         <code className="font-mono text-[13px] text-ink">{SKILL_COMMAND}</code>
         <CopyButton text={SKILL_COMMAND} label="Copy install command" className="hit size-8 justify-center rounded-lg text-ink-muted hover:text-ink" />
       </div>
+      <p className="mt-2 text-[13px] text-ink-muted">Adds the whole vocabulary to your agent as a skill.</p>
       <a
         href={REPO_URL}
-        className="press mt-3 flex items-center justify-between rounded-2xl bg-surface px-5 py-4 text-ink shadow-card hover:shadow-card-hover"
+        className="press mt-4 flex items-center justify-between rounded-2xl bg-surface px-5 py-4 text-ink shadow-card hover:shadow-card-hover"
       >
         <span className="text-sm">{REPO}</span>
         <ArrowUpRight size={16} aria-hidden className="text-ink-muted" />

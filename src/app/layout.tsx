@@ -28,10 +28,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Header />
           <div className="lg:grid lg:grid-cols-[260px_minmax(0,1fr)_260px]">
             <Sidebar />
-            <main id="main" className="mx-auto w-full max-w-[680px] px-4 pb-24 pt-6 sm:px-6 lg:pt-10">
-              {children}
+            <div className="min-w-0">
+              <main id="main" className="mx-auto w-full max-w-[680px] px-4 pt-6 sm:px-6 lg:pt-10">
+                {children}
+              </main>
               <Footer />
-            </main>
+            </div>
           </div>
         </ThemeProvider>
       </body>
