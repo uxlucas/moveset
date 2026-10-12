@@ -119,4 +119,8 @@ list.querySelectorAll('.section-header').forEach((h) => io.observe(h))
 
 Keep stuck headers as real headings in reading order, and set scroll-padding-top on the scroll container so a focused row is never hidden underneath a stuck header.
 
+## Related
+
+- [Scroll Snap](https://moveset.lucaslima.design/terms/scroll-snap)
+
 Source: https://moveset.lucaslima.design/terms/sticky

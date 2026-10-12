@@ -155,9 +155,11 @@ Keep scroll-linked movement small and in step with the scroll: large motion out 
 ## Related
 
 - [Scroll-triggered](https://moveset.lucaslima.design/terms/scroll-triggered)
+- [Parallax](https://moveset.lucaslima.design/terms/parallax)
 
 ## Often confused with
 
+- [Scroll-linked vs Parallax](https://moveset.lucaslima.design/compare/parallax-vs-scroll-linked): Parallax is one use of scroll-linked motion: layers move at different speeds to suggest depth. Scroll-linked is the general technique of tying any property to the scroll position.
 - [Scroll-linked vs Scroll-triggered](https://moveset.lucaslima.design/compare/scroll-linked-vs-scroll-triggered): Scroll-triggered plays once on its own clock when something enters view. Scroll-linked has no clock: its progress is the scroll position, so it runs backwards when you scroll up.
 
 Source: https://moveset.lucaslima.design/terms/scroll-linked

@@ -295,7 +295,7 @@ export default defineTerm({
   name: 'Scroll Snap',
   category: 'scroll',
   order: 5,
-  status: 'review',
+  status: 'published',
   definition: 'Scrolling comes to rest exactly on an item instead of stopping anywhere in between.',
   aliases: ['snap scrolling', 'paged scroll', 'full-page scroll', 'section snapping', 'stops on each section', 'scroll-snap-type'],
   description:

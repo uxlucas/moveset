@@ -1,6 +1,6 @@
 ---
 name: moveset
-description: "Design engineering vocabulary with copy-ready prompts: turns a vague description of motion or interaction into its exact term and a prompt with acceptance criteria. Use when someone describes an effect loosely (\"the header stays put while I scroll\", \"things fade in as they come into view\"), asks what an effect is called, or wants a precise prompt for building one. Terms: Scroll-triggered, Scroll-linked, Sticky."
+description: "Design engineering vocabulary with copy-ready prompts: turns a vague description of motion or interaction into its exact term and a prompt with acceptance criteria. Use when someone describes an effect loosely (\"the header stays put while I scroll\", \"things fade in as they come into view\"), asks what an effect is called, or wants a precise prompt for building one. Terms: Scroll-triggered, Scroll-linked, Parallax, Sticky, Scroll Snap."
 ---
 
 # moveset
@@ -21,7 +21,9 @@ A visual dictionary of design engineering terms. Each one shows the idea moving,
 
 - **Scroll-triggered**: An animation that plays once when an element scrolls into view. Also called: reveal on scroll, animate on scroll, in-view animation, scroll reveal, fade in when scrolled to, appear as you scroll. Read `terms/scroll-triggered.md`.
 - **Scroll-linked**: An animation whose progress is tied directly to the scroll position, moving forward and backward as you scroll. Also called: scroll-driven animation, scrubbing, scroll timeline, tied to scroll position, progress follows the scrollbar, scroll scrubbed. Read `terms/scroll-linked.md`.
+- **Parallax**: Layers move at different speeds while you scroll, which makes the page feel like it has depth. Also called: depth scroll, multi-speed scroll, layered scroll, background moves slower, background lags behind the content, parallax scrolling. Read `terms/parallax.md`.
 - **Sticky**: An element scrolls with the page until it hits an edge, then stays pinned while the rest of its section scrolls underneath. Also called: sticky header, sticky section header, pinned header, header that stays at the top, position sticky, sticky table header, stuck header, header stays while scrolling, content scrolls under the header, sticky nav, section headers push each other. Read `terms/sticky.md`.
+- **Scroll Snap**: Scrolling comes to rest exactly on an item instead of stopping anywhere in between. Also called: snap scrolling, paged scroll, full-page scroll, section snapping, stops on each section, scroll-snap-type. Read `terms/scroll-snap.md`.
 
 ## House motion tokens
 

@@ -316,7 +316,7 @@ export default defineTerm({
   name: 'Parallax',
   category: 'scroll',
   order: 3,
-  status: 'review',
+  status: 'published',
   definition: 'Layers move at different speeds while you scroll, which makes the page feel like it has depth.',
   aliases: [
     'depth scroll',
