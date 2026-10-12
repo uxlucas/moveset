@@ -88,9 +88,11 @@ test('drafts have no page and are never linked as prev/next', async ({ page }) =
   expect(published?.status()).toBe(200)
   const response = await page.goto('/terms/parallax')
   expect(response?.status()).toBe(404)
+  // Sticky is 4th in Scroll and Parallax (3rd) is a draft, so the previous link skips over it.
   await page.goto('/terms/sticky')
   const nav = page.getByRole('navigation', { name: 'Previous and next' })
-  await expect(nav.getByRole('link')).toHaveCount(0)
+  await expect(nav.getByRole('link')).toHaveCount(1)
+  await expect(nav.getByRole('link')).toHaveText('← Scroll-linked')
 })
 
 test('a compare pair with a draft side has no page', async ({ page }) => {
