@@ -30,16 +30,22 @@ const controls = [
 type V = ControlValues<typeof controls>
 
 const PANELS = 5
-// What shows below a panel at rest (the 8px gap, then the next panel), in the prompt and in the demo.
+// The prompt's numbers: what shows below a resting panel (the 8px gap, then the next panel), and the gap.
 const PEEK = 48
 const GAP = 8
-const DEMO_PEEK = { card: 40, detail: 64 }
+// The demo's: the same idea scaled to the small window, plus an inset at the top (scroll-padding-top and a spacer of
+// the same height) so a resting panel doesn't sit flush against the toolbar. It equals the gap, so all that shows
+// above a resting panel is the gap, never a sliver of the panel before it.
+const INSET = GAP
+const DEMO = { card: { peek: 36 }, detail: { peek: 56 } }
 
 // Panels sit one stride apart (panel + gap) and both alignments rest at multiples of it, so with five panels
 // a stride is a quarter of the scroll and panel 3 rests at exactly half.
 const STRIDE = 1 / (PANELS - 1)
 // A visitor's flick: a short drag that is still moving when released, then the snap carrying it onto the next panel.
-const NUDGE: Bezier = [0.45, 0, 0.85, 0.55]
+// NUDGE ends at 4x its average speed and SETTLE starts at 3x its own; flick() sizes the settle so the two speeds match
+// at the hand-off.
+const NUDGE: Bezier = [0.5, 0, 0.85, 0.4]
 const SETTLE: Bezier = [0.2, 0.6, 0.3, 1]
 // Proximity only: a slow drag that stops halfway between two panels and stays there.
 const DRIFT: Bezier = [0.4, 0, 0.6, 1]
@@ -47,32 +53,35 @@ const DRIFT: Bezier = [0.4, 0, 0.6, 1]
 function buildTrack(strictness: V['strictness']): TrackPoint[] {
   const track: TrackPoint[] = [[0, 0]]
   let t = 0
-  const at = () => track[track.length - 1][1]
+  const at = () => track[track.length - 1][1] / STRIDE
   const hold = (ms: number) => {
     t += ms
-    track.push([t, at(), 'linear'])
+    track.push([t, at() * STRIDE, 'linear'])
   }
-  const flick = (to: number, drag = 0.18) => {
-    t += 480
-    track.push([t, at() + drag * STRIDE, NUDGE])
-    t += 460
+  // Drag `drag` strides in `nudgeMs`, then settle the rest of the way to panel `to`.
+  const flick = (to: number, drag: number, nudgeMs: number) => {
+    const rest = to - at() - drag
+    t += nudgeMs
+    track.push([t, (at() + drag) * STRIDE, NUDGE])
+    // Release speed 4 × drag / nudgeMs = settle start speed 3 × rest / settleMs.
+    t += Math.round((3 * rest * nudgeMs) / (4 * drag))
     track.push([t, to * STRIDE, SETTLE])
   }
   hold(600)
-  flick(1)
-  hold(700)
-  flick(2)
-  hold(700)
+  flick(1, 0.25, 240)
+  hold(800)
+  flick(2, 0.25, 240)
+  hold(800)
   if (strictness === 'proximity') {
     t += 900
     track.push([t, 2.5 * STRIDE, DRIFT])
     hold(1100)
-    flick(3, 0.28)
+    flick(3, 0.2, 400)
   } else {
-    flick(3)
+    flick(3, 0.25, 240)
   }
-  hold(700)
-  flick(4)
+  hold(800)
+  flick(4, 0.25, 240)
   hold(300)
   return track
 }
@@ -91,6 +100,7 @@ const SNAP_CLASS = {
     takeover: '[&_[data-scroller][data-taken-over=true]]:[scroll-snap-type:y_proximity]',
   },
 } as const
+const PADDING_CLASS = '[&_[data-scroller]]:[scroll-padding-top:8px]'
 
 function ScrollSnapDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }: DemoProps<V>) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -104,21 +114,23 @@ function ScrollSnapDemo({ values, playing, replayKey, size, timeScale, onCycleEn
     stillAt: 2 * STRIDE,
   })
   const detail = size === 'detail'
-  const peek = DEMO_PEEK[size]
+  const { peek } = DEMO[size]
+  const inset = INSET
   const center = values.align === 'center'
-  // Room so the first and last panels can rest like the others: below the last for start, half on each end for center.
-  const before = center ? peek / 2 : 0
+  // Same rules as the prompt: the top inset first, then room so the first and last panels can rest like the others
+  // (below the last for start, half on each end for center).
+  const before = inset + (center ? peek / 2 : 0)
   const after = center ? peek / 2 : peek
 
   return (
-    <div className={`h-full ${SNAP_CLASS[values.strictness][playing ? 'takeover' : 'still']}`}>
+    <div className={`h-full ${PADDING_CLASS} ${SNAP_CLASS[values.strictness][playing ? 'takeover' : 'still']}`}>
       <BrowserFrame scrollRef={scrollRef} size={size} label="Numbered panels that snap into place as the page scrolls">
-        {before > 0 && <div aria-hidden style={{ height: before }} />}
+        <div aria-hidden style={{ height: before }} />
         {Array.from({ length: PANELS }, (_, i) => (
           <div
             key={i}
             data-panel={i + 1}
-            style={{ height: `calc(100% - ${peek}px)`, marginBottom: i < PANELS - 1 ? GAP : 0 }}
+            style={{ height: `calc(100% - ${inset + peek}px)`, marginBottom: i < PANELS - 1 ? GAP : 0 }}
             className={`flex items-center justify-center rounded-lg bg-demo ${center ? 'snap-center' : 'snap-start'} ${detail ? 'mx-4' : 'mx-3'}`}
           >
             <span className={`font-medium tabular-nums tracking-[-0.02em] text-demo-subject ${detail ? 'text-5xl' : 'text-3xl'}`}>{i + 1}</span>
@@ -141,36 +153,55 @@ function ScrollSnapGlyph({ active }: GlyphProps) {
   )
 }
 
+// Room at each end so the first and last panels rest like the others. The snap area is the viewport below the header;
+// a panel is PEEK shorter, so start needs all of it after the last panel, center half of it at each end.
 const ROOM = {
-  start: { prompt: `\`padding-bottom: ${PEEK}px\`, so the last panel can reach the top`, css: `padding-bottom: ${PEEK}px;` },
-  center: { prompt: `\`padding-block: ${PEEK / 2}px\`, so the first and last panels can center`, css: `padding-block: ${PEEK / 2}px;` },
+  start: { top: 'H', bottom: PEEK, css: `var(--header) ${PEEK}px` },
+  center: { top: `H + ${PEEK / 2}px`, bottom: PEEK / 2, css: `calc(var(--header) + ${PEEK / 2}px) ${PEEK / 2}px` },
 }
 
 function cssCode(v: V): string {
   const center = v.align === 'center'
   return [
     '/* The whole page snaps. For a nested scroller, move the html rules onto it,',
-    '   give it a fixed height and overflow-y: auto, and use 100% for 100svh. */',
+    '   give it a fixed height and overflow-y: auto, and use that height for 100svh. */',
+    ':root {',
+    "  --header: 0px; /* a fixed header's height, e.g. 56px */",
+    '}',
+    '',
     'html {',
     `  scroll-snap-type: y ${v.strictness};`,
     ...(v.strictness === 'proximity' ? ['  /* proximity: rests on a panel only when released near one. */'] : []),
-    center ? '  /* Room before the first panel and after the last, so they center too. */' : '  /* Room after the last panel, so it can rest at the top too. */',
-    `  ${ROOM[v.align].css}`,
-    '  /* A fixed header: its height, so panels rest under it, not behind it. */',
-    '  scroll-padding-top: var(--header, 0px);',
+    '  /* Panels rest under the header, not behind it. */',
+    '  scroll-padding-top: var(--header);',
+    ...(center
+      ? [
+          "  /* At each end, half the snap area's height minus a panel's (plus the",
+          '     header at the top), so the first and last panels can center too. */',
+        ]
+      : [
+          "  /* Top: the first panel starts below the header. Bottom: the snap area's",
+          "     height minus a panel's, so the last panel can rest at the top too. */",
+        ]),
+    `  padding-block: ${ROOM[v.align].css};`,
+    '}',
+    '',
+    'body {',
+    '  margin: 0;',
     '}',
     '',
     '.panel {',
     `  scroll-snap-align: ${v.align};`,
-    `  /* Fits under the header, with ${PEEK}px left for the gap and ${center ? 'the neighbours' : 'the next panel'}.`,
-    '     A panel taller than the viewport cannot be read whole. */',
-    `  height: calc(100svh - var(--header, 0px) - ${PEEK}px);`,
+    `  /* The snap area (viewport minus header) less ${PEEK}px: the ${GAP}px gap and the`,
+    `     edge of ${center ? 'each neighbour' : 'the next panel'} show. Never taller than the snap area. */`,
+    `  height: calc(100svh - var(--header) - ${PEEK}px);`,
+    `  margin-bottom: ${GAP}px;`,
     '  /* normal lets a fast fling pass panels. always: none can be skipped. */',
     '  scroll-snap-stop: normal;',
     '}',
     '',
-    '.panel + .panel {',
-    `  margin-top: ${GAP}px;`,
+    '.panel:last-child {',
+    '  margin-bottom: 0;',
     '}',
     '',
     '/* Nested scroller only: the page behind stays put at either end.',
@@ -204,14 +235,17 @@ function jsCode(v: V): string {
     '}',
     '',
     'function go(i) {',
-    '  const panel = panels[Math.min(Math.max(i, 0), panels.length - 1)]',
+    '  const target = Math.min(Math.max(i, 0), panels.length - 1)',
+    '  // Step from the target, not the panel on screen, so a quick double click',
+    '  // moves two panels.',
+    '  show(target)',
     '  // block matches scroll-snap-align; scrollIntoView respects scroll-padding.',
     '  // Snapping stays under reduced motion; only the glide goes.',
-    `  panel.scrollIntoView({ block: '${v.align}', behavior: reduce.matches ? 'auto' : 'smooth' })`,
+    `  panels[target].scrollIntoView({ block: '${v.align}', behavior: reduce.matches ? 'instant' : 'smooth' })`,
     '}',
     '',
     center
-      ? "// The panel at rest: its middle nearest the middle of the area below the header."
+      ? '// The panel at rest: its middle nearest the middle of the area below the header.'
       : '// The panel at rest: its top nearest the top of the area below the header.',
     'function nearest() {',
     '  const header = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0',
@@ -231,9 +265,12 @@ function jsCode(v: V): string {
     "next.addEventListener('click', () => go(current + 1))",
     '',
     "if ('onscrollsnapchange' in window) {",
-    '  // Chromium 129+: fires once a scroll is going to rest on another panel.',
+    '  // Chromium 129+: fires when a scroll comes to rest on a different snap target.',
     '  // The page fires it on document; a nested scroller fires it on itself.',
-    "  document.addEventListener('scrollsnapchange', (e) => show(panels.indexOf(e.snapTargetBlock)))",
+    '  // The target is null when a scroll rests between two panels (proximity).',
+    "  document.addEventListener('scrollsnapchange', (e) => {",
+    '    show(e.snapTargetBlock ? panels.indexOf(e.snapTargetBlock) : nearest())',
+    '  })',
     "} else if ('onscrollend' in window) {",
     "  addEventListener('scrollend', () => show(nearest()))",
     '} else {',
@@ -258,9 +295,9 @@ export default defineTerm({
   definition: 'Scrolling comes to rest exactly on an item instead of stopping anywhere in between.',
   aliases: ['snap scrolling', 'paged scroll', 'full-page scroll', 'section snapping', 'stops on each section', 'scroll-snap-type'],
   description:
-    'Scroll snap is plain CSS. The container says how strictly to snap, mandatory or proximity, and each panel says which of its edges lines up. People still scroll freely with wheel, trackpad, touch or keys; when the scroll comes to rest, the browser carries it the rest of the way onto a panel with its own momentum. JavaScript is only needed for extras like next and previous buttons.',
+    'Scroll snap is plain CSS. The container says how strictly to snap, mandatory or proximity, and each panel says which part lines up: start, center or end. People still scroll freely with wheel, trackpad, touch or keys. When a scroll ends, the browser finishes it on the nearest panel. JavaScript is only needed for extras like next and previous buttons.',
   useWhen: [
-    'Galleries and carousels, where each image or card is the unit.',
+    'Vertical galleries and full-screen feeds, where each image or post is the unit. Use the x axis for a sideways carousel.',
     'Onboarding steps and full-screen slides, one idea per screen.',
     'Story sections people page through, where resting between two is never useful.',
   ],
@@ -278,35 +315,37 @@ export default defineTerm({
   },
   prompt: (v) => {
     const center = v.align === 'center'
+    const room = ROOM[v.align]
     return [
       'Make this page snap to whole panels as it scrolls.',
       '',
-      `- Container (\`html\` for the whole page, or a nested scroller with a fixed height and \`overflow-y: auto\`): \`scroll-snap-type: y ${v.strictness}\`${v.strictness === 'proximity' ? ' (rests on a panel only when released near one)' : ''}; ${ROOM[v.align].prompt}.`,
-      `- Panels: \`scroll-snap-align: ${v.align}\`, \`height: calc(100svh - ${PEEK}px)\`, ${GAP}px apart (${center ? 'both neighbours show' : 'the next one shows'}); nested: \`100%\` for \`100svh\`. Never taller than the container.`,
-      '- Fixed header: `scroll-padding-top` = its height (e.g. 56px); subtract it from the panel height.',
+      `- Container (\`html\` for the whole page, or a nested scroller with a fixed height and \`overflow-y: auto\`): \`scroll-snap-type: y ${v.strictness}\`${v.strictness === 'proximity' ? ' (rests on a panel only when released near one)' : ''}.`,
+      `- H = a fixed header's height (e.g. 56px), else 0. Container: \`scroll-padding-top: H\`, \`padding-top: ${room.top}\`, \`padding-bottom: ${room.bottom}px\` (${center ? 'half of ' : ''}snap area height, viewport − H, minus panel height). Page: \`body { margin: 0 }\`.`,
+      `- Panels: \`scroll-snap-align: ${v.align}\`, \`height: calc(100svh - H - ${PEEK}px)\` (nested: the scroller's height for \`100svh\`), \`margin-bottom: ${GAP}px\`, none on the last.`,
       '- Panels that must not be skipped (steps, onboarding): `scroll-snap-stop: always`; otherwise `normal`.',
       '- Nested scroller: `overscroll-behavior-y: contain`, `tabindex="0"`, `role="region"`, an `aria-label`, so arrow keys and PageDown scroll it.',
-      `- Prev/next buttons: \`panel.scrollIntoView({ block: '${v.align}', behavior })\`, \`'smooth'\`, or \`'auto'\` under reduced motion; disabled at the ends.`,
-      `- Current panel: \`scrollsnapchange\` (\`event.snapTargetBlock\`) where \`'onscrollsnapchange' in window\`; else on \`scrollend\` (or 100ms after the last \`scroll\`), the panel whose ${center ? 'middle is nearest the middle of' : 'top is nearest the top of'} the area below \`scroll-padding-top\`.`,
+      `- Prev/next buttons: \`panel.scrollIntoView({ block: '${v.align}', behavior })\`, \`behavior: 'smooth'\`, \`'instant'\` under reduced motion; set the current index on click; disabled at the ends.`,
+      `- Current panel: where \`'onscrollsnapchange' in window\`, \`event.snapTargetBlock\` (\`null\` between panels: use the nearest); else on \`scrollend\` (or 100ms after the last \`scroll\`), the nearest. Nearest: ${center ? "middle closest to the snap area's middle" : "top closest to the snap area's top"}.`,
       '- No wheel or touch listeners, no `preventDefault`: the browser snaps.',
       '- Reduced motion: keep snapping (a resting position, not an animation); `scroll-behavior: auto` on the container.',
     ].join('\n')
   },
   acceptance: (v) => {
     const center = v.align === 'center'
-    const rest = center ? 'with one panel centered and both neighbours showing equally' : "with one panel's top at the top of the container"
+    const rest = center ? 'with one panel centered in the snap area and both neighbours showing equally' : "with one panel's top at the top of the snap area"
     return [
       v.strictness === 'mandatory'
         ? `Releasing a scroll anywhere between two panels, including after a fast fling, comes to rest ${rest}.`
         : `Releasing a scroll close to a panel comes to rest ${rest}; stopping about halfway between two panels stays there.`,
       v.strictness === 'mandatory'
         ? 'With focus in the container, PageDown moves exactly one panel and PageUp one back.'
-        : 'With focus in the container, PageDown and PageUp scroll as usual and never get stuck on a panel.',
+        : 'With focus in the container, PageDown moves one panel; ArrowDown moves a few lines and stays there instead of jumping to the next panel.',
       center
-        ? 'With a 56px fixed header, a resting panel is centered in the area below the header.'
-        : "With a 56px fixed header, a resting panel's top sits directly under the header, not behind it.",
-      center ? 'The first and last panels can rest centered like the others.' : 'The last panel can rest at the top like the others.',
-      'Prev and next move one panel each and are disabled on the first and last; after any scroll they reflect the panel at rest.',
+        ? 'With a 56px fixed header, every panel, the first one at scroll 0 included, rests centered in the area below the header.'
+        : 'With a 56px fixed header, every panel, the first one at scroll 0 included, rests with its top directly under the header.',
+      center ? 'The first and last panels rest centered like the others.' : 'The last panel can rest at the top like the others.',
+      'Prev and next move one panel each, a quick double click moves two, and they are disabled on the first and last panel.',
+      'After any scroll, including one that rests between two panels, prev and next step from the panel nearest the snap position.',
       'In a nested scroller, scrolling past the last panel does not scroll the page behind it.',
       'Resizing the window keeps the same panel in place.',
       'With reduced motion on, scrolling still snaps; prev and next jump without a glide.',
