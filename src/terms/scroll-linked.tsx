@@ -204,26 +204,37 @@ function ScrollLinkedGlyph({ active }: GlyphProps) {
 type Range = 'page' | 'barSection' | 'figureSection'
 const rangeOf = (v: V): Range => (v.range === 'page' ? 'page' : v.effect === 'bar' ? 'barSection' : 'figureSection')
 
-const RANGE_WORDS: Record<Range, string> = {
-  page: '0 at the top of the page and 1 when it is scrolled to the end: `scrollTop / (scrollHeight - clientHeight)`. If the page does not scroll, progress is 0',
-  barSection:
-    '0 when the top of the section enters at the bottom of the viewport, 1 when its bottom leaves at the top (CSS `animation-range: cover`). Before the section the bar is empty; after it, full',
-  figureSection:
-    "0 when the figure's top edge reaches the bottom of the viewport, 1 when its bottom edge does (CSS `animation-range: entry`). Before that range it holds its start state; after it, its end state",
+function intro(v: V): string {
+  if (v.effect === 'bar') {
+    return v.range === 'page'
+      ? 'Add a reading progress bar that follows the scroll position of the page.'
+      : 'Add a progress bar that tracks one section of the page (class `marked-section`, or the section the user names).'
+  }
+  const verb = v.effect === 'fade' ? 'Fade this figure in' : 'Scale this figure up'
+  return v.range === 'page'
+    ? `${verb} as the page scrolls, tied to the scroll position. Only for an element below the first screen.`
+    : `${verb} as it scrolls into view, tied to the scroll position.`
+}
+
+const PROGRESS_LINE: Record<Range, string> = {
+  page: 'Progress = `scrollTop / (scrollHeight - clientHeight)` of the page scroll (`document.scrollingElement`), clamped 0..1; 0 if the page does not scroll.',
+  barSection: "Progress: 0 when the section's top enters at the bottom of the viewport, 1 when its bottom leaves at the top; clamped 0..1.",
+  figureSection: "Progress: 0 when the figure's top reaches the bottom of the viewport, 1 when its bottom does; clamped 0..1.",
 }
 
 const TIMELINE_WORDS: Record<Range, string> = {
   page: '`animation-timeline: scroll(root)`',
   barSection:
-    '`animation-timeline: --section` and `animation-range: cover`, where the section declares `view-timeline: --section block` and `body` shares the name with `timeline-scope: --section`',
+    '`animation-timeline: --section` and `animation-range: cover` (`.marked-section { view-timeline: --section block }`, `body { timeline-scope: --section }`)',
   figureSection: '`animation-timeline: view()` and `animation-range: entry`',
 }
 
-const MOTION_OFFSET: Record<Range, string> = {
-  page: '',
-  barSection: " with `target` and `offset: ['start end', 'end start']`",
-  figureSection: " with `target` and `offset: ['start end', 'end end']`",
-}
+// Keyframe ends as the prompt names them.
+const PROMPT_STEPS = {
+  bar: ['`scaleX(0)`', '`scaleX(1)`'],
+  fade: ['`opacity: 0`', '`opacity: 1`'],
+  scale: [`\`scale(${SCALE_FROM})\``, '`scale(1)`'],
+} as const
 
 // Per effect: the keyframes' name and steps, and the property and value the JS route writes.
 const EFFECT = {
@@ -460,18 +471,6 @@ function motionCode(v: V): string {
   ].join('\n')
 }
 
-function intro(v: V): string {
-  if (v.effect === 'bar') {
-    return v.range === 'page'
-      ? 'Add a reading progress bar that follows the scroll position of the page.'
-      : 'Add a progress bar that tracks one section of the page (give it the class `marked-section`, or use the section the user names).'
-  }
-  const verb = v.effect === 'fade' ? 'Fade this figure in' : 'Scale this figure up'
-  return v.range === 'page'
-    ? `${verb} as the page scrolls, tied to the scroll position. Use this only for an element below the first screen; anything visible on load needs its own range.`
-    : `${verb} as it scrolls into view, tied to the scroll position.`
-}
-
 export default defineTerm({
   slug: 'scroll-linked',
   name: 'Scroll-linked',
@@ -510,31 +509,28 @@ export default defineTerm({
     const bar = v.effect === 'bar'
     const fx = EFFECT[v.effect]
     const range = rangeOf(v)
+    const [from, to] = PROMPT_STEPS[v.effect]
     const effectLine = bar
-      ? '- The bar is 2px tall and fixed across the top of the viewport at full width, above the page header (`z-index: 50`), with `pointer-events: none`, `transform-origin: left`, `transform: scaleX(progress)` and `will-change: transform`. Never animate its width. It is decorative: give it `aria-hidden`.'
+      ? '- Bar: 2px tall, fixed across the top, full width, `z-index: 50`, `pointer-events: none`, `aria-hidden`, `transform-origin: left`, `transform: scaleX(progress)` (base `scaleX(0)`), `will-change: transform`. Never animate width.'
       : v.effect === 'fade'
-        ? '- Set `opacity: progress`, from 0 to 1. The figure keeps its space the whole time, so nothing around it moves.'
-        : `- Set \`transform: scale(${SCALE_FROM} + ${+(1 - SCALE_FROM).toFixed(2)} × progress)\`, from ${SCALE_FROM} to 1, centered. Never animate its width or height.`
-    const reduced = bar
-      ? '- Under `prefers-reduced-motion: reduce`, keep the bar tracking and add no override: its position is the information, and it moves only as far as the reader scrolls.'
-      : `- Under \`prefers-reduced-motion: reduce\`, show the final state (${v.effect === 'fade' ? 'fully opaque' : 'full size'}) and leave it there while scrolling.`
-    const top =
-      range === 'page' ? (bar ? 'bar empty' : 'figure at its start state') : range === 'barSection' ? 'bar empty until the section enters' : 'figure at its start state until it reaches the viewport'
+        ? '- Figure: `opacity: progress` (0 to 1); it keeps its space.'
+        : `- Figure: \`transform: scale(${SCALE_FROM} + ${+(1 - SCALE_FROM).toFixed(2)} × progress)\`, centered. Never animate width or height.`
     return [
       intro(v),
       '',
-      '- There is no duration and no easing: progress is the scroll position, mapped linearly to a number from 0 to 1, so the effect moves exactly as far as the reader scrolls and runs backwards when they scroll up. No transition, delay or smoothing on top; any lag breaks the 1:1 link with the scrollbar.',
-      `- Progress: ${RANGE_WORDS[range]}.`,
+      `- ${PROGRESS_LINE[range]} No transition, easing, delay or smoothing.`,
+      ...(range === 'page' ? ['- For a nested scroller, use its own scrollTop/scrollHeight and `scroll(nearest)`.'] : []),
       effectLine,
-      `- CSS route: define \`@keyframes ${fx.name}\` from \`${fx.from}\` to \`${fx.to}\`, and apply it with \`animation: ${fx.name} linear both\` followed by ${TIMELINE_WORDS[range]}. The shorthand resets \`animation-timeline\`, so it must come first. \`linear\` keeps progress 1:1 (the default is ease), and \`both\` holds the start and end states outside the range.`,
-      "- Feature-test once in JS with `CSS.supports('animation-timeline', 'scroll()')`. When it is false, set `data-fallback` on `<html>` and take the JS route. Scope the CSS animation under `html:not([data-fallback])` inside `@supports (animation-timeline: scroll())`, so the two routes never both drive the element.",
-      '- JS route: a passive scroll listener that schedules one requestAnimationFrame, reads the scroll position, clamps progress to 0..1 and writes the style. Also recompute on `resize` and when content changes size (a `ResizeObserver` on `document.body`); a scroll listener alone goes stale. The CSS route needs none of this.',
-      bar
-        ? `- With Motion (only if the project already uses it): \`useScroll\`${MOTION_OFFSET[range]}, and bind \`scrollYProgress\` straight to \`scaleX\`.`
-        : `- With Motion (only if the project already uses it): \`useScroll\`${MOTION_OFFSET[range]}, and \`useTransform\` to map progress onto \`${v.effect === 'fade' ? 'opacity' : 'scale'}\`.`,
-      `- States to handle: at the top (${top}); midway (exactly proportional); at the end (${bar ? 'bar full' : 'final state'}); scrolling back up (runs backwards at the same rate, never replays forward); resize and content changes (recompute the range from the new sizes)${range === 'page' ? '; a page that does not scroll (start state, no division by zero)' : ''}; browsers without scroll timelines (the JS route).`,
-      reduced,
-      "- Don't trigger it once when the element enters (that is scroll-triggered), and don't store progress in framework state on every scroll event; write to the element.",
+      ...(bar ? [] : ["- The figure's base style is its final state."]),
+      `- CSS route: \`@keyframes ${fx.name}\` from ${from} to ${to}; \`animation: ${fx.name} linear both\`, then ${TIMELINE_WORDS[range]} (the shorthand resets the timeline, so it goes first).`,
+      "- Feature-test `CSS.supports('animation-timeline', 'scroll()')` synchronously before first render and set `data-fallback` on `<html>` when false; then use the JS route. Scope the CSS animation to `html:not([data-fallback])` inside `@supports (animation-timeline: scroll())`.",
+      `- JS route: passive scroll listener, one requestAnimationFrame, clamp, write the ${fx.prop} to the element (not framework state). Also recompute on \`resize\` and a \`ResizeObserver\` on \`document.body\`; scroll alone goes stale.${v.effect === 'scale' && range === 'figureSection' ? " Measure the figure's layout box (its rect includes the scale)." : ''}`,
+      ...(bar && range === 'page'
+        ? [
+            '- If the page stops being scrollable (content removed, window grown), reset the bar to 0 (watch with the same `resize` and `ResizeObserver` on both routes): on the CSS route, keep the animation on `.is-linked`, remove `.is-linked` from the bar while the page cannot scroll and add it back when it can; on the JS route write `scaleX(0)`.',
+          ]
+        : []),
+      bar ? '- Reduced motion: no override.' : `- Reduced motion: no animation; ${v.effect === 'fade' ? 'fully opaque' : 'full size'}.`,
     ].join('\n')
   },
   acceptance: (v) => {
