@@ -362,7 +362,7 @@ export default defineTerm({
       "- Progress: 0 when the hero's top is at the viewport top, 1 when its bottom is; clamped.",
       `- ${three ? 'Each layer' : 'Layer'}: \`translate3d(0, progress × (1 − ratio) × 100%, 0)\` (${three ? `${shift(far)}% far, ${shift(back)}% back` : `${shift(back)}%`}), so n × (1 − ratio) px after n px. Linear; transform only; no \`background-attachment: fixed\`; static \`will-change: transform\`.`,
       `- Visible while the ${layers} ${three ? 'peek' : 'peeks'} above the panel (first 40vh of scroll); more padding, longer window.`,
-      `- CSS route: \`.hero { view-timeline: --hero block }\`; \`animation: parallax linear both\`, then \`animation-timeline: --hero; animation-range: exit-crossing\` (shorthand first); \`@keyframes parallax\` to \`translate3d(0, calc((1 - var(--ratio)) * 100%), 0)\`.`,
+      `- CSS route: \`.hero { view-timeline: --hero block }\`; layers: \`animation: parallax linear both\`, then \`animation-timeline: --hero; animation-range: exit-crossing\` (shorthand first); \`@keyframes parallax\` to \`translate3d(0, calc((1 - var(--ratio)) * 100%), 0)\`.`,
       "- Feature-test `CSS.supports('animation-timeline', 'scroll()')` before first paint; false: `data-fallback` on `<html>`, JS route. CSS animation only under `html:not([data-fallback])` in `@supports (animation-timeline: scroll())`.",
       '- JS route (after the DOM exists: end of `<body>`, or after mount): passive `scroll`/`resize`, one requestAnimationFrame, hero rect per frame, ratio from `--ratio`.',
       '- Reduced motion: no animation or transform; JS clears inline transforms and removes listeners while it matches, re-arming on `change`.',
