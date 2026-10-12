@@ -115,13 +115,13 @@ test('rapid replay never stacks animations', async ({ page }) => {
 test('drafts have no page and are never linked as prev/next', async ({ page }) => {
   const published = await page.goto('/terms/sticky')
   expect(published?.status()).toBe(200)
-  const response = await page.goto('/terms/parallax')
+  const response = await page.goto('/terms/scroll-fade')
   expect(response?.status()).toBe(404)
-  // Sticky is 4th in Scroll and Parallax (3rd) is a draft, so the previous link skips over it.
-  await page.goto('/terms/sticky')
+  // Scroll Snap is 5th in Scroll and the three terms after it are drafts, so it has no next link.
+  await page.goto('/terms/scroll-snap')
   const nav = page.getByRole('navigation', { name: 'Previous and next' })
   await expect(nav.getByRole('link')).toHaveCount(1)
-  await expect(nav.getByRole('link')).toHaveText('← Scroll-linked')
+  await expect(nav.getByRole('link')).toHaveText('← Sticky')
 })
 
 test('a compare pair with a draft side has no page', async ({ page }) => {

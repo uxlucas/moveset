@@ -46,7 +46,7 @@ The standard every demo, prompt and piece of site chrome is held to. Distilled f
 - Site chrome: under `prefers-reduced-motion: reduce`, transitions and animations are switched off.
 - Demos: nothing autoplays. Each demo shows a still frame and a play button, and plays once when asked.
 - Decision: the sources disagree (turn off everything vs keep fades). On a site whose content is motion, playing on request respects the setting and still teaches the term.
-- Recipes: scroll-linked effects whose position *is* the information (progress bars) keep tracking under reduced motion; decorative scroll-linked effects (fades, scales) show their final state.
+- Recipes: scroll-linked effects whose position *is* the information (progress bars) keep tracking under reduced motion; decorative scroll-linked effects (fades, scales) show their final state; parallax drops the speed difference, so every layer moves with the content.
 
 ## Performance
 - Never drive per-frame animation through React state. Write to the DOM through refs, or let Motion or CSS run it.

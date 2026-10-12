@@ -33,11 +33,11 @@ test('intro says what it is and who made it', async ({ page }) => {
 test('category headings show the written count and a one-line description', async ({ page }) => {
   await page.goto('/')
   const main = page.getByRole('main')
-  // Relies on review mode (NEXT_PUBLIC_SHOW_REVIEW=1, set in .env.development): Scroll-triggered, Scroll-linked and
-  // Sticky are in review and count as written. A build without review mode shows "0 / 8".
+  // Relies on review mode (NEXT_PUBLIC_SHOW_REVIEW=1, set in .env.development): Parallax and Scroll Snap are in
+  // review and count as written next to the three published terms. A build without review mode shows "3 / 8".
   const scroll = main.getByRole('heading', { level: 2, name: 'Scroll' })
-  await expect(scroll).toContainText('3 / 8')
-  await expect(scroll).toHaveAccessibleName(/3 of 8 written/)
+  await expect(scroll).toContainText('5 / 8')
+  await expect(scroll).toHaveAccessibleName(/5 of 8 written/)
   await expect(main.getByText('Motion that scrolling drives or triggers.')).toBeVisible()
 })
 
@@ -45,7 +45,7 @@ test('shows all 47 cards, drafts without links', async ({ page }) => {
   const errors = trackErrors(page)
   await page.goto('/')
   await expect(cards(page)).toHaveCount(47)
-  await expect(cards(page).filter({ hasText: 'Parallax' }).getByRole('link')).toHaveCount(0)
+  await expect(cards(page).filter({ hasText: 'Scroll Fade' }).getByRole('link')).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
   expect(errors).toEqual([])
 })
