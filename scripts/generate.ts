@@ -44,8 +44,10 @@ async function main() {
   const published = publishedTerms(terms)
   writeIfChanged(path.join(publicDir, 'llms.txt'), renderLlmsTxt(terms))
   writeFolder(path.join(publicDir, 'terms'), Object.fromEntries(published.map((t) => [`${t.slug}.md`, renderTermMarkdown(t, terms)])))
-  writeIfChanged(path.join(publicDir, 'api/terms.json'), JSON.stringify(renderTermsJson(terms, new Date().toISOString()), null, 2) + '\n')
-  writeFolder(skillDir, renderSkill(terms))
+  writeIfChanged(path.join(publicDir, 'api/terms.json'), JSON.stringify(renderTermsJson(terms), null, 2) + '\n')
+  const skill = renderSkill(terms)
+  writeFolder(skillDir, skill)
+  writeFolder(path.join(publicDir, 'skills/moveset'), skill)
   console.log(`generate: ${slugs.length} terms, ${published.length} published`)
 }
 

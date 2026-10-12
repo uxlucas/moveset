@@ -50,11 +50,11 @@ export function renderLlmsTxt(terms: readonly Term[]): string {
   return `${[`# moveset`, `> ${SUMMARY}`, ...sections, data].join('\n\n')}\n`
 }
 
-export function renderTermsJson(terms: readonly Term[], generatedAt: string) {
+/** Reproducible: the same term files always give the same bytes. */
+export function renderTermsJson(terms: readonly Term[]) {
   const published = publishedTerms(terms)
   const isPublished = (slug: string) => published.some((t) => t.slug === slug)
   return {
-    generatedAt,
     site: SITE_URL,
     terms: published.map((t) => {
       const values = defaultValues(t.demo.controls)
@@ -75,7 +75,8 @@ export function renderTermsJson(terms: readonly Term[], generatedAt: string) {
           .map((c) => ({ ...c, compare: `${SITE_URL}/compare/${compareSlug(t.slug, c.slug)}` })),
         controls: t.demo.controls ?? [],
         defaults: values,
-        prompt: buildPromptText(t, values),
+        prompt: t.prompt(values).trim(),
+        promptText: buildPromptText(t, values),
         acceptance: [...t.acceptance(values)],
         code: t.code(values),
         url: termUrl(t.slug),

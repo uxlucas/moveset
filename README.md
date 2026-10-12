@@ -16,6 +16,6 @@ A visual dictionary of design engineering terms. See `docs/` for the spec, plan 
 Generated from the term files by `npm run generate`, published terms only (never `review` or `draft`, whatever `NEXT_PUBLIC_SHOW_REVIEW` says):
 
 - `/llms.txt`, `/terms/<slug>.md` and `/api/terms.json`, written to `public/` (gitignored).
-- `skills/moveset/`: `SKILL.md` (how to use, glossary, house tokens) and `terms/<slug>.md` (committed).
+- `skills/moveset/`: `SKILL.md` (how to use, glossary, house tokens) and `terms/<slug>.md` (committed). The same files are served for download at `/skills/moveset/SKILL.md` and `/skills/moveset/terms/<slug>.md` (copied to `public/skills/`, gitignored).
 
 The generators live in `scripts/lib/outputs.ts`. Deploying: `docs/deploy.md`.

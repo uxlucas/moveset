@@ -73,18 +73,18 @@ describe('renderTermMarkdown', () => {
 })
 
 describe('renderTermsJson', () => {
-  const json = renderTermsJson(terms, '2026-01-01T00:00:00.000Z')
+  const json = renderTermsJson(terms)
   const sticky = json.terms.find((t) => t.slug === 'sticky')!
   test('holds exactly the published terms', () => {
     expect(json.site).toBe('https://moveset.lucaslima.design')
-    expect(json.generatedAt).toBe('2026-01-01T00:00:00.000Z')
     expect(json.terms.map((t) => t.slug)).toEqual(['scroll-linked', 'sticky', 'stagger'])
   })
   test('renders prompt, acceptance and code at defaults, with controls', () => {
     expect(sticky.defaults).toEqual({ ms: 200 })
     expect(sticky.controls[0]).toMatchObject({ id: 'ms', type: 'range', default: 200 })
-    expect(sticky.prompt).toContain('Fade sticky over 200ms')
-    expect(sticky.prompt).toContain('- [ ] Takes 200ms.')
+    expect(sticky.prompt).toBe('Fade sticky over 200ms with var(--ease-out).')
+    expect(sticky.promptText).toMatch(/^# STICKY\n\nFade sticky over 200ms/)
+    expect(sticky.promptText).toContain('- [ ] Takes 200ms.')
     expect(sticky.acceptance).toEqual(['Takes 200ms.'])
     expect(sticky.code.css).toContain('opacity 200ms')
     expect(sticky.url).toBe('https://moveset.lucaslima.design/terms/sticky')
@@ -96,8 +96,10 @@ describe('renderTermsJson', () => {
       { slug: 'scroll-linked', difference: 'Linked vs pinned.', compare: 'https://moveset.lucaslima.design/compare/scroll-linked-vs-sticky' },
     ])
   })
-  test('is plain JSON', () => {
+  test('is plain JSON and reproducible', () => {
     expect(JSON.parse(JSON.stringify(json))).toEqual(json)
+    expect(Object.keys(json)).toEqual(['site', 'terms'])
+    expect(JSON.stringify(renderTermsJson(terms))).toBe(JSON.stringify(json))
   })
 })
 

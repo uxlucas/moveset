@@ -70,6 +70,17 @@ describe('buildMarkdown links', () => {
     expect(none).not.toContain('## Related')
     expect(none).not.toContain('## Often confused with')
   })
+  test("confusedWith defaults to the term's own declarations", () => {
+    expect(buildMarkdown(linked, { ms: 200 }, resolve)).toBe(buildMarkdown(linked, { ms: 200 }, resolve, linked.confusedWith))
+  })
+  test('a supplied confusedWith list replaces it, dropping invisible sides', () => {
+    const md = buildMarkdown(term, { ms: 200 }, resolve, [
+      { slug: 'sticky', difference: 'Declared on the other side.' },
+      { slug: 'parallax', difference: 'Hidden side.' },
+    ])
+    expect(md).toContain('- [Demo vs STICKY](https://moveset.lucaslima.design/compare/demo-vs-sticky): Declared on the other side.')
+    expect(md).not.toContain('Hidden side.')
+  })
   test('omits Code when no approach has code', () => {
     const bare = defineTerm({ ...term, code: () => ({}) } as never) as FullTerm
     expect(buildMarkdown(bare, { ms: 200 }, resolve)).not.toContain('## Code')
