@@ -206,24 +206,8 @@ function ScrollTriggeredGlyph({ active }: GlyphProps) {
 
 const seconds = (ms: string) => Number(ms) / 1000
 
-// Where each duration fits, said once around the chosen value so the prompt never repeats it.
-const DURATION_NOTE: Record<V['duration'], string> = {
-  '300': ', which suits app UI (500ms is the editorial default; 800ms only when pacing matters more than speed)',
-  '500': ', the editorial default (300ms suits app UI; 800ms only when pacing matters more than speed)',
-  '800': ', only when pacing matters more than speed (300ms suits app UI; 500ms is the editorial default)',
-}
-
-function timingLine(v: V): string {
-  const ms = Number(v.duration)
-  const duration = `${ms}ms${DURATION_NOTE[v.duration]}`
-  if (v.easing === 'spring') {
-    return `- Timing: a spring with bounce 0.2 over ${duration} on both properties (Motion: \`{ type: 'spring', duration: ${seconds(v.duration)}, bounce: 0.2 }\`; CSS has no spring, so use \`transition-duration: ${ms}ms\` with \`transition-timing-function: ${SPRING_LINEAR}\`, which samples it). What the spring adds over ease-out is a softer start. Build it with the spring as specified. It is a comparison option; ease-out is the recommended default for entrances.`
-  }
-  const line = `- Timing: ${duration}, with \`${EASING[v.easing].css}\` on both properties.`
-  return v.easing === 'out'
-    ? line
-    : `${line} Build it with \`${EASING[v.easing].css}\` as specified. It is a comparison option; ease-out is the recommended default for entrances.`
-}
+// Non-default durations get a two-word note on where they fit.
+const DURATION_TAG: Record<V['duration'], string> = { '300': ' (app UI)', '500': '', '800': ' (editorial only)' }
 
 function cssCode(v: V): string {
   const easing = EASING[v.easing]
@@ -466,26 +450,35 @@ export default defineTerm({
     controls,
     glyph: ScrollTriggeredGlyph,
   },
-  prompt: (v) =>
-    [
+  prompt: (v) => {
+    const ms = Number(v.duration)
+    const compare = 'comparison only; ease-out is the default'
+    const timing =
+      v.easing === 'spring'
+        ? `${ms === 800 ? 'an' : 'a'} ${ms}ms${DURATION_TAG[v.duration]} spring, bounce 0.2 (CSS: \`linear(${SPRING_POINTS.join(',')})\`; ${compare})`
+        : `${ms}ms${DURATION_TAG[v.duration]} \`${EASING[v.easing].css}\`${v.easing === 'out' ? '' : ` (${compare})`}`
+    return [
       'Reveal the cards in this grid as they scroll into view, once each.',
       '',
-      `- When a card is 15% inside the viewport, fade it from \`opacity: 0\` to \`1\` and move it from \`translateY(${TRAVEL}px)\` to \`none\`. It plays once and stays. Scrolling back up never replays it.`,
-      timingLine(v),
+      `- Reveal: \`opacity: 0\` to \`1\`, \`translateY(${TRAVEL}px)\` to \`none\`, ${timing}. Transition only those two, named. Once.`,
+      '- One IntersectionObserver, `threshold: 0.1` (the observer measures the translated box, so cards reveal at roughly 15% visible), no scroll listener. On intersect: set `data-in="true"`, `unobserve`.',
       v.stagger
-        ? `- The first observer callback reports every observed card; later ones report only cards whose visibility changed, including cards leaving. So filter each callback to entries that are intersecting, then start those ${STAGGER_MS}ms apart in DOM order, capped at ${MAX_STEPS} steps (${MAX_STEPS * STAGGER_MS}ms) so a fast jump never queues a long wave. Set the delay on the card when it reveals, and clear it once the transition ends.`
-        : '- Cards that enter together all start at the same moment. No stagger. Filter each observer callback to entries that are intersecting: the first callback reports every observed card, and later ones include cards leaving.',
-      `- Detect entry with one IntersectionObserver, \`threshold: ${THRESHOLD}\` (with Motion: \`whileInView\` and \`viewport={{ once: true, amount: ${THRESHOLD} }}\`). On intersect, set \`data-in="true"\` on the card (the CSS keys off it) and \`unobserve\` it. Don't use a scroll listener.`,
-      '- Hide only cards that are not in view yet, and only from JavaScript. The observer script (end of <body>, or deferred) first marks every card with any part on screen, or already scrolled past, with `data-in="true"`, then adds a `js` class to <html>. The hidden state is `.js .reveal:not([data-in="true"])`, and the transition lives on the revealed state only, so hiding is instant. Cards on the first screen are never hidden, and if the script fails to load, no card is.',
-      `- With Motion, \`initial\` is rendered into the server HTML: skip \`initial\` for cards on the first screen, and add a \`<noscript>\`, print and ${FAILSAFE_MS / 1000}s failsafe style that forces \`.reveal\` visible with \`!important\`.`,
-      '- States to handle: in view on first paint (visible from the first frame, never animated); before reveal (invisible but holding its space, so nothing shifts); revealing; revealed (opacity 1, no transform left); after an instant jump such as an anchor link (cards in view end fully visible; cards never in view reveal when reached); keyboard focus landing in a card that has not revealed (on `focusin` it starts revealing immediately, with the same transition and no stagger delay); printing (`@media print` shows every card, with no transition).',
-      '- Under `prefers-reduced-motion: reduce`: no movement and no stagger. In CSS, drop the transform and fade opacity only, over 150ms. In JS, set no delays, and read the media query inside the callback so a change mid-session counts.',
-      '- Transition only `opacity` and `transform`, and name them; never `transition: all`.',
-      "- Don't tie the animation's progress to the scroll position; that is scroll-linked.",
-    ].join('\n'),
+        ? `- Each callback: keep \`isIntersecting\` entries not yet revealed (by focus or first paint), in DOM order; delay = min(index, ${MAX_STEPS}) × ${STAGGER_MS}ms. Set at reveal; clear on \`transitionend\`.`
+        : '- Each callback: keep `isIntersecting` entries not yet revealed (by focus or first paint). No stagger.',
+      '- First paint: cards with any pixel on screen at load (also after a `#hash` jump) show without animating. Run the first-paint pass at DOMContentLoaded and again at `load` (hash jumps apply at `load`), writing `data-in` with `transition: none` inline for that pass.',
+      '- Observer script (end of <body> or deferred): first set `data-in="true"` on those and on cards scrolled past, then add `js` to <html>. Hidden state: `.js .reveal:not([data-in="true"])`; transition on the revealed state only.',
+      '- Cards stay in the initial HTML (server-rendered or static markup) and keep their space while hidden.',
+      '- `focusin` on an unrevealed card: reveal now, no delay.',
+      '- `@media print`: all cards visible, no transition.',
+      v.stagger
+        ? '- Reduced motion: no transform, opacity over 150ms, no JS delays (read the media query in the callback).'
+        : '- Reduced motion: no transform, opacity over 150ms.',
+    ].join('\n')
+  },
+
   acceptance: (v) => [
     'Cards in view when the page loads are visible from the first frame and do not animate.',
-    'Each card below animates the first time it is 15% inside the viewport, then stays.',
+    'Each card below animates the first time it is about 15% inside the viewport (within 5 points; the observer measures the translated box), then stays.',
     'Scrolling back up never replays a card that has already revealed.',
     `One card takes ${v.duration}ms from hidden to rest.`,
     v.stagger
