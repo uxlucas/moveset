@@ -18,7 +18,7 @@
   --ink-faint: oklch(0.66 0 0);
   --demo: oklch(0.93 0 0);
   --demo-2: oklch(0.87 0 0);
-  --demo-subject: oklch(0.205 0 0);
+  --demo-subject: oklch(0.55 0 0);
   --shadow-color: oklch(0 0 0 / 0.04);
   --selection: oklch(0.205 0 0 / 0.12);
   --seg: oklch(0.205 0 0 / 0.05);
@@ -40,7 +40,7 @@
   --ink-faint: oklch(0.52 0 0);
   --demo: oklch(0.25 0 0);
   --demo-2: oklch(0.32 0 0);
-  --demo-subject: oklch(0.95 0 0);
+  --demo-subject: oklch(0.72 0 0);
   --shadow-color: transparent;
   --selection: oklch(0.95 0 0 / 0.16);
   --seg: oklch(1 0 0 / 0.07);

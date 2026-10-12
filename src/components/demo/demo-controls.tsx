@@ -16,10 +16,10 @@ export function DemoControls({ controls, values, onChange, onReplay }: Props) {
       <button
         type="button"
         onClick={onReplay}
-        className="press hit inline-flex min-h-9 items-center gap-1.5 rounded-full bg-surface px-3 text-ink shadow-card hover:shadow-card-hover"
+        aria-label="Replay"
+        className="press hit inline-flex size-9 items-center justify-center rounded-full bg-surface text-ink shadow-card hover:shadow-card-hover"
       >
         <RotateCcw size={14} aria-hidden />
-        Replay
       </button>
       {controls.map((c) => (
         <ControlField key={c.id} control={c} value={values[c.id]} onChange={(v) => onChange(c.id, v)} />
@@ -62,7 +62,7 @@ function ControlField({ control, value, onChange }: { control: Control; value: C
           aria-checked={Boolean(value)}
           aria-labelledby={`${id}-label`}
           onClick={() => onChange(!value)}
-          className={`press hit relative h-5 w-9 rounded-full transition-colors duration-150 ease-[ease] ${value ? 'bg-ink' : 'bg-demo-2'}`}
+          className={`press hit relative h-5 w-9 rounded-full transition-colors duration-150 ease-[ease] ${value ? 'bg-ink/70' : 'bg-demo-2'}`}
         >
           <span
             aria-hidden
@@ -76,14 +76,14 @@ function ControlField({ control, value, onChange }: { control: Control; value: C
   return (
     <div role="group" aria-label={control.label} className="flex items-center gap-3">
       <span aria-hidden className="text-ink-muted">{control.label}</span>
-      <div className="flex rounded-full bg-surface p-0.5 shadow-card">
+      <div className="flex rounded-full bg-seg p-0.5">
         {control.options.map((o) => (
           <button
             key={o.value}
             type="button"
             aria-pressed={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`press hit rounded-full px-2.5 py-1 transition-colors duration-150 ease-[ease] ${value === o.value ? 'bg-ink text-canvas' : 'text-ink-muted hover:text-ink'}`}
+            className={`press hit rounded-full px-2.5 py-1 transition-colors duration-150 ease-[ease] ${value === o.value ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line),0_1px_2px_var(--shadow-color)]' : 'text-ink-muted hover:text-ink'}`}
           >
             {o.label}
           </button>
