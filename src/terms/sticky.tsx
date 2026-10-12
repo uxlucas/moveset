@@ -129,7 +129,7 @@ function StickyDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
               data-sticky-header=""
               data-stuck="false"
               style={{ top: offset }}
-              className={`sticky z-10 bg-surface px-3 py-1 text-[10px] font-medium text-ink-muted transition-shadow duration-150 ease-[ease] motion-reduce:transition-none ${values.shadow ? 'data-[stuck=true]:[box-shadow:var(--stuck-shadow,0_1px_0_var(--line),0_4px_12px_oklch(0_0_0/0.06))]' : ''}`}
+              className={`sticky z-10 flex min-h-8 items-center bg-surface px-3 text-[10px] font-medium text-ink-muted transition-shadow duration-150 ease-[ease] motion-reduce:transition-none ${values.shadow ? 'data-[stuck=true]:[box-shadow:var(--stuck-shadow,0_1px_0_var(--line),0_4px_12px_oklch(0_0_0/0.06))]' : ''}`}
             >
               {section.letter}
             </div>
@@ -199,19 +199,21 @@ export default defineTerm({
     return [
       'Make the section headers in this list sticky.',
       '',
-      '- Wrap each header and its rows in their own element, header first.',
+      '- Wrap each header and its rows in one element, header first.',
       `- Header: real h2 or h3, \`position: sticky; top: ${offset}px;\` in the list's own scroll container, opaque background, z-index above rows.`,
       ...(offset > 0
-        ? [`- ${offset}px is a bar pinned with \`position: sticky; top: 0\` in the same scroll container; if the bar sits outside it, use \`top: 0\`.`]
+        ? [
+            `- ${offset}px is the height of a bar pinned with \`position: sticky; top: 0\` in the scroll container. If the bar is outside it: \`top: 0\`${v.shadow ? ", rootMargin '-1px 0px 100000px 0px'" : ''} and no offset in \`scroll-padding-top\`.`,
+          ]
         : []),
-      `- Headers are 32px tall; \`scroll-padding-top: ${padding}\` on the scroll container matches.`,
-      '- No `overflow: hidden`, `auto` or `scroll` on ancestors between the header and the scroll container; use `overflow: clip`.',
-      ...(v.shadow ? ['- Scroll container: no padding.', '- First section wrapper: `margin-top: 1px`.'] : []),
-      '- A last section shorter than the container height never pins.',
+      `- Headers are 32px tall; \`scroll-padding-top: ${padding}\` on the scroll container.`,
+      '- No `overflow: hidden`, `auto` or `scroll` on ancestors between header and scroll container; use `overflow: clip`.',
+      ...(v.shadow ? ['- Scroll container: no padding. First section wrapper: `margin-top: 1px`.'] : []),
+      "- A last section shorter than the container never pins (expected; don't pad it).",
       ...(v.shadow
         ? [
-            '- `[data-stuck="true"]`: `box-shadow: var(--stuck-shadow, 0 1px 0 var(--border, rgb(0 0 0 / 0.08)), 0 4px 12px rgb(0 0 0 / 0.06))`, 150ms `ease`. Reduced motion: no transition.',
-            '- Under `prefers-color-scheme: dark`, set `--stuck-shadow: 0 1px 0 rgb(255 255 255 / 0.12), 0 4px 12px rgb(0 0 0 / 0.4)`.',
+            '- Header: `transition: box-shadow 150ms ease` (none under reduced motion). `[data-stuck="true"]`: `box-shadow: var(--stuck-shadow, 0 1px 0 var(--border, rgb(0 0 0 / 0.08)), 0 4px 12px rgb(0 0 0 / 0.06))`.',
+            '- Dark (`prefers-color-scheme: dark`): `--stuck-shadow: 0 1px 0 rgb(255 255 255 / 0.12), 0 4px 12px rgb(0 0 0 / 0.4)`.',
             `- One IntersectionObserver on the headers: root = scroll container, rootMargin '-${offset + 1}px 0px 100000px 0px', threshold [0, 0.01, 1]. Stuck = \`entry.isIntersecting && entry.intersectionRatio < 1 && entry.boundingClientRect.top <= entry.rootBounds.top && entry.boundingClientRect.bottom > entry.rootBounds.top\`, written to the header as \`data-stuck="true"\` or \`"false"\`. Use these values exactly.`,
           ]
         : ["- Don't change the header's style when it is stuck."]),
@@ -242,14 +244,15 @@ export default defineTerm({
       css: [
         '.list {',
         '  overflow-y: auto;',
-        '  padding: 0; /* put padding on a wrapper, so rootMargin lines up with top */',
-        offset > 0 ? `  scroll-padding-top: calc(32px + ${offset}px); /* your header height + offset */` : '  scroll-padding-top: 32px; /* your header height */',
+        ...(v.shadow ? ['  padding: 0; /* put padding on a wrapper, so rootMargin lines up with top */'] : []),
+        offset > 0 ? `  scroll-padding-top: calc(32px + ${offset}px); /* header height + offset */` : '  scroll-padding-top: 32px; /* header height */',
         '}',
         '',
         '.section-header {',
         '  position: sticky;',
         `  top: ${offset}px;`,
         '  z-index: 1;',
+        '  min-height: 32px;',
         '  background: var(--surface, #fff); /* opaque, so rows never show through */',
         ...(v.shadow
           ? [

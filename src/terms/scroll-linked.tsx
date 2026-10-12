@@ -162,7 +162,7 @@ function ScrollLinkedDemo({ values, playing, replayKey, size, timeScale, onCycle
     <BrowserFrame scrollRef={scrollRef} size={size} label="Article with a scroll-linked effect">
       {isBar && (
         <div className="sticky top-0 z-10 h-0">
-          <div ref={barRef} data-progress-bar="" className="h-0.5 origin-left bg-demo-subject [transform:scaleX(0)]" />
+          <div ref={barRef} data-progress-bar="" aria-hidden className="h-0.5 origin-left bg-demo-subject [transform:scaleX(0)]" />
         </div>
       )}
       <article className={detail ? 'px-6 pb-6 pt-5' : 'px-3.5 pb-3.5 pt-3'}>
@@ -268,7 +268,7 @@ function cssCode(v: V): string {
   const range = rangeOf(v)
   const timeline =
     range === 'page'
-      ? ['animation-timeline: scroll(root);']
+      ? ['/* A nested scroller: use scroll(nearest) on an element inside it. */', 'animation-timeline: scroll(root);']
       : range === 'barSection'
         ? ['/* 0: its top enters at the bottom. 1: its bottom leaves at the top. */', 'animation-timeline: --section;', 'animation-range: cover;']
         : ['/* 0: its top reaches the bottom edge. 1: its bottom does. */', 'animation-timeline: view();', 'animation-range: entry;']
@@ -336,36 +336,39 @@ function cssCode(v: V): string {
 // Bar × page runs on both routes: the JS keeps .is-linked in step with whether the page can scroll,
 // and drives the bar itself only where scroll timelines are missing.
 const LINKED_PAGE_JS = [
+  '// Load at the end of `<body>`: the bar exists, and the test runs before it paints.',
   '// Markup: <div class="progress is-linked" aria-hidden="true"></div>',
   '// Same test as the CSS @supports, so the two routes never both drive the bar.',
   "const supported = CSS.supports('animation-timeline', 'scroll()')",
   ...['prefers-reduced-motion: no override.', ...HOUSE_RULE].map((l) => `// ${l}`),
-  '',
-  'const root = document.documentElement',
   "const bar = document.querySelector('.progress')",
-  'const clamp = (n) => Math.min(Math.max(n, 0), 1)',
-  'let frame = 0',
   '',
-  'const render = () => {',
-  '  frame = 0',
-  '  const max = root.scrollHeight - root.clientHeight',
-  '  // Both routes: while the page cannot scroll, .is-linked comes off and the',
-  '  // bar empties instead of holding its last value. It goes back on when it can.',
-  "  bar.classList.toggle('is-linked', max > 0)",
-  '  if (!supported) bar.style.transform = `scaleX(${max > 0 ? clamp(root.scrollTop / max) : 0})`',
-  '}',
-  'const schedule = () => {',
-  '  if (!frame) frame = requestAnimationFrame(render)',
-  '}',
+  'if (bar) {',
+  '  const root = document.documentElement',
+  '  const clamp = (n) => Math.min(Math.max(n, 0), 1)',
+  '  let frame = 0',
   '',
-  'if (!supported) {',
-  "  root.dataset.fallback = ''",
-  "  addEventListener('scroll', schedule, { passive: true })",
+  '  const render = () => {',
+  '    frame = 0',
+  '    const max = root.scrollHeight - root.clientHeight',
+  '    // Both routes: while the page cannot scroll, .is-linked comes off and the',
+  '    // bar empties instead of holding its last value. It goes back on when it can.',
+  "    bar.classList.toggle('is-linked', max > 0)",
+  '    if (!supported) bar.style.transform = `scaleX(${max > 0 ? clamp(root.scrollTop / max) : 0})`',
+  '  }',
+  '  const schedule = () => {',
+  '    if (!frame) frame = requestAnimationFrame(render)',
+  '  }',
+  '',
+  '  if (!supported) {',
+  "    root.dataset.fallback = ''",
+  "    addEventListener('scroll', schedule, { passive: true })",
+  '  }',
+  "  addEventListener('resize', schedule)",
+  '  // Content that loads or goes away changes the range without a scroll.',
+  '  new ResizeObserver(schedule).observe(document.body)',
+  '  render()',
   '}',
-  "addEventListener('resize', schedule)",
-  '// Content that loads or goes away changes the range without a scroll.',
-  'new ResizeObserver(schedule).observe(document.body)',
-  'render()',
 ].join('\n')
 
 function jsCode(v: V): string {
@@ -398,17 +401,18 @@ function jsCode(v: V): string {
               'return clamp((root.clientHeight - box.top) / box.height)',
             ]
   return [
+    '// Load at the end of `<body>`, so the elements exist and the test runs before they paint.',
     '// Same test as the CSS @supports, so the two routes never both run.',
     "const supported = CSS.supports('animation-timeline', 'scroll()')",
     ...(bar
       ? ['prefers-reduced-motion: no override.', ...HOUSE_RULE].map((l) => `// ${l}`)
       : ['// Reduced motion: leave the figure in its final state.', "const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches"]),
+    `const ${el} = document.querySelector('.${bar ? 'progress' : 'figure'}')`,
+    ...(range === 'barSection' ? ["const section = document.querySelector('.marked-section')"] : []),
     '',
-    `if (!supported${bar ? '' : ' && !reduce'}) {`,
+    `if (${el}${range === 'barSection' ? ' && section' : ''} && !supported${bar ? '' : ' && !reduce'}) {`,
     '  const root = document.documentElement',
     '  root.dataset.fallback = \'\'',
-    `  const ${el} = document.querySelector('.${bar ? 'progress' : 'figure'}')`,
-    ...(range === 'barSection' ? ["  const section = document.querySelector('.marked-section')"] : []),
     '  const clamp = (n) => Math.min(Math.max(n, 0), 1)',
     '  let frame = 0',
     ...(bar ? [] : ['  let idle = 0']),
@@ -565,12 +569,12 @@ export default defineTerm({
       ...(range === 'page' ? ['- For a nested scroller, use its own scrollTop/scrollHeight and `scroll(nearest)`.'] : []),
       effectLine,
       ...(bar ? [] : ["- The figure's base style is its final state."]),
-      `- CSS route: \`@keyframes ${fx.name}\` from ${from} to ${to}; \`animation: ${fx.name} linear both\`, then ${TIMELINE_WORDS[range]} (the shorthand resets the timeline, so it goes first).`,
-      "- Feature-test `CSS.supports('animation-timeline', 'scroll()')` synchronously before first render and set `data-fallback` on `<html>` when false; then use the JS route. Scope the CSS animation to `html:not([data-fallback])` inside `@supports (animation-timeline: scroll())`.",
+      `- CSS route: \`@keyframes ${fx.name}\` from ${from} to ${to}; \`animation: ${fx.name} linear both\`, then ${TIMELINE_WORDS[range]}; shorthand first, it resets the timeline.`,
+      `- Feature-test \`CSS.supports('animation-timeline', 'scroll()')\` before the ${bar ? 'bar' : 'figure'}'s first paint and set \`data-fallback\` on \`<html>\` when false; then use the JS route. Scope the CSS animation to \`html:not([data-fallback])\` inside \`@supports (animation-timeline: scroll())\`.`,
       `- JS route: passive scroll listener, one requestAnimationFrame, clamp, write the ${fx.prop} to the element (not framework state). Also recompute on \`resize\` and a \`ResizeObserver\` on \`document.body\`; scroll alone goes stale.${v.effect === 'scale' && range === 'figureSection' ? " Measure the figure's layout box (its rect includes the scale)." : ''}`,
       ...(bar && range === 'page'
         ? [
-            '- If the page stops being scrollable (content removed, window grown), reset the bar to 0 (watch with the same `resize` and `ResizeObserver` on both routes): on the CSS route, keep the animation on `.is-linked`, remove `.is-linked` from the bar while the page cannot scroll and add it back when it can; on the JS route write `scaleX(0)`.',
+            '- Page not scrollable: bar at 0. Put `.is-linked` on the bar in the markup and scope the CSS animation to it; JS toggles it from `scrollHeight > clientHeight` on `resize`/`ResizeObserver`; the JS route writes `scaleX(0)`.',
           ]
         : []),
       bar ? '- Reduced motion: no override.' : `- Reduced motion: no animation; ${v.effect === 'fade' ? 'fully opaque' : 'full size'}.`,

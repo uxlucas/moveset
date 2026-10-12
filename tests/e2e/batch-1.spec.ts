@@ -30,7 +30,7 @@ for (const { slug, name } of [
 test.describe('Scroll-triggered', () => {
   test('controls rewrite the prompt', async ({ page }) => {
     await page.goto('/terms/scroll-triggered')
-    await expect(prompt(page)).toContainText('`translateY(14px)` to `none`, 500ms `var(--ease-out)`.')
+    await expect(prompt(page)).toContainText('`translateY(14px)` to `none`, 500ms `var(--ease-out)` (`cubic-bezier(0.23, 1, 0.32, 1)`).')
     await expect(prompt(page)).not.toContainText('comparison only')
     await option(page, 'Duration', '800ms').click()
     await expect(prompt(page)).toContainText('800ms (editorial only) `var(--ease-out)`')
@@ -103,8 +103,10 @@ test.describe('Scroll-linked', () => {
   test('controls rewrite the prompt', async ({ page }) => {
     await page.goto('/terms/scroll-linked')
     await expect(prompt(page)).toContainText('Add a reading progress bar that follows the scroll position of the page.')
+    await expect(prompt(page)).toContainText('.is-linked')
     await option(page, 'Effect', 'Fade').click()
     await expect(prompt(page)).toContainText('Fade this figure in as the page scrolls')
+    await expect(prompt(page)).not.toContainText('Add a reading progress bar')
     await option(page, 'Range', 'Element in view').click()
     await expect(prompt(page)).toContainText('`animation-range: entry`')
   })

@@ -89,12 +89,14 @@ function visibleRatio(tile: HTMLElement, view: DOMRect) {
   return Math.max(0, Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top)) / r.height
 }
 
-// Reveals each tile once, the first time 15% of it is inside the scroller. The observer watches the outer
-// tile, which never moves, and writes data-in on it; the inner box animates. No React state per tile; no React state per tile. Tiles already in view when a cycle starts are shown without animating,
-// like cards on first paint. Off the play path (reduced motion before play, off-screen), it paints a still:
-// tiles in the upper part of the window are in, the ones below show as outlines of what comes next.
+// The inner box of a tile: the part that animates.
 const inner = (tile: HTMLElement) => tile.firstElementChild as HTMLElement
 
+// Reveals each tile once, the first time 15% of it is inside the scroller. The observer watches the outer
+// tile, which never moves, and writes data-in on it; the inner box animates. No React state per tile.
+// Tiles already in view when a cycle starts are shown without animating, like cards on first paint.
+// Off the play path (reduced motion before play, off-screen), it paints a still: tiles in the upper part
+// of the window are in, the ones below show as outlines of what comes next.
 function useReveals(
   rootRef: RefObject<HTMLDivElement | null>,
   pageRef: RefObject<HTMLDivElement | null>,
@@ -474,26 +476,26 @@ export default defineTerm({
   prompt: (v) => {
     const ms = Number(v.duration)
     const compare = 'comparison only; ease-out is the default'
+    const easing = EASING[v.easing]
     const timing =
       v.easing === 'spring'
         ? `${ms === 800 ? 'an' : 'a'} ${ms}ms${DURATION_TAG[v.duration]} spring, bounce 0.2 (CSS: \`${SPRING_LINEAR}\`; ${compare})`
-        : `${ms}ms${DURATION_TAG[v.duration]} \`${EASING[v.easing].css}\`${v.easing === 'out' ? '' : ` (${compare})`}`
+        : `${ms}ms${DURATION_TAG[v.duration]} \`${easing.css}\` (\`${TOKENS[easing.token!]}\`${v.easing === 'out' ? '' : `; ${compare}`})`
     return [
-      'Reveal each card in this grid once, as it scrolls into view.',
+      'Reveal each card once as it scrolls into view.',
       '',
-      `- Reveal: \`opacity: 0\` to \`1\`, \`translateY(${TRAVEL}px)\` to \`none\`, ${timing}. Transition only those two.`,
-      '- Observe the card itself with `threshold: 0.15` and animate an inner wrapper, so the observed box never moves. No scroll listener; on intersect, set `data-in="true"` and `unobserve`.',
+      `- Inner box: \`opacity\` 0 to 1, \`translateY(${TRAVEL}px)\` to \`none\`, ${timing}. Transition only those.`,
+      '- Observe the card itself (it never moves; only the inner box animates) with `threshold: 0.15`. On intersect: `data-in="true"`, `unobserve`.',
       v.stagger
-        ? `- Each callback: keep \`isIntersecting\` entries not yet revealed (by focus or first paint), in DOM order; delay = min(index, ${MAX_STEPS}) × ${STAGGER_MS}ms. Set at reveal; clear on \`transitionend\`.`
-        : '- Each callback: keep `isIntersecting` entries not yet revealed (by focus or first paint). No stagger.',
-      '- First paint: cards with any pixel on screen at load (also after a `#hash` jump) show without animating: run the pass at DOMContentLoaded and again at `load`, setting `data-in` with inline `transition: none`.',
-      '- Observer script (end of `<body>` or deferred): mark those and cards scrolled past with `data-in="true"`, then add `js` to `<html>`. Hidden state: `.js .reveal:not([data-in="true"]) > .reveal-inner`; transition on the revealed state only.',
-      '- Cards are in the initial HTML (server-rendered or static markup), keeping their space.',
+        ? `- Each callback: keep \`isIntersecting\` entries with \`intersectionRatio >= 0.15\`, skip entries already revealed (focus, first paint), DOM order; delay = min(index, ${MAX_STEPS}) × ${STAGGER_MS}ms, cleared on \`transitionend\`.`
+        : '- Each callback: keep `isIntersecting` entries with `intersectionRatio >= 0.15`, skip entries already revealed (focus, first paint). No stagger.',
+      '- First paint: cards with any pixel on screen show without animating: run the pass at DOMContentLoaded and again at `load` (`#hash` jumps), with inline `transition: none` on the inner box for that pass, restored after a reflow.',
+      '- Observer script (end of `<body>` or deferred): mark those and cards scrolled past with `data-in="true"`, then add `js` to `<html>`; hide `.js .reveal:not([data-in="true"]) > .reveal-inner`, transition only when revealed.',
+      '- Cards are in the initial HTML (server-rendered or static), keeping their space.',
+      `- Motion/SSR: \`initial\` is in the server HTML; add \`<noscript>\`, print and ${FAILSAFE_MS / 1000}s-failsafe styles forcing \`.reveal-inner\` visible.`,
       '- `focusin` on an unrevealed card: reveal now, no delay.',
       '- `@media print`: all cards visible, no transition.',
-      v.stagger
-        ? '- Reduced motion: no transform, opacity over 150ms, no JS delays (media query read per callback).'
-        : '- Reduced motion: no transform, opacity over 150ms.',
+      v.stagger ? '- Reduced motion: no transform, opacity over 150ms, no JS delays.' : '- Reduced motion: no transform, opacity over 150ms.',
     ].join('\n')
   },
 
