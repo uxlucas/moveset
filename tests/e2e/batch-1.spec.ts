@@ -30,11 +30,14 @@ for (const { slug, name } of [
 test.describe('Scroll-triggered', () => {
   test('controls rewrite the prompt', async ({ page }) => {
     await page.goto('/terms/scroll-triggered')
-    await expect(prompt(page)).toContainText('Timing: 500ms with `var(--ease-out)` on both properties.')
+    const budget = '(300ms for app UI; 500 to 800ms only for editorial pacing)'
+    await expect(prompt(page)).toContainText(`Timing: 500ms ${budget} with \`var(--ease-out)\` on both properties.`)
+    await expect(prompt(page)).not.toContainText('comparison option')
     await option(page, 'Duration', '800ms').click()
-    await expect(prompt(page)).toContainText('Timing: 800ms with `var(--ease-out)`')
+    await expect(prompt(page)).toContainText(`Timing: 800ms ${budget}`)
     await option(page, 'Easing', 'Spring').click()
     await expect(prompt(page)).toContainText('a spring with bounce 0.2 over 800ms')
+    await expect(prompt(page)).toContainText('It is a comparison option; ease-out is the recommended default for entrances.')
     await page.getByRole('switch', { name: 'Stagger' }).click()
     await expect(prompt(page)).toContainText('Cards that enter together all start at the same moment. No stagger.')
   })
@@ -80,6 +83,16 @@ test.describe('Scroll-triggered', () => {
         return [...s.querySelectorAll<HTMLElement>('[data-tile]')].filter((t) => t.getBoundingClientRect().bottom < top && t.dataset.in !== 'true').length
       })
     expect(await hiddenAbove()).toBe(0)
+    // Back at the top, the first screen is simply there: no tile in view waits on a stagger.
+    const waitingInView = await el.evaluate((s) => {
+      const view = s.getBoundingClientRect()
+      return [...s.querySelectorAll<HTMLElement>('[data-tile]')].filter((t) => {
+        const r = t.getBoundingClientRect()
+        const seen = Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top)
+        return seen >= r.height * 0.15 && (t.dataset.in !== 'true' || t.style.transitionDelay !== '')
+      }).length
+    })
+    expect(waitingInView).toBe(0)
     await page.waitForTimeout(2500)
     expect(await hiddenAbove()).toBe(0)
   })
