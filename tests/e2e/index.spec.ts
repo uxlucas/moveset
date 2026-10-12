@@ -23,6 +23,23 @@ test('copy failure says so instead of showing a check', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Copy install command' }).locator('[data-icon="check"]')).toHaveCount(0)
 })
 
+test('intro says what it is and who made it', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByText('A visual dictionary of design engineering terms.')).toBeVisible()
+  await expect(page.getByText(/Brought to you by/)).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Lucas Lima' })).toHaveAttribute('href', 'https://lucaslima.design')
+})
+
+test('category headings show the written count and a one-line description', async ({ page }) => {
+  await page.goto('/')
+  const main = page.getByRole('main')
+  // Sticky is in review, which counts as written in dev.
+  const scroll = main.getByRole('heading', { level: 2, name: 'Scroll' })
+  await expect(scroll).toContainText('1 / 8')
+  await expect(scroll).toHaveAccessibleName(/1 of 8 written/)
+  await expect(main.getByText('Motion that scrolling drives or triggers.')).toBeVisible()
+})
+
 test('shows all 47 cards, drafts without links', async ({ page }) => {
   const errors = trackErrors(page)
   await page.goto('/')

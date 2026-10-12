@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist_Mono, Inter } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import type { ReactNode } from 'react'
+import { Footer } from '@/components/site/footer'
 import { Header } from '@/components/site/header'
 import { Sidebar } from '@/components/site/sidebar'
 import { SITE_URL } from '@/lib/site'
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <Sidebar />
             <main id="main" className="mx-auto w-full max-w-[680px] px-4 pb-24 pt-6 sm:px-6 lg:pt-10">
               {children}
+              <Footer />
             </main>
           </div>
         </ThemeProvider>

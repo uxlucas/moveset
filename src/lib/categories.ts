@@ -1,11 +1,11 @@
 export const CATEGORIES = [
-  { slug: 'scroll', name: 'Scroll', short: 'Scroll', hue: 245 },
-  { slug: 'motion', name: 'Motion & Easing', short: 'Motion', hue: 190 },
-  { slug: 'transitions', name: 'Transitions', short: 'Transitions', hue: 280 },
-  { slug: 'gestures', name: 'Gestures', short: 'Gestures', hue: 160 },
-  { slug: 'layout', name: 'Layout', short: 'Layout', hue: 215 },
-  { slug: 'states', name: 'States & Feedback', short: 'States', hue: 170 },
-  { slug: 'visual', name: 'Typography & Visual', short: 'Visual', hue: 300 },
+  { slug: 'scroll', name: 'Scroll', short: 'Scroll', hue: 245, line: 'Motion that scrolling drives or triggers.' },
+  { slug: 'motion', name: 'Motion & Easing', short: 'Motion', hue: 190, line: 'How fast, how it accelerates, how it settles.' },
+  { slug: 'transitions', name: 'Transitions', short: 'Transitions', hue: 280, line: 'Getting from one state to the next without a cut.' },
+  { slug: 'gestures', name: 'Gestures', short: 'Gestures', hue: 160, line: 'What the interface does while your finger or cursor is on it.' },
+  { slug: 'layout', name: 'Layout', short: 'Layout', hue: 215, line: 'Keeping things steady, aligned, and easy to hit.' },
+  { slug: 'states', name: 'States & Feedback', short: 'States', hue: 170, line: 'Loading, empty, done, wrong, and saying so.' },
+  { slug: 'visual', name: 'Typography & Visual', short: 'Visual', hue: 300, line: 'The finish: type, shadow, shape, texture.' },
 ] as const
 
 export type Category = (typeof CATEGORIES)[number]

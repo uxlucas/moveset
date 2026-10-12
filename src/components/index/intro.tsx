@@ -7,15 +7,16 @@ export function Intro() {
     <section aria-labelledby="intro-title" className="mb-14">
       <h1 id="intro-title" className="mb-3 text-[17px] font-medium">moveset</h1>
       <p className="leading-relaxed text-ink-muted">
-        A visual dictionary of design engineering terms. Each entry shows the idea moving, gives it its precise name,
-        and hands you a prompt you can paste into Cursor, Claude or v0 to get exactly that.
+        A visual dictionary of design engineering terms. Each one shows the idea moving, gives it a precise name, and
+        comes with a prompt you can give your agent.
       </p>
       <p className="mt-4 leading-relaxed text-ink-muted">
-        Made by{' '}
+        Brought to you by{' '}
         <a href={AUTHOR_URL} className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
           {AUTHOR_NAME}
         </a>
-        . Add the whole vocabulary to your agent:
+        . I started it because I kept describing motion to agents as “that thing where…” and getting back something
+        close, but wrong.
       </p>
       <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-surface px-5 py-4 shadow-card">
         <code className="font-mono text-[13px] text-ink">{SKILL_COMMAND}</code>

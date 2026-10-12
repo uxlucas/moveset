@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { REPO_URL } from '@/lib/site'
 import { ThemeToggle } from './theme-toggle'
 
 export function Header() {
@@ -8,15 +7,7 @@ export function Header() {
       <Link href="/" className="text-[15px] font-medium tracking-[-0.01em] text-ink">
         moveset
       </Link>
-      <div className="flex items-center gap-1">
-        <a
-          href={REPO_URL}
-          className="press inline-flex min-h-11 items-center rounded-md px-3 text-sm text-ink-muted hover:text-ink pointer-fine:min-h-0 pointer-fine:py-1.5"
-        >
-          GitHub
-        </a>
-        <ThemeToggle />
-      </div>
+      <ThemeToggle />
     </header>
   )
 }

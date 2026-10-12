@@ -2,19 +2,22 @@
 
 import { Search } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { CategoryIcon } from '@/components/site/category-icon'
 import data from '@/generated/terms-data.json'
-import { groupByCategory, matchesQuery } from '@/lib/content'
+import { groupByCategory, matchesQuery, progress } from '@/lib/content'
 import type { TermData } from '@/lib/term-data'
 import { FilterPills, type Filter } from './filter-pills'
 import { TermCard } from './term-card'
+import { useScrollSpy } from './use-scroll-spy'
 
 const ALL = data as TermData[]
+const PROGRESS = new Map(groupByCategory(ALL).map((g) => [g.category.slug, progress(g.terms)]))
 
 export function TermBrowser() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const inputRef = useRef<HTMLInputElement>(null)
+  const rootRef = useRef<HTMLElement>(null)
+  useScrollSpy(rootRef, `${filter}|${query}`)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -33,7 +36,7 @@ export function TermBrowser() {
     .filter((g) => g.terms.length > 0)
 
   return (
-    <section aria-label="Terms">
+    <section ref={rootRef} aria-label="Terms">
       <div className="mb-10 flex flex-col gap-3">
         <label className="relative block">
           <span className="sr-only">Search terms</span>
@@ -61,19 +64,29 @@ export function TermBrowser() {
           Nothing matches “{query.trim()}”. Try describing what it does.
         </p>
       ) : (
-        groups.map(({ category, terms }) => (
-          <section key={category.slug} aria-labelledby={`cat-${category.slug}`} className="mb-14">
-            <h2 id={`cat-${category.slug}`} className="mb-4 flex items-center gap-2 text-[15px] text-ink">
-              <CategoryIcon slug={category.slug} />
-              {category.name}
-            </h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {terms.map((t) => (
-                <TermCard key={t.slug} term={t} />
-              ))}
-            </div>
-          </section>
-        ))
+        <div className="flex flex-col gap-[52px]">
+          {groups.map(({ category, terms }) => {
+            const count = PROGRESS.get(category.slug)!
+            return (
+              <section key={category.slug} aria-labelledby={`cat-${category.slug}`}>
+                <h2 id={`cat-${category.slug}`} className="flex items-center gap-2.5 text-[13px] font-medium leading-5 text-ink">
+                  {category.name}
+                  <span aria-hidden className="h-px flex-1 bg-line" />
+                  <span className="text-[11px] font-normal tabular-nums text-ink-muted">
+                    <span aria-hidden>{count.text}</span>
+                    <span className="sr-only"> ({count.label})</span>
+                  </span>
+                </h2>
+                <p className="mb-3.5 mt-0.5 text-[13px] leading-5 text-ink-muted">{category.line}</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {terms.map((t) => (
+                    <TermCard key={t.slug} term={t} />
+                  ))}
+                </div>
+              </section>
+            )
+          })}
+        </div>
       )}
     </section>
   )

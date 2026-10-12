@@ -12,25 +12,29 @@ export function TermCard({ term }: { term: TermData }) {
     <article
       data-testid="term-card"
       data-slug={term.slug}
-      className={`relative flex flex-col rounded-2xl bg-surface shadow-card transition-shadow duration-150 ease-[ease] has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-ink-faint ${visible ? 'hover:shadow-card-hover' : ''}`}
+      className={`relative flex flex-col rounded-2xl ${
+        visible
+          ? 'bg-surface shadow-card transition-shadow duration-150 ease-[ease] hover:shadow-card-hover has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-ink-faint'
+          : 'bg-transparent outline-1 -outline-offset-1 outline-dashed outline-line'
+      }`}
     >
-      <div className="h-52 p-3">
+      <div className={`h-52 p-3 ${visible ? '' : 'opacity-45'}`}>
         <DemoPlayer slug={term.slug} size="card" />
       </div>
-      <div className="px-5 pb-5 pt-2">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className={`text-[15px] ${visible ? 'text-ink' : 'text-ink-faint'}`}>
-            {visible ? (
-              <Link href={`/terms/${term.slug}`} className="outline-none after:absolute after:inset-0 after:rounded-2xl">
-                {term.name}
-              </Link>
-            ) : (
-              term.name
-            )}
-          </h3>
-          {!visible && <SoonPill />}
-        </div>
-        <p className={`mt-1 text-sm leading-snug ${visible ? 'text-ink-muted' : 'text-ink-faint'}`}>{term.definition}</p>
+      <div className={`px-5 pb-5 pt-2 ${visible ? '' : 'opacity-45'}`}>
+        <h3 className="flex items-center gap-2 text-[15px] text-ink">
+          {visible ? (
+            <Link href={`/terms/${term.slug}`} className="outline-none after:absolute after:inset-0 after:rounded-2xl">
+              {term.name}
+            </Link>
+          ) : (
+            <>
+              {term.name}
+              <SoonPill />
+            </>
+          )}
+        </h3>
+        <p className="mt-1 text-sm leading-snug text-ink-muted">{term.definition}</p>
       </div>
     </article>
   )

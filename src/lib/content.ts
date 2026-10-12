@@ -19,6 +19,16 @@ export function isVisible(
   return term.status === 'published' || (showReview && term.status === 'review')
 }
 
+/** "1 / 8" while a category fills up, just "8" once every term is written. */
+export function progress(terms: readonly { status: TermStatus }[], showReview?: boolean): { text: string; label: string } {
+  const total = terms.length
+  const written = terms.filter((t) => isVisible(t, showReview)).length
+  return {
+    text: written === total ? String(total) : `${written} / ${total}`,
+    label: `${written} of ${total} written`,
+  }
+}
+
 const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order
 
 export function groupByCategory<T extends Listable>(terms: readonly T[]): { category: Category; terms: T[] }[] {

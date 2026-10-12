@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  compareSlug, confusedPairs, defaultValues, groupByCategory, isVisible, matchesQuery, neighbors, normalize, visibleConfusedPairs,
+  compareSlug, confusedPairs, defaultValues, groupByCategory, isVisible, matchesQuery, neighbors, normalize, progress, visibleConfusedPairs,
 } from './content'
 import type { TermData } from './term-data'
 
@@ -19,6 +19,17 @@ describe('isVisible', () => {
   test('review is visible only when review mode is on', () => {
     expect(isVisible({ status: 'review' }, true)).toBe(true)
     expect(isVisible({ status: 'review' }, false)).toBe(false)
+  })
+})
+
+describe('progress', () => {
+  test('shows written / total while drafts remain', () => {
+    const terms = [t({ slug: 'a' }), t({ slug: 'b', status: 'draft' }), t({ slug: 'c', status: 'review' })]
+    expect(progress(terms, false)).toEqual({ text: '1 / 3', label: '1 of 3 written' })
+    expect(progress(terms, true)).toEqual({ text: '2 / 3', label: '2 of 3 written' })
+  })
+  test('shows only the total once complete', () => {
+    expect(progress([t({ slug: 'a' }), t({ slug: 'b' })], false)).toEqual({ text: '2', label: '2 of 2 written' })
   })
 })
 
