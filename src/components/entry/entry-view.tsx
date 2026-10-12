@@ -50,24 +50,20 @@ function Entry({ term }: { term: FullTerm }) {
       />
 
       <header className="mt-12">
-        <p className="mb-2 flex items-center gap-2 text-sm text-ink-muted">
-          <CategoryIcon slug={term.category} />
-          {getCategory(term.category).name}
+        <p className="text-[13px] leading-5">
+          <Link href={`/#cat-${term.category}`} className="hit inline-flex items-center gap-2 text-ink-muted hover:text-ink">
+            <CategoryIcon slug={term.category} />
+            {getCategory(term.category).name}
+          </Link>
         </p>
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h1 className="text-2xl font-medium tracking-[-0.015em]">{term.name}</h1>
-          <div className="flex flex-wrap gap-1 text-sm">
-            <CopyButton text={() => buildPromptText(term, values)} label="Copy as prompt" className="hit rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
-              Copy as prompt
-            </CopyButton>
-            <CopyButton text={() => buildMarkdown(term, values, resolve)} label="Copy as markdown" className="hit rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
-              Copy as markdown
-            </CopyButton>
-          </div>
-        </div>
-        {term.aliases.length > 0 && <p className="mt-2 text-sm text-ink-muted">Also called {term.aliases.join(', ')}</p>}
-        <p className="mt-6 text-[17px] leading-relaxed text-ink">{term.definition}</p>
-        <p className="mt-3 leading-relaxed text-ink-muted">{term.description}</p>
+        <h1 className="mt-2 text-2xl/8 font-medium tracking-[-0.02em] text-ink sm:text-[26px]/8">{term.name}</h1>
+        <p className="mt-3 max-w-[56ch] text-pretty text-[18px]/7 text-ink">{term.definition}</p>
+        <p className="mt-3 text-pretty text-[15px]/6 text-ink-muted">{term.description}</p>
+        {term.aliases.length > 0 && (
+          <p className="mt-5 text-[13px]/5 text-ink-faint">
+            <span className="text-ink-muted">Also called</span> {term.aliases.join(', ')}
+          </p>
+        )}
       </header>
 
       <div className="mt-12 grid gap-8 sm:grid-cols-2">
@@ -86,7 +82,17 @@ function Entry({ term }: { term: FullTerm }) {
       </div>
 
       <section aria-labelledby="prompt" className="mt-12">
-        <h2 id="prompt" className={h2}>Prompt</h2>
+        <div className="flex flex-wrap items-center justify-between gap-x-3">
+          <h2 id="prompt" className={h2}>Prompt</h2>
+          <div className="flex gap-1 text-[13px]">
+            <CopyButton text={() => buildPromptText(term, values)} label="Copy as prompt" className="hit rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
+              Copy as prompt
+            </CopyButton>
+            <CopyButton text={() => buildMarkdown(term, values, resolve)} label="Copy as markdown" className="hit rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
+              Copy as markdown
+            </CopyButton>
+          </div>
+        </div>
         <div className="relative mt-3 rounded-2xl bg-surface shadow-card">
           <pre className="whitespace-pre-wrap break-words p-5 pr-14 font-mono text-[13px] leading-relaxed text-ink">
             <code>{term.prompt(values).trim()}</code>
