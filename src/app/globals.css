@@ -172,6 +172,11 @@
   .gl[data-glyph='pinned-horizontal-scroll'][data-active='true'] .m {
     animation: g-horz 1.6s linear infinite;
   }
+  /* Shoots out and settles on the house ease-out, then fades back to the start. */
+  .gl[data-glyph='ease-out'][data-active='true'] .m {
+    animation-name: g-eout;
+    animation-duration: 2s;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .gl .m {
@@ -206,6 +211,13 @@
 }
 @keyframes g-horz {
   to { transform: translateX(-4px); }
+}
+@keyframes g-eout {
+  0%, 10% { transform: translateX(-3px); opacity: 1; }
+  45%, 80% { transform: translateX(3px); opacity: 1; }
+  92% { transform: translateX(3px); opacity: 0; }
+  93% { transform: translateX(-3px); opacity: 0; }
+  100% { transform: translateX(-3px); opacity: 1; }
 }
 
 /* Site chrome goes still under reduced motion. Demos handle it themselves (play on request). */
