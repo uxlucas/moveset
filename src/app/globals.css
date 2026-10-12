@@ -1,0 +1,219 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root {
+  --canvas: oklch(0.985 0 0);
+  --surface: oklch(1 0 0);
+  --line: oklch(0.922 0 0);
+  --line-strong: oklch(0.86 0 0);
+  --ink: oklch(0.205 0 0);
+  --ink-muted: oklch(0.48 0 0);
+  --ink-faint: oklch(0.66 0 0);
+  --demo: oklch(0.93 0 0);
+  --demo-2: oklch(0.87 0 0);
+  --demo-subject: oklch(0.55 0 0);
+  --shadow-color: oklch(0 0 0 / 0.04);
+  --selection: oklch(0.205 0 0 / 0.12);
+  --seg: oklch(0.205 0 0 / 0.05);
+  --cat-l: 0.58;
+  --duration-1: 150ms;
+  --duration-2: 200ms;
+  --duration-3: 250ms;
+  --duration-4: 300ms;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: oklch(0.145 0 0);
+  --surface: oklch(0.185 0 0);
+  --line: oklch(0.26 0 0);
+  --line-strong: oklch(0.34 0 0);
+  --ink: oklch(0.95 0 0);
+  --ink-muted: oklch(0.7 0 0);
+  --ink-faint: oklch(0.52 0 0);
+  --demo: oklch(0.25 0 0);
+  --demo-2: oklch(0.32 0 0);
+  --demo-subject: oklch(0.72 0 0);
+  --shadow-color: transparent;
+  --selection: oklch(0.95 0 0 / 0.16);
+  --seg: oklch(1 0 0 / 0.07);
+  --cat-l: 0.74;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-demo: var(--demo);
+  --color-demo-2: var(--demo-2);
+  --color-demo-subject: var(--demo-subject);
+  --color-seg: var(--seg);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --shadow-card: 0 0 0 1px var(--line), 0 1px 2px var(--shadow-color), 0 4px 12px var(--shadow-color);
+  --shadow-card-hover: 0 0 0 1px var(--line-strong), 0 1px 2px var(--shadow-color), 0 4px 12px var(--shadow-color);
+}
+
+@utility press {
+  transition-property: scale, color, background-color, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-out);
+  &:active {
+    scale: 0.97;
+  }
+}
+
+/* Extends the pointer hit area to 44px without changing the visual size. */
+@utility hit {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    translate: -50% -50%;
+  }
+}
+
+/* Fades only the scroller edge that has more content (data attributes set by useScrollEdges). Mobile only: wider screens wrap. */
+@utility scroll-fade-x {
+  @media (width < 40rem) {
+    &[data-fade-start='true'] {
+      mask-image: linear-gradient(to right, transparent, black 24px);
+    }
+    &[data-fade-end='true'] {
+      mask-image: linear-gradient(to left, transparent, black 24px);
+    }
+    &[data-fade-start='true'][data-fade-end='true'] {
+      mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--canvas);
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  ::selection {
+    background: var(--selection);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ink-faint);
+    outline-offset: 2px;
+  }
+}
+
+/* Sidebar glyphs (components/site/glyph.tsx). The part with class `m` loops only on the current term. */
+.gl {
+  display: block;
+  flex: none;
+  overflow: visible;
+  color: var(--ink-faint);
+  transition: color 150ms ease;
+}
+.gl[data-active='true'] {
+  color: var(--ink);
+}
+.gl .m {
+  transform-box: fill-box;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .gl[data-active='true'] .m {
+    animation: 2.4s var(--ease-out) infinite;
+  }
+  .gl[data-glyph='scroll-triggered'][data-active='true'] .m {
+    animation-name: g-trig;
+  }
+  .gl[data-glyph='scroll-linked'][data-active='true'] .m {
+    animation-name: g-link;
+    transform-origin: 0 50%;
+  }
+  /* A slow bob between two positions, so ease-in-out on both ends. */
+  .gl[data-glyph='parallax'][data-active='true'] .m {
+    animation-timing-function: var(--ease-in-out);
+  }
+  .gl[data-glyph='parallax'][data-active='true'] .m.b {
+    animation-name: g-par-b;
+  }
+  .gl[data-glyph='parallax'][data-active='true'] .m.f {
+    animation-name: g-par-f;
+  }
+  /* Constant scrolling: linear, and each loop moves exactly one line so the seam doesn't show. */
+  .gl[data-glyph='sticky'][data-active='true'] .m {
+    animation: g-stick 1.2s linear infinite;
+  }
+  .gl[data-glyph='scroll-snap'][data-active='true'] .m {
+    animation-name: g-snap;
+    animation-duration: 2.8s;
+  }
+  .gl[data-glyph='pinned-horizontal-scroll'][data-active='true'] .m {
+    animation: g-horz 1.6s linear infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gl .m {
+    animation: none;
+  }
+}
+@keyframes g-trig {
+  0%, 12% { transform: translateY(2.5px); opacity: 0; }
+  45%, 85% { transform: none; opacity: 1; }
+  100% { transform: none; opacity: 0; }
+}
+@keyframes g-link {
+  0% { transform: scaleX(0.1); }
+  70%, 85% { transform: scaleX(1); }
+  100% { transform: scaleX(0.1); }
+}
+@keyframes g-par-b {
+  0%, 100% { transform: translateY(0.8px); }
+  50% { transform: translateY(-0.8px); }
+}
+@keyframes g-par-f {
+  0%, 100% { transform: translateY(2.4px); }
+  50% { transform: translateY(-2.4px); }
+}
+@keyframes g-stick {
+  to { transform: translateY(-2.5px); }
+}
+@keyframes g-snap {
+  0%, 30% { transform: translateY(0); }
+  48%, 80% { transform: translateY(-8px); }
+  98%, 100% { transform: translateY(0); }
+}
+@keyframes g-horz {
+  to { transform: translateX(-4px); }
+}
+
+/* Site chrome goes still under reduced motion. Demos handle it themselves (play on request). */
+@media (prefers-reduced-motion: reduce) {
+  *:not([data-demo] *),
+  *:not([data-demo] *)::before,
+  *:not([data-demo] *)::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
