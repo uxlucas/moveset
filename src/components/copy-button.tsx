@@ -41,7 +41,7 @@ export function CopyButton({ text, label, children, className = '' }: Props) {
               exit={{ scale: 0.3, opacity: 0, filter: 'blur(3px)' }}
               transition={reduce ? { duration: 0 } : { type: 'spring', duration: 0.35, bounce: 0 }}
             >
-              {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
+              {copied ? <Check size={14} aria-hidden data-icon="check" /> : <Copy size={14} aria-hidden data-icon="copy" />}
             </motion.span>
           </AnimatePresence>
         </span>

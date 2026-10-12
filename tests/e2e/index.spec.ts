@@ -20,6 +20,7 @@ test('copy failure says so instead of showing a check', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Copy install command' }).click()
   await expect(page.getByText("Couldn't copy")).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Copy install command' }).locator('[data-icon="check"]')).toHaveCount(0)
 })
 
 test('shows all 47 cards, drafts without links', async ({ page }) => {

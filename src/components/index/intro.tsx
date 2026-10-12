@@ -19,7 +19,7 @@ export function Intro() {
       </p>
       <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-surface px-5 py-4 shadow-card">
         <code className="font-mono text-[13px] text-ink">{SKILL_COMMAND}</code>
-        <CopyButton text={SKILL_COMMAND} label="Copy install command" className="size-8 justify-center rounded-lg text-ink-muted hover:text-ink" />
+        <CopyButton text={SKILL_COMMAND} label="Copy install command" className="hit size-8 justify-center rounded-lg text-ink-muted hover:text-ink" />
       </div>
       <a
         href={REPO_URL}

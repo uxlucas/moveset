@@ -20,7 +20,7 @@ export function FilterPills({ value, onChange }: { value: Filter; onChange: (f: 
       ref={ref}
       role="group"
       aria-label="Filter by category"
-      className="-mx-4 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 py-1 [scrollbar-width:none] sm:mx-0 sm:px-0"
+      className="-mx-4 -my-0.5 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 py-1.5 [scrollbar-width:none] sm:mx-0 sm:px-0"
       style={{ maskImage: mask, WebkitMaskImage: mask }}
     >
       {OPTIONS.map((o) => {
@@ -31,7 +31,7 @@ export function FilterPills({ value, onChange }: { value: Filter; onChange: (f: 
             type="button"
             aria-pressed={pressed}
             onClick={() => onChange(o.value)}
-            className={`press shrink-0 rounded-full px-3 py-1.5 text-sm ${pressed ? 'bg-ink text-canvas' : 'bg-surface text-ink-muted shadow-card hover:text-ink'}`}
+            className={`press hit shrink-0 rounded-full px-3 py-1.5 text-sm ${pressed ? 'bg-ink text-canvas' : 'bg-surface text-ink-muted shadow-card hover:text-ink'}`}
           >
             {o.label}
           </button>

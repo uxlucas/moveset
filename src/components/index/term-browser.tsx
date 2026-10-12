@@ -50,7 +50,7 @@ export function TermBrowser() {
             placeholder="Search"
             autoComplete="off"
             spellCheck={false}
-            className="h-9 w-full rounded-full bg-surface pl-8 pr-8 text-base text-ink shadow-card placeholder:text-ink-faint [&::-webkit-search-cancel-button]:hidden"
+            className="h-9 pointer-coarse:h-11 w-full rounded-full bg-surface pl-8 pr-8 text-base text-ink shadow-card placeholder:text-ink-faint [&::-webkit-search-cancel-button]:hidden"
           />
           <kbd aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-ink-faint">/</kbd>
         </label>

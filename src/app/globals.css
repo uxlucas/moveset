@@ -70,6 +70,20 @@
   }
 }
 
+/* Extends the pointer hit area to 44px without changing the visual size. */
+@utility hit {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    translate: -50% -50%;
+  }
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
