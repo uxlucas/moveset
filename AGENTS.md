@@ -1,3 +1,12 @@
+# moveset agents
+
+- One term is one file: `src/terms/<slug>.tsx`, built with `defineTerm`.
+- `npm run generate` rebuilds the registry and `terms-data.json`. It runs before dev, build and test.
+- Restart `npm run dev` after adding a term or changing its name, status, category or order (or run `npm run dev:watch` in a second terminal).
+- `review` terms only show in dev; `published` terms need a passing, approved review file.
+- Read `docs/house-rules.md` before writing a demo or prompt.
+- This is Next.js 16: check `node_modules/next/dist/docs/` before relying on older APIs.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know

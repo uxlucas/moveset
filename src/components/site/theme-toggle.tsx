@@ -20,7 +20,7 @@ export function ThemeToggle() {
       type="button"
       onClick={() => setTheme(next)}
       aria-label={`Theme: ${LABEL[current]}. Switch to ${LABEL[next]}.`}
-      className="press inline-grid min-h-11 items-center rounded-md px-3 text-sm text-ink-muted hover:text-ink sm:min-h-0 sm:py-1.5"
+      className="press inline-grid min-h-11 items-center rounded-md px-3 text-sm text-ink-muted hover:text-ink pointer-fine:min-h-0 pointer-fine:py-1.5"
     >
       {/* All labels share one grid cell, so the button keeps the width of the longest label. */}
       {ORDER.map((mode) => (

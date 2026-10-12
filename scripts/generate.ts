@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, readdirSync, readFileSync, watch, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { assertSlugsMatch, renderRegistry, renderSlugs, slugFromFile, toTermData } from './lib/registry'
@@ -25,7 +26,19 @@ async function main() {
   console.log(`generate: ${slugs.length} terms`)
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error)
-  process.exit(1)
-})
+if (process.argv.includes('--watch')) {
+  // Each run is a fresh process: the term files are cached once imported.
+  const run = () => spawnSync(process.execPath, [...process.execArgv, process.argv[1]], { stdio: 'inherit' })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  run()
+  watch(termsDir, () => {
+    clearTimeout(timer)
+    timer = setTimeout(run, 150)
+  })
+  console.log('generate: watching src/terms')
+} else {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error)
+    process.exit(1)
+  })
+}

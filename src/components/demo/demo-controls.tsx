@@ -16,7 +16,7 @@ export function DemoControls({ controls, values, onChange, onReplay }: Props) {
       <button
         type="button"
         onClick={onReplay}
-        className="press inline-flex min-h-9 items-center gap-1.5 rounded-full bg-surface px-3 text-ink shadow-card hover:shadow-card-hover"
+        className="press hit inline-flex min-h-9 items-center gap-1.5 rounded-full bg-surface px-3 text-ink shadow-card hover:shadow-card-hover"
       >
         <RotateCcw size={14} aria-hidden />
         Replay
@@ -43,7 +43,7 @@ function ControlField({ control, value, onChange }: { control: Control; value: C
           step={control.step}
           value={Number(value)}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-28 accent-[var(--ink)]"
+          className="w-28 accent-[var(--ink)] pointer-coarse:h-11"
         />
         <output htmlFor={id} className="w-12 tabular-nums text-ink">{`${value}${control.unit ?? ''}`}</output>
       </div>
@@ -61,7 +61,7 @@ function ControlField({ control, value, onChange }: { control: Control; value: C
           aria-checked={Boolean(value)}
           aria-labelledby={`${id}-label`}
           onClick={() => onChange(!value)}
-          className={`press relative h-5 w-9 rounded-full transition-colors duration-150 ease-[ease] ${value ? 'bg-ink' : 'bg-demo-2'}`}
+          className={`press hit relative h-5 w-9 rounded-full transition-colors duration-150 ease-[ease] ${value ? 'bg-ink' : 'bg-demo-2'}`}
         >
           <span
             aria-hidden
@@ -82,7 +82,7 @@ function ControlField({ control, value, onChange }: { control: Control; value: C
             type="button"
             aria-pressed={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`press rounded-full px-2.5 py-1 transition-colors duration-150 ease-[ease] ${value === o.value ? 'bg-ink text-canvas' : 'text-ink-muted hover:text-ink'}`}
+            className={`press hit rounded-full px-2.5 py-1 transition-colors duration-150 ease-[ease] ${value === o.value ? 'bg-ink text-canvas' : 'text-ink-muted hover:text-ink'}`}
           >
             {o.label}
           </button>

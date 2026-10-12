@@ -61,4 +61,4 @@ The standard every demo, prompt and piece of site chrome is held to. Distilled f
 ## Copy
 - Plain, specific and calm. Say what it does, not how good it is.
 - Definitions are one sentence, under 140 characters.
-- Blocked: seamless, leverage, delve, robust, elevate, effortless, cutting-edge, unlock, game-changer.
+- Blocked: seamless, seamlessly, leverage, delve, robust, elevate, effortless, effortlessly, cutting-edge, unlock, game-changer.

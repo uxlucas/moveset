@@ -1,18 +1,20 @@
 import type { Metadata } from 'next'
 import data from '@/generated/terms-data.json'
+import { isVisible } from '@/lib/content'
 import type { TermData } from '@/lib/term-data'
 
 export const metadata: Metadata = { title: 'About' }
 
 const REFERENCES = [
   { label: 'Emil Kowalski', url: 'https://emilkowal.ski' },
-  { label: 'Rauno Freiberg — Web Interface Guidelines', url: 'https://interfaces.rauno.me' },
-  { label: 'Gustavo Fior — Craft', url: 'https://craft.gustavofior.com' },
+  { label: 'Rauno Freiberg: Web Interface Guidelines', url: 'https://interfaces.rauno.me' },
+  { label: 'Gustavo Fior: Craft', url: 'https://craft.gustavofior.com' },
 ]
 
 export default function About() {
   const seen = new Set(REFERENCES.map((r) => r.url))
   const sources = (data as TermData[])
+    .filter((t) => isVisible(t))
     .flatMap((t) => t.sources)
     .filter((s) => (seen.has(s.url) ? false : (seen.add(s.url), true)))
 

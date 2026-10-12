@@ -92,7 +92,7 @@ export function DemoPlayer({ slug, size, values, timeScale = 1, replayRequest = 
           type="button"
           onClick={play}
           aria-label={`Play ${term.name} demo`}
-          className="press absolute bottom-2 right-2 z-10 inline-flex size-8 items-center justify-center rounded-full bg-surface text-ink shadow-card"
+          className="press hit absolute bottom-2 right-2 z-10 inline-flex size-8 items-center justify-center rounded-full bg-surface text-ink shadow-card"
         >
           <Play size={14} aria-hidden />
         </button>

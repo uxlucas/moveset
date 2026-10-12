@@ -110,11 +110,11 @@ export default defineTerm({
     [
       'Make the section headers in this list sticky.',
       '',
-      "- Wrap each header and its rows in their own element, with the header as that element's first child. Sticky only holds inside its parent, which is what lets the next header push the current one away instead of stacking on it.",
+      "- Wrap each header and its rows in their own element, with the header at the top of that element (right after its sentinel, when you use one). Sticky only holds inside its parent, which is what lets the next header push the current one away instead of stacking on it.",
       `- Give each section header \`position: sticky; top: ${v.offset}px;\`${v.offset > 0 ? ` (${v.offset}px is the height of the bar that stays above the list)` : ''} inside the list's own scroll container. Each header should only stick within its own section, so the next header pushes it up instead of overlapping it.`,
       '- Give headers an opaque background that matches the list, and a z-index above the rows, so rows never show through.',
       '- Check every ancestor between the header and the scroll container: `overflow: hidden`, `overflow-x: hidden`, `overflow: auto` or `overflow: scroll` on any of them silently breaks sticky. Use `overflow: clip` when you need clipping.',
-      `- Set \`scroll-padding-top\` on the scroll container to the header height plus ${v.offset}px, so rows focused with the keyboard are never hidden behind a stuck header.`,
+      `- Set \`scroll-padding-top\` on the scroll container to the header height${v.offset > 0 ? ` plus ${v.offset}px` : ''}, so rows focused with the keyboard are never hidden behind a stuck header.`,
       ...(v.shadow
         ? [
             `- While a header is stuck, show a soft shadow under it: \`box-shadow: 0 1px 0 var(--border, rgb(0 0 0 / 0.08)), 0 4px 12px rgb(0 0 0 / 0.06)\`, transitioned over 150ms with \`ease\`. Detect "stuck" with an IntersectionObserver whose root is the list's scroll container and whose rootMargin is '-${v.offset + 1}px 0px 0px 0px', watching a 1px sentinel element placed just above each header. A header is stuck when its sentinel is not intersecting and sits above the root's top edge. Do not use a scroll listener.`,

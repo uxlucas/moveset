@@ -1,5 +1,5 @@
 import { defaultValues } from './content'
-import type { Term } from './term-types'
+import type { Control, ControlValue, Term, Values } from './term-types'
 
 export type LintIssue = { slug: string; rule: string; message: string }
 export type Review = { slug: string; verdict?: string; approved: boolean }
@@ -62,10 +62,34 @@ export function parseFrontmatter(src: string): Record<string, string | boolean> 
   return out
 }
 
-function proseOf(term: Term): string[] {
+const MAX_COMBINATIONS = 64
+
+function candidateValues(control: Control): ControlValue[] {
+  if (control.type === 'toggle') return [true, false]
+  if (control.type === 'select') return control.options.map((o) => o.value)
+  return [...new Set([control.min, control.default, control.max])]
+}
+
+/** Every combination of control values worth linting: all toggle states, select options and range min/default/max, defaults first, capped at 64. */
+export function controlCombinations(controls: readonly Control[] = []): Values[] {
+  const defaults = defaultValues(controls)
+  const out: Values[] = [defaults]
+  const candidates = controls.map(candidateValues)
+  const pick = new Array<number>(controls.length).fill(0)
+  const isDefaults = (v: Values) => controls.every((c) => v[c.id] === defaults[c.id])
+  while (out.length < MAX_COMBINATIONS) {
+    const combo: Values = Object.fromEntries(controls.map((c, i) => [c.id, candidates[i][pick[i]]]))
+    if (!isDefaults(combo)) out.push(combo)
+    let i = controls.length - 1
+    while (i >= 0 && ++pick[i] === candidates[i].length) pick[i--] = 0
+    if (i < 0) break
+  }
+  return out
+}
+
+function proseOf(term: Term, v: Values): string[] {
   const prose = [term.name, term.definition, ...(term.aliases ?? []), ...(term.confusedWith ?? []).map((c) => c.difference)]
   if (term.status !== 'draft') {
-    const v = defaultValues(term.demo.controls)
     prose.push(term.description, ...term.useWhen, ...term.avoidWhen, term.a11y, term.prompt(v), ...term.acceptance(v))
   }
   return prose
@@ -73,7 +97,13 @@ function proseOf(term: Term): string[] {
 
 export function lintTerms(terms: readonly Term[], reviews: readonly Review[], config: LintConfig): LintIssue[] {
   const issues: LintIssue[] = []
-  const add = (slug: string, rule: string, message: string) => issues.push({ slug, rule, message })
+  const seenIssues = new Set<string>()
+  const add = (slug: string, rule: string, message: string) => {
+    const key = [slug, rule, message].join('|')
+    if (seenIssues.has(key)) return
+    seenIssues.add(key)
+    issues.push({ slug, rule, message })
+  }
   const aliasOwner = new Map<string, string>()
   const orderOwner = new Map<string, string>()
 
@@ -102,14 +132,16 @@ export function lintTerms(terms: readonly Term[], reviews: readonly Review[], co
       if (c.slug === slug) add(slug, 'confused-self', 'A term cannot be confused with itself.')
     }
 
-    const prose = proseOf(term).join('\n')
-    for (const word of BLOCKED_WORDS) {
-      if (new RegExp(`\\b${word}\\b`, 'i').test(prose)) add(slug, 'blocked-word', `Remove "${word}".`)
+    const combinations = term.status === 'draft' ? [{}] : controlCombinations(term.demo.controls)
+    for (const v of combinations) {
+      const prose = proseOf(term, v).join(' ')
+      for (const word of BLOCKED_WORDS) {
+        if (new RegExp(`\\b${word}\\b`, 'i').test(prose)) add(slug, 'blocked-word', `Remove "${word}".`)
+      }
     }
 
     if (term.status !== 'draft') {
-      const code = term.code(defaultValues(term.demo.controls))
-      for (const [approach, src] of Object.entries(code)) {
+      for (const v of combinations) for (const [approach, src] of Object.entries(term.code(v))) {
         if (!src) continue
         if (!config.allowEaseIn.includes(slug) && EASE_IN.test(src)) add(slug, 'code-ease-in', `${approach}: don't use ease-in on UI.`)
         if (TRANSITION_ALL.test(src)) add(slug, 'code-transition-all', `${approach}: name the transitioned properties.`)

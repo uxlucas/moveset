@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { TermSlug } from '@/generated/slugs'
-import { lintTerms, parseFrontmatter, type LintConfig, type Review } from './lint'
-import { defineTerm, type Term } from './term-types'
+import { controlCombinations, lintTerms, parseFrontmatter, type LintConfig, type Review } from './lint'
+import { defineTerm, type Control, type Term } from './term-types'
 
 const config: LintConfig = { allowLayoutProps: [], allowEaseIn: [] }
 
@@ -158,4 +158,65 @@ describe('parseFrontmatter', () => {
     expect(parseFrontmatter('---\r\nverdict: "pass"\r\napproved: false\r\n---\r\n')).toEqual({ verdict: 'pass', approved: false })
   })
   test('returns an empty object without frontmatter', () => expect(parseFrontmatter('# hi')).toEqual({}))
+})
+
+describe('control combinations', () => {
+  const toggle = (id: string, def = true): Control => ({ id, type: 'toggle', label: id, default: def })
+
+  test('a term with no controls has exactly one combination', () => {
+    expect(controlCombinations([])).toEqual([{}])
+    expect(controlCombinations(undefined)).toEqual([{}])
+  })
+
+  test('covers toggles, select options and range min, default and max with the defaults first', () => {
+    const controls: Control[] = [
+      toggle('on'),
+      { id: 'mode', type: 'select', label: 'Mode', default: 'a', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] },
+      { id: 'n', type: 'range', label: 'N', min: 0, max: 10, step: 1, default: 5 },
+    ]
+    const combos = controlCombinations(controls)
+    expect(combos).toHaveLength(2 * 2 * 3)
+    expect(combos[0]).toEqual({ on: true, mode: 'a', n: 5 })
+    expect(combos).toContainEqual({ on: false, mode: 'b', n: 10 })
+  })
+
+  test('range values are de-duplicated when the default sits on an end', () => {
+    expect(controlCombinations([{ id: 'n', type: 'range', label: 'N', min: 0, max: 10, step: 1, default: 0 }])).toHaveLength(2)
+  })
+
+  test('the cap holds at 64 with the defaults first', () => {
+    const controls = Array.from({ length: 7 }, (_, i) => toggle(`t${i}`))
+    const combos = controlCombinations(controls)
+    expect(combos).toHaveLength(64)
+    expect(combos[0]).toEqual(Object.fromEntries(controls.map((c) => [c.id, true])))
+    expect(new Set(combos.map((c) => JSON.stringify(c))).size).toBe(64)
+  })
+
+  test('code that breaks a rule only at a non-default control value is flagged', () => {
+    const t = term({
+      demo: { component: () => null, label: 'A demo.', controls: [toggle('smooth')] },
+      code: (v: { smooth: boolean }) => ({
+        css: v.smooth
+          ? '.a { transition: opacity 200ms ease-out; } @media (prefers-reduced-motion: reduce) {}'
+          : '.a { transition: opacity 200ms ease-in; } @media (prefers-reduced-motion: reduce) {}',
+      }),
+    })
+    expect(rules([t])).toContain('code-ease-in')
+  })
+
+  test('prose that breaks a rule only at a non-default control value is flagged', () => {
+    const t = term({
+      demo: { component: () => null, label: 'A demo.', controls: [toggle('smooth')] },
+      prompt: (v: { smooth: boolean }) => (v.smooth ? 'Build it.' : 'Build it seamlessly.'),
+    })
+    expect(rules([t])).toContain('blocked-word')
+  })
+
+  test('the same issue found at several combinations is reported once', () => {
+    const t = term({
+      demo: { component: () => null, label: 'A demo.', controls: [toggle('a'), toggle('b')] },
+      code: () => ({ css: '.a { transition: all 1s; }' }),
+    })
+    expect(rules([t]).filter((r) => r === 'code-transition-all')).toHaveLength(1)
+  })
 })
