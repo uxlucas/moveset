@@ -32,13 +32,19 @@ export function buildPromptText(term: FullTerm, values: Values): string {
 
 export type Resolve = (slug: string) => { name: string; visible: boolean }
 
-export function buildMarkdown(term: FullTerm, values: Values, resolve: Resolve): string {
+/** `confusedWith` defaults to the term's own declarations; pass both directions (see `confusedPairs`) to list pairs declared on the other side too. */
+export function buildMarkdown(
+  term: FullTerm,
+  values: Values,
+  resolve: Resolve,
+  confusedWith: readonly { slug: string; difference: string }[] = term.confusedWith ?? [],
+): string {
   const code = term.code(values)
   const approaches = CODE_APPROACHES.filter((a) => code[a.key])
     .map((a) => `### ${a.label}\n\n\`\`\`${a.lang}\n${code[a.key]}\n\`\`\``)
     .join('\n\n')
   const related = term.related.map((slug) => ({ slug, ...resolve(slug) })).filter((r) => r.visible)
-  const confused = (term.confusedWith ?? []).map((c) => ({ ...c, ...resolve(c.slug) })).filter((c) => c.visible)
+  const confused = confusedWith.map((c) => ({ ...c, ...resolve(c.slug) })).filter((c) => c.visible)
   const parts = [
     `# ${term.name}`,
     term.aliases.length > 0 ? `Also called: ${term.aliases.join(', ')}` : '',

@@ -11,6 +11,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: skills/ is committed up to date
+        run: |
+          git diff --exit-code -- skills/ || { echo "skills/ is stale: run npm run generate and commit skills/"; exit 1; }
+          test -z "$(git ls-files --others --exclude-standard -- skills/)" || { echo "skills/ has uncommitted files: run npm run generate and commit skills/"; exit 1; }
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

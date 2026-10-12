@@ -1,2 +1,7 @@
 #!/bin/sh
-npm run check
+npm run check || exit 1
+# generate rewrites skills/moveset; anything it changed must be part of the commit.
+if ! git diff --quiet -- skills/ || [ -n "$(git ls-files --others --exclude-standard -- skills/)" ]; then
+  echo "skills/ changed after npm run generate. Stage it: git add skills/" >&2
+  exit 1
+fi

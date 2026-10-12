@@ -88,7 +88,11 @@ function Entry({ term }: { term: FullTerm }) {
             <CopyButton text={() => buildPromptText(term, values)} label="Copy as prompt" className="hit rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
               Copy as prompt
             </CopyButton>
-            <CopyButton text={() => buildMarkdown(term, values, resolve)} label="Copy as markdown" className="hit rounded-full px-3 py-1.5 text-ink-muted hover:text-ink">
+            <CopyButton
+              text={() => buildMarkdown(term, values, resolve, confused.map((c) => ({ slug: c.other.slug, difference: c.difference })))}
+              label="Copy as markdown"
+              className="hit rounded-full px-3 py-1.5 text-ink-muted hover:text-ink"
+            >
               Copy as markdown
             </CopyButton>
           </div>
