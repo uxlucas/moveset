@@ -38,24 +38,31 @@ test.describe('Ease-out', () => {
     await page.goto('/terms/ease-out')
     await expect(prompt(page)).toContainText('200ms `var(--ease-out)` (`cubic-bezier(0.23, 1, 0.32, 1)`).')
     await expect(prompt(page)).toContainText('`opacity: 0; transform: scale(0.95)`, 150ms, same curve.')
+    await expect(prompt(page)).toContainText('base rule `transition-duration: 150ms` (close), `[data-open]` `200ms` (open)')
+    await expect(prompt(page)).toContainText('CSS route, closed: stays mounted, `inert`, `pointer-events: none`.')
+    await expect(prompt(page)).toContainText('Motion route: `AnimatePresence`, unmounts after the exit')
     await expect(prompt(page)).not.toContainText('Comparison only')
+    await expect(page.getByRole('group', { name: 'Curve' }).getByRole('button', { name: 'Keyword' })).toHaveCount(0)
     await option(page, 'Curve', 'Expo').click()
     await expect(prompt(page)).toContainText('`cubic-bezier(0.19, 1, 0.22, 1)` (ease-out expo)')
     await expect(prompt(page)).not.toContainText('var(--ease-out)')
-    await option(page, 'Curve', 'Keyword').click()
-    await expect(prompt(page)).toContainText('`ease-out` keyword (comparison only; ship `cubic-bezier(0.23, 1, 0.32, 1)`)')
     await option(page, 'Duration', '300ms').click()
-    await expect(prompt(page)).toContainText('`none`, 300ms `ease-out` keyword')
     await expect(prompt(page)).toContainText('`opacity: 0; transform: scale(0.95)`, 220ms, same curve.')
+    await expect(prompt(page)).toContainText('`[data-open]` `300ms` (open)')
     await expect(prompt(page)).not.toContainText('200ms')
+    await option(page, 'Compare', 'Keyword').click()
+    await expect(prompt(page)).toContainText('Comparison only; ship the curve above: a second menu beside it with the CSS `ease-out` keyword')
+    await option(page, 'Curve', 'Quint (house)').click()
+    await expect(prompt(page)).toContainText('Comparison only; ship the house curve: a second menu beside it with the CSS `ease-out` keyword')
     await option(page, 'Compare', 'Ease-in').click()
+    await expect(prompt(page)).not.toContainText('keyword')
     await expect(prompt(page)).toContainText('Comparison only; do not ship ease-in on UI: a second menu beside it with `cubic-bezier(0.42, 0, 1, 1)`')
     await option(page, 'Compare', 'Linear').click()
     await expect(prompt(page)).toContainText('Comparison only: a second menu beside it with `linear`')
     await expect(prompt(page)).not.toContainText('do not ship ease-in')
   })
 
-  test('the menu transitions with the selected curve and duration; the comparison menu is linear', async ({ page }) => {
+  test('the menu transitions with the selected curve and duration; the comparison menus use theirs', async ({ page }) => {
     // Reduced motion keeps the demo on its still frame (menu open), so the computed values are stable.
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/terms/ease-out')
@@ -75,6 +82,10 @@ test.describe('Ease-out', () => {
     await expect.poll(async () => (await timing(page, '[data-popover]'))[1].fn).toBe('linear')
     // The still frame puts both menus open again.
     await expect(page.locator('main [data-popover][data-open="true"]')).toHaveCount(2)
+    await option(page, 'Compare', 'Keyword').click()
+    await expect.poll(async () => (await timing(page, '[data-popover]'))[1].fn).toBe('ease-out')
+    await expect(demo(page, 'ease-out').getByText('CSS keyword', { exact: true })).toBeVisible()
+    await expect(demo(page, 'ease-out').getByText('ease-out expo', { exact: true })).toBeVisible()
   })
 
   test('a play closes the menu, then opens it again from the trigger corner', async ({ page }) => {

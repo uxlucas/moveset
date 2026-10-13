@@ -3,13 +3,25 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import { terms } from '@/generated/registry'
 import { groupByCategory } from '@/lib/content'
-import { lintTerms } from '@/lib/lint'
+import { controlCombinations, lintTerms } from '@/lib/lint'
 import { loadReviews } from '@/lib/reviews'
+import { isFull } from '@/lib/term-types'
 import config from '../content-lint.config'
 import { renderSkill } from '../scripts/lib/outputs'
 
 test('every term passes the content lint', () => {
   expect(lintTerms(terms, loadReviews('reviews'), config)).toEqual([])
+})
+
+// content-lint.config.ts exempts the whole ease-out term from the ease-in rule; ease-in belongs only in its comparison branch.
+test('ease-out shows ease-in in its code only when comparing against ease-in', () => {
+  const term = terms.find((t) => t.slug === 'ease-out')
+  if (!term || !isFull(term)) throw new Error('ease-out is not a full term')
+  const easeIn = /\bease-in\b(?!-out)|0\.42, 0, 1, 1/
+  for (const v of controlCombinations(term.demo.controls)) {
+    const code = Object.values(term.code(v)).join('\n')
+    expect(easeIn.test(code), JSON.stringify(v)).toBe(v.compare === 'ease-in')
+  }
 })
 
 test('the 47 terms are spread across the seven categories in order', () => {

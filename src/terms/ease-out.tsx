@@ -13,7 +13,6 @@ const controls = [
       { value: 'quint', label: 'Quint (house)' },
       { value: 'cubic', label: 'Cubic' },
       { value: 'expo', label: 'Expo' },
-      { value: 'keyword', label: 'Keyword' },
     ],
     default: 'quint',
   },
@@ -34,6 +33,7 @@ const controls = [
     label: 'Compare',
     options: [
       { value: 'none', label: 'None' },
+      { value: 'keyword', label: 'Keyword' },
       { value: 'ease-in', label: 'Ease-in' },
       { value: 'linear', label: 'Linear' },
     ],
@@ -42,18 +42,21 @@ const controls = [
 ] as const satisfies readonly Control[]
 
 type V = ControlValues<typeof controls>
+type Compare = Exclude<V['compare'], 'none'>
 
 // `css` is what goes in the stylesheet and what getComputedStyle reports; `motion` is the same curve for Motion.
 const CURVES: Record<V['curve'], { css: string; motion: string; name: string }> = {
   quint: { css: 'cubic-bezier(0.23, 1, 0.32, 1)', motion: '[0.23, 1, 0.32, 1]', name: 'ease-out quint, the house --ease-out' },
   cubic: { css: 'cubic-bezier(0.215, 0.61, 0.355, 1)', motion: '[0.215, 0.61, 0.355, 1]', name: 'ease-out cubic' },
   expo: { css: 'cubic-bezier(0.19, 1, 0.22, 1)', motion: '[0.19, 1, 0.22, 1]', name: 'ease-out expo' },
-  keyword: { css: 'ease-out', motion: '[0, 0, 0.58, 1]', name: 'the built-in ease-out keyword' },
 }
-const COMPARE: Record<Exclude<V['compare'], 'none'>, { css: string; motion: string }> = {
-  'ease-in': { css: 'cubic-bezier(0.42, 0, 1, 1)', motion: '[0.42, 0, 1, 1]' },
-  linear: { css: 'linear', motion: '"linear"' },
+// The twin that opens beside the menu; `label` names it on the stage.
+const COMPARE: Record<Compare, { css: string; motion: string; label: string }> = {
+  keyword: { css: 'ease-out', motion: '[0, 0, 0.58, 1]', label: 'CSS keyword' },
+  'ease-in': { css: 'cubic-bezier(0.42, 0, 1, 1)', motion: '[0.42, 0, 1, 1]', label: 'ease-in' },
+  linear: { css: 'linear', motion: "'linear'", label: 'linear' },
 }
+
 // Closing runs about 25% faster than opening, rounded down to 10ms.
 const EXIT_MS: Record<V['duration'], number> = { '150': 110, '200': 150, '300': 220 }
 const PRESS_MS = 150
@@ -146,8 +149,8 @@ function EaseOutDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }
 
   return (
     <div ref={rootRef} style={vars} className={`group/stage flex h-full items-center justify-center ${size === 'detail' ? 'gap-8 sm:gap-16' : 'gap-8'}`}>
-      <Menu size={size} ease={CURVES[values.curve].css} label={compare ? 'ease-out' : undefined} />
-      {compare && <Menu size={size} ease={compare.css} label={values.compare} />}
+      <Menu size={size} ease={CURVES[values.curve].css} label={compare ? `ease-out ${values.curve}` : undefined} />
+      {compare && <Menu size={size} ease={compare.css} label={compare.label} />}
     </div>
   )
 }
@@ -161,10 +164,26 @@ function EaseOutGlyph({ active }: GlyphProps) {
 }
 
 function curveText(v: V) {
-  const c = CURVES[v.curve]
   if (v.curve === 'quint') return '`var(--ease-out)` (`cubic-bezier(0.23, 1, 0.32, 1)`)'
-  if (v.curve === 'keyword') return '`ease-out` keyword (comparison only; ship `cubic-bezier(0.23, 1, 0.32, 1)`)'
-  return `\`${c.css}\` (${c.name})`
+  return `\`${CURVES[v.curve].css}\` (${CURVES[v.curve].name})`
+}
+
+// "Ship the house curve" only fits when the house curve is the one picked.
+const shipNote = (v: V) => (v.curve === 'quint' ? 'ship the house curve' : 'ship the curve above')
+
+function compareLine(v: V): string[] {
+  if (v.compare === 'none') return []
+  const twin = {
+    keyword: 'the CSS `ease-out` keyword (`cubic-bezier(0, 0, 0.58, 1)`)',
+    'ease-in': '`cubic-bezier(0.42, 0, 1, 1)` (`ease-in`)',
+    linear: '`linear`',
+  }[v.compare]
+  const label = {
+    keyword: `Comparison only; ${shipNote(v)}`,
+    'ease-in': 'Comparison only; do not ship ease-in on UI',
+    linear: 'Comparison only',
+  }[v.compare]
+  return [`- ${label}: a second menu beside it with ${twin}, same durations, toggled at the same instant.`]
 }
 
 function cssCode(v: V): string {
@@ -172,34 +191,36 @@ function cssCode(v: V): string {
   const exit = EXIT_MS[v.duration]
   const timing =
     v.curve === 'quint'
-      ? '  transition-timing-function: var(--ease-out);'
-      : v.curve === 'keyword'
-        ? [
-            '  /* The built-in keyword is cubic-bezier(0, 0, 0.58, 1): a tenth of the way',
-            '     in it has covered 16% of the distance, the house curve 40%. */',
-            '  transition-timing-function: ease-out;',
-          ].join('\n')
-        : `  transition-timing-function: ${CURVES[v.curve].css}; /* ${CURVES[v.curve].name} */`
-  const compare =
-    v.compare === 'ease-in'
-      ? [
-          '',
-          '/* Comparison only; do not ship ease-in on UI. The same menu with a slow',
-          '   start: the first frames barely move, so the click feels ignored. */',
-          '.menu.compare {',
-          `  transition-timing-function: ${COMPARE['ease-in'].css}; /* ease-in */`,
-          '}',
-        ]
-      : v.compare === 'linear'
-        ? [
-            '',
-            '/* Comparison only. Constant speed: no quick start, and it stops abruptly',
-            '   instead of settling. */',
-            '.menu.compare {',
-            '  transition-timing-function: linear;',
-            '}',
-          ]
-        : []
+      ? ['  transition-timing-function: var(--ease-out);']
+      : [`  /* ${CURVES[v.curve].name} */`, `  transition-timing-function: ${CURVES[v.curve].css};`]
+  const compare: Record<V['compare'], string[]> = {
+    none: [],
+    keyword: [
+      '',
+      `/* Comparison only; ${shipNote(v)}. The built-in keyword is`,
+      '   cubic-bezier(0, 0, 0.58, 1): a tenth of the way in it has covered 16% of',
+      '   the distance, the house quint 40%. Too gentle to read as a response. */',
+      '.menu.compare {',
+      '  transition-timing-function: ease-out;',
+      '}',
+    ],
+    'ease-in': [
+      '',
+      '/* Comparison only; do not ship ease-in on UI. The same menu with a slow',
+      '   start: the first frames barely move, so the click feels ignored. */',
+      '.menu.compare {',
+      `  transition-timing-function: ${COMPARE['ease-in'].css}; /* ease-in */`,
+      '}',
+    ],
+    linear: [
+      '',
+      '/* Comparison only. Constant speed: no quick start, and it stops abruptly',
+      '   instead of settling. */',
+      '.menu.compare {',
+      '  transition-timing-function: linear;',
+      '}',
+    ],
+  }
   return [
     ...(v.curve === 'quint'
       ? [
@@ -211,71 +232,95 @@ function cssCode(v: V): string {
           '',
         ]
       : []),
-    '/* Stays mounted while closed so it can animate out. Add `inert` while closed:',
-    '   out of the tab order and the accessibility tree. */',
+    '/* Markup: <div class="menu-wrap"><button aria-expanded="false">…</button>',
+    '   <div class="menu" inert>…</div></div>. To open, set data-open on the menu',
+    '   and remove inert; to close, the reverse. */',
+    '.menu-wrap {',
+    '  position: relative;',
+    '}',
+    '',
+    '/* Stays mounted while closed so it can animate out; inert keeps it out of',
+    '   the tab order and the accessibility tree. */',
     '.menu {',
+    '  position: absolute;',
+    '  top: calc(100% + 4px);',
+    '  left: 0;',
     '  /* Grow out of the trigger, not the center. With Radix:',
     '     var(--radix-popper-transform-origin); Base UI: var(--transform-origin). */',
     '  transform-origin: top left;',
     '  opacity: 0;',
     '  transform: scale(0.95); /* a visible shape from the first frame, never 0 */',
     '  pointer-events: none;',
-    '  /* Closing values live here, opening values on [data-open]: each direction',
-    '     uses the duration of the state it is heading to. */',
     '  transition-property: opacity, transform;',
+    '  /* A transition takes the duration of the state it is heading to: this',
+    '     closed rule holds the close, [data-open] holds the open. */',
     `  transition-duration: ${exit}ms; /* close: about 25% faster */`,
-    timing,
+    ...timing,
     '}',
     '',
     '/* A transition, not keyframes: closing mid-open reverses from where it is. */',
-    '.menu[data-open="true"] {',
+    '.menu[data-open] {',
     '  opacity: 1;',
     '  transform: none;',
     '  pointer-events: auto;',
-    `  transition-duration: ${enter}ms;`,
+    `  transition-duration: ${enter}ms; /* open */`,
     '}',
-    ...compare,
+    ...compare[v.compare],
     '',
     '/* Reduced motion: fade only, no change in size. */',
     '@media (prefers-reduced-motion: reduce) {',
-    '  .menu { transform: none; }',
+    '  .menu,',
+    '  .menu[data-open] {',
+    '    transform: none;',
+    '  }',
     '}',
   ].join('\n')
 }
 
 function motionCode(v: V): string {
   const ease = CURVES[v.curve].motion
+  const name = CURVES[v.curve].name
+  const swap: Record<V['compare'], string[]> = {
+    none: [],
+    keyword: [
+      `// For the comparison menu, swap both eases for ${COMPARE.keyword.motion} (the CSS`,
+      `// ease-out keyword). Comparison only; ${shipNote(v)}.`,
+    ],
+    'ease-in': ['// For the comparison menu, swap both eases for [0.42, 0, 1, 1] (ease-in).', '// Comparison only; do not ship ease-in on UI.'],
+    linear: ["// For the comparison menu, swap both eases for 'linear'. Comparison only."],
+  }
   return [
-    "import { AnimatePresence, motion, useReducedMotion } from 'motion/react'",
+    "import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react'",
     "import type { ReactNode } from 'react'",
     '',
-    `// ${CURVES[v.curve].name[0].toUpperCase()}${CURVES[v.curve].name.slice(1)}: ${ease}.`,
-    ...(v.curve === 'keyword' ? ['// Weak on purpose here; the house curve is [0.23, 1, 0.32, 1].'] : []),
-    ...(v.compare === 'ease-in'
-      ? ['// For the comparison menu, swap both eases for [0.42, 0, 1, 1] (ease-in).', '// Comparison only; do not ship ease-in on UI.']
-      : v.compare === 'linear'
-        ? ["// For the comparison menu, swap both eases for 'linear'. Comparison only."]
-        : []),
+    `// ${name[0].toUpperCase()}${name.slice(1)}: ${ease}.`,
+    ...swap[v.compare],
+    '// Render it inside a position: relative wrapper with the trigger.',
     'export function Menu({ open, children }: { open: boolean; children: ReactNode }) {',
+    '  return <AnimatePresence>{open && <MenuPanel>{children}</MenuPanel>}</AnimatePresence>',
+    '}',
+    '',
+    'function MenuPanel({ children }: { children: ReactNode }) {',
+    '  // false while the exit plays: the closing menu takes no clicks and is',
+    '  // hidden from screen readers until it unmounts.',
+    '  const present = useIsPresent()',
     '  // Reduced motion: fade only.',
     '  const from = useReducedMotion() ? 1 : 0.95',
     '  return (',
-    '    <AnimatePresence>',
-    '      {open && (',
-    '        <motion.div',
-    '          role="menu"',
-    '          // Grow out of the trigger: here, a menu below a left-aligned button.',
-    "          style={{ transformOrigin: 'top left' }}",
-    '          initial={{ opacity: 0, scale: from }}',
-    `          animate={{ opacity: 1, scale: 1, transition: { duration: ${s(Number(v.duration))}, ease: ${ease} } }}`,
-    '          // Closing runs about 25% faster. Reopened mid-exit, it animates back',
-    '          // from its current values instead of restarting.',
-    `          exit={{ opacity: 0, scale: from, transition: { duration: ${s(EXIT_MS[v.duration])}, ease: ${ease} } }}`,
-    '        >',
-    '          {children}',
-    '        </motion.div>',
-    '      )}',
-    '    </AnimatePresence>',
+    '    <motion.div',
+    '      // Placed absolutely below the trigger, as in the CSS tab.',
+    '      className="menu"',
+    '      aria-hidden={present ? undefined : true}',
+    '      // Grow out of the trigger. Motion drives the scale, so the origin goes here.',
+    "      style={{ transformOrigin: 'top left', pointerEvents: present ? 'auto' : 'none' }}",
+    '      initial={{ opacity: 0, scale: from }}',
+    `      animate={{ opacity: 1, scale: 1, transition: { duration: ${s(Number(v.duration))}, ease: ${ease} } }}`,
+    '      // Closing runs about 25% faster. Reopened mid-exit, it animates back',
+    '      // from its current values instead of restarting.',
+    `      exit={{ opacity: 0, scale: from, transition: { duration: ${s(EXIT_MS[v.duration])}, ease: ${ease} } }}`,
+    '    >',
+    '      {children}',
+    '    </motion.div>',
     '  )',
     '}',
   ].join('\n')
@@ -298,13 +343,15 @@ export default defineTerm({
   ],
   avoidWhen: [
     'Elements already on screen moving from A to B, like a reorder or a sliding tab indicator. Use ease-in-out.',
+    'Hover and color changes. Use ease at 150ms.',
     'Constant-rate motion, like a marquee, a spinner or progress that is time. Use linear.',
+    'Actions used 100+ times a day or triggered from the keyboard. Do not animate them at all.',
     'Never ease-in on its own for UI: the slow start makes every click feel late.',
   ],
   demo: {
     component: EaseOutDemo,
     label:
-      'A button is pressed and a menu opens below it, growing from 95% size and fading in from the corner next to the button, fast at first and then settling. It holds, then closes a little faster. With a comparison picked, a second menu opens beside it at the same instant with ease-in or linear.',
+      'A button is pressed and a menu opens below it, growing from 95% size and fading in from the corner next to the button, fast at first and then settling. It holds, then closes a little faster. With a comparison picked, a second menu opens beside it at the same instant with the CSS ease-out keyword, ease-in or linear.',
     controls,
     glyph: EaseOutGlyph,
   },
@@ -316,16 +363,13 @@ export default defineTerm({
       '',
       `- Open: \`opacity\` 0 to 1, \`transform: scale(0.95)\` to \`none\`, ${enter}ms ${curveText(v)}.`,
       `- Close: back to \`opacity: 0; transform: scale(0.95)\`, ${exit}ms, same curve.`,
-      '- `transition-property: opacity, transform` only, toggled by `data-open`. Transitions, not keyframes: closing mid-open reverses from the current state.',
-      '- `transform-origin` at the trigger: `top left` for a menu below a left-aligned trigger, or the library variable (`--radix-popper-transform-origin`, Base UI `--transform-origin`).',
-      '- Closed: stays mounted, `inert`, `pointer-events: none`.',
-      `- Motion: \`AnimatePresence\`; \`initial\`/\`exit\` \`{ opacity: 0, scale: 0.95 }\`, \`animate\` \`{ opacity: 1, scale: 1 }\`; \`ease: ${CURVES[v.curve].motion}\`, ${s(enter)}s in, ${s(exit)}s out.`,
-      ...(v.compare === 'ease-in'
-        ? ['- Comparison only; do not ship ease-in on UI: a second menu beside it with `cubic-bezier(0.42, 0, 1, 1)` (`ease-in`), same durations, toggled at the same instant.']
-        : v.compare === 'linear'
-          ? ['- Comparison only: a second menu beside it with `linear`, same durations, toggled at the same instant.']
-          : []),
-      '- Reduced motion: no scale; opacity only, same durations.',
+      '- Menu: `position: absolute; top: calc(100% + 4px); left: 0` in a `position: relative` wrapper with the trigger; `transform-origin: top left` (Radix `--radix-popper-transform-origin`, Base UI `--transform-origin`).',
+      `- CSS route: \`data-open\` present = open. \`transition-property: opacity, transform\`; base rule \`transition-duration: ${exit}ms\` (close), \`[data-open]\` \`${enter}ms\` (open). Transitions, not keyframes: closing mid-open reverses from the current state.`,
+      '- CSS route, closed: stays mounted, `inert`, `pointer-events: none`.',
+      `- Motion route: \`AnimatePresence\`, unmounts after the exit; during the exit set \`pointer-events: none\` and \`aria-hidden\` (\`useIsPresent()\`). \`initial\`/\`exit\` \`{ opacity: 0, scale: 0.95 }\`, \`animate\` \`{ opacity: 1, scale: 1 }\`, \`ease: ${CURVES[v.curve].motion}\`, ${s(enter)}s in, ${s(exit)}s out; \`transformOrigin: 'top left'\` in \`style\`.`,
+      '- Focus: on close, return focus to the trigger; Escape and outside click close.',
+      ...compareLine(v),
+      '- Reduced motion: no scale, opacity only, same durations. CSS: `transform: none` on both states in `@media (prefers-reduced-motion: reduce)`. Motion: `useReducedMotion()`, keep `scale` at 1.',
     ].join('\n')
   },
   acceptance: (v) => {
@@ -335,19 +379,20 @@ export default defineTerm({
       `Open, the menu's computed \`transition-timing-function\` is \`${CURVES[v.curve].css}\` and \`transition-duration\` is \`${s(enter)}s\` (CSS route).`,
       `Closed, its computed \`transition-duration\` is \`${s(exit)}s\`: closing takes ${exit}ms, no more than 75% of opening (CSS route).`,
       'Opening starts at 95% size and opacity 0, never from `scale(0)`.',
-      'The menu grows out of the trigger: the corner next to the trigger stays put while it scales.',
+      'The menu grows out of the trigger: its top-left corner stays put while it scales.',
       'Closing while it is still opening reverses from its current size and opacity, without first jumping to fully open.',
-      'Toggling it ten times quickly leaves at most two running animations on the menu (`menu.getAnimations().length <= 2`).',
-      'Closed, the menu cannot be clicked, focused or reached by a screen reader.',
+      "Closed 50ms into opening, the next frame's scale and opacity are within 0.02 of the frame before.",
+      'Closed, the menu cannot be clicked, focused or reached by a screen reader; while the exit plays it takes no clicks.',
+      'Closing returns focus to the trigger; Escape and a click outside the menu close it.',
       ...(v.compare === 'none'
         ? []
-        : [`The comparison menu opens at the same instant, and its computed \`transition-timing-function\` is \`${COMPARE[v.compare].css}\`.`]),
+        : [`The comparison menu opens at the same instant, and its computed \`transition-timing-function\` is \`${COMPARE[v.compare].css}\` (comparison only).`]),
       'With reduced motion on, the menu fades in and out without changing size.',
     ]
   },
   code: (v) => ({ css: cssCode(v), motion: motionCode(v) }),
-  a11y: 'Keep the closed menu out of the tab order and the accessibility tree with inert, or unmount it once the exit ends. When it opens from the keyboard, move focus into it, and return focus to the trigger when it closes. Under reduced motion, drop the scale and keep a short fade, so the menu still appears without moving.',
-  related: ['ease-in-out', 'duration', 'origin-aware', 'spring'],
+  a11y: 'Keep the closed menu out of the tab order and the accessibility tree: inert while it stays mounted, or unmounted once the exit ends and click-through while the exit plays. When it opens from the keyboard, move focus into it, and return focus to the trigger when it closes. Under reduced motion, drop the scale and keep a short fade, so the menu still appears without moving.',
+  related: ['ease-in-out', 'duration', 'origin-aware', 'interruptibility', 'enter-and-exit', 'spring'],
   confusedWith: [
     {
       slug: 'ease-in-out',
