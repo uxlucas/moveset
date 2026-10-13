@@ -33,7 +33,7 @@ function RowLink({ id, href, current, routeMatch, glyph: Glyph, children }: RowP
       data-k={id}
       data-current={current ? 'true' : undefined}
       aria-current={routeMatch ? 'page' : undefined}
-      className={`${ROW} transition-colors duration-150 ease-[ease] hover:text-ink ${current ? 'text-ink' : 'text-ink-muted'}`}
+      className={`${ROW} transition-colors duration-150 ease-[ease] ${current ? 'text-accent-ink' : 'text-ink-muted hover:text-ink'}`}
     >
       <span className="mt-0.5">
         <Glyph active={current} />

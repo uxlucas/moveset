@@ -2,20 +2,24 @@ import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import data from '../../src/generated/terms-data.json'
 
+import { SITE_URL } from '../../src/lib/site'
+
 // Machine-readable outputs carry published terms only, whatever NEXT_PUBLIC_SHOW_REVIEW says.
-const published = data.filter((t) => t.status === 'published').map((t) => t.slug)
-const unpublished = data.filter((t) => t.status !== 'published').map((t) => t.slug)
+// Both sets come from the generated data, so publishing a term never breaks these tests.
+const published = data.filter((t) => t.status === 'published')
+const unpublished = data.filter((t) => t.status !== 'published')
 
 test('/llms.txt lists published terms and nothing else', async ({ request }) => {
+  expect(published.length).toBeGreaterThan(0)
   const res = await request.get('/llms.txt')
   expect(res.status()).toBe(200)
   expect(res.headers()['content-type']).toContain('text/plain')
   const body = await res.text()
   expect(body).toContain('# moveset')
-  expect(body).toContain('[Sticky](https://moveset.lucaslima.design/terms/sticky.md)')
-  // Spring is in review: visible on the site with NEXT_PUBLIC_SHOW_REVIEW=1, never in agent outputs.
-  expect(body).not.toContain('[Spring]')
-  expect(body).toContain('https://moveset.lucaslima.design/api/terms.json')
+  for (const t of published) expect(body).toContain(`[${t.name}](${SITE_URL}/terms/${t.slug}.md)`)
+  // Review terms show on the site with NEXT_PUBLIC_SHOW_REVIEW=1, never in agent outputs.
+  for (const t of unpublished) expect(body, t.slug).not.toContain(`/terms/${t.slug}.md`)
+  expect(body).toContain(`${SITE_URL}/api/terms.json`)
 })
 
 test('/terms/sticky.md serves the entry as markdown', async ({ request }) => {
@@ -25,9 +29,15 @@ test('/terms/sticky.md serves the entry as markdown', async ({ request }) => {
   expect(await res.text()).toMatch(/^# Sticky\n/)
 })
 
+test('every published term has a .md', async ({ request }) => {
+  for (const { slug } of published) {
+    expect((await request.get(`/terms/${slug}.md`)).status(), slug).toBe(200)
+  }
+})
+
 test('no unpublished term has a .md', async ({ request }) => {
-  expect(unpublished).toContain('spring')
-  for (const slug of unpublished) {
+  test.skip(unpublished.length === 0, 'every term is published')
+  for (const { slug } of unpublished) {
     expect((await request.get(`/terms/${slug}.md`)).status(), slug).toBe(404)
   }
 })
@@ -38,8 +48,8 @@ test('/api/terms.json holds exactly the published terms', async ({ request }) =>
   expect(res.headers()['content-type']).toContain('application/json')
   const json = await res.json()
   expect(Object.keys(json)).toEqual(['site', 'terms'])
-  expect(json.site).toBe('https://moveset.lucaslima.design')
-  expect(json.terms.map((t: { slug: string }) => t.slug).sort()).toEqual([...published].sort())
+  expect(json.site).toBe(SITE_URL)
+  expect(json.terms.map((t: { slug: string }) => t.slug).sort()).toEqual(published.map((t) => t.slug).sort())
   const sticky = json.terms.find((t: { slug: string }) => t.slug === 'sticky')
   expect(sticky.prompt.length).toBeGreaterThan(0)
   expect(sticky.promptText).toMatch(/^# Sticky\n/)

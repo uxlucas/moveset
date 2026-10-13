@@ -14,7 +14,7 @@ export function TermCard({ term }: { term: TermData }) {
       data-slug={term.slug}
       className={`relative flex flex-col rounded-2xl ${
         visible
-          ? 'bg-surface shadow-card transition-shadow duration-150 ease-[ease] hover:shadow-card-hover has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-ink-faint'
+          ? 'bg-surface shadow-card transition-shadow duration-150 ease-[ease] hover:shadow-card-hover has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-accent'
           : 'bg-transparent outline-1 -outline-offset-1 outline-dashed outline-line'
       }`}
     >

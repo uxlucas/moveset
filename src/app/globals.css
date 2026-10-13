@@ -20,7 +20,10 @@
   --demo-2: oklch(0.87 0 0);
   --demo-subject: oklch(0.55 0 0);
   --shadow-color: oklch(0 0 0 / 0.04);
-  --selection: oklch(0.205 0 0 / 0.12);
+  /* The one accent (#946AFF family). Marks where you are and what is live; see docs/house-rules.md for its uses. */
+  --accent: oklch(0.62 0.2 292);
+  --accent-ink: oklch(0.53 0.2 292);
+  --accent-soft: oklch(0.62 0.2 292 / 0.14);
   --seg: oklch(0.205 0 0 / 0.05);
   --cat-l: 0.58;
   --duration-1: 150ms;
@@ -42,7 +45,10 @@
   --demo-2: oklch(0.32 0 0);
   --demo-subject: oklch(0.72 0 0);
   --shadow-color: transparent;
-  --selection: oklch(0.95 0 0 / 0.16);
+  /* Lighter and calmer on the dark surface; already passes as text, so ink and base are one color. */
+  --accent: oklch(0.72 0.15 292);
+  --accent-ink: oklch(0.72 0.15 292);
+  --accent-soft: oklch(0.72 0.15 292 / 0.26);
   --seg: oklch(1 0 0 / 0.07);
   --cat-l: 0.74;
   color-scheme: dark;
@@ -60,6 +66,9 @@
   --color-demo-2: var(--demo-2);
   --color-demo-subject: var(--demo-subject);
   --color-seg: var(--seg);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --shadow-card: 0 0 0 1px var(--line), 0 1px 2px var(--shadow-color), 0 4px 12px var(--shadow-color);
@@ -72,6 +81,19 @@
   transition-timing-function: var(--ease-out);
   &:active {
     scale: 0.97;
+  }
+}
+
+/* Links in running text: the words keep their color, the underline carries the accent, and hover turns the words accent too. */
+@utility link {
+  text-decoration-line: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 4px;
+  transition: color 150ms ease;
+  @media (hover: hover) {
+    &:hover {
+      color: var(--accent-ink);
+    }
   }
 }
 
@@ -118,10 +140,14 @@
     text-wrap: balance;
   }
   ::selection {
-    background: var(--selection);
+    background: var(--accent-soft);
+  }
+  /* `transition-colors` animates outline-color too; starting it at the accent keeps a focus ring from fading in from the text color. */
+  :where(:not([data-demo] *)) {
+    outline-color: var(--accent);
   }
   :focus-visible {
-    outline: 2px solid var(--ink-faint);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 }
@@ -135,7 +161,7 @@
   transition: color 150ms ease;
 }
 .gl[data-active='true'] {
-  color: var(--ink);
+  color: var(--accent-ink);
 }
 .gl .m {
   transform-box: fill-box;

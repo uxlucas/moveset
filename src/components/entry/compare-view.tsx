@@ -17,7 +17,7 @@ export function CompareView({ a, b, difference }: { a: string; b: string; differ
               <DemoPlayer slug={t.slug} size="detail" />
             </div>
             <h2 id={`cmp-${t.slug}`} className="mt-4 text-[15px] font-medium">
-              <Link href={`/terms/${t.slug}`} className="underline decoration-line-strong underline-offset-4 hover:decoration-ink">{t.name}</Link>
+              <Link href={`/terms/${t.slug}`} className="link">{t.name}</Link>
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-ink-muted">{t.definition}</p>
           </section>
