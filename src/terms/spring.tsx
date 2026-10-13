@@ -44,9 +44,10 @@ type Physics = { stiffness: number; damping: number; at40: number }
 
 /**
  * Each duration/bounce spring as mass-1 physics, from Motion's own conversion (findSpring in motion-dom), rounded.
- * The two forms trace the same path (spring.test.ts holds them within 0.5% of the distance), but only the physics form
- * accepts a starting `velocity`: Motion 14 ignores it on duration/bounce springs, so they always start from rest.
- * `at40`: ms until the spring has covered 40% of the distance, when the demo sends the card back.
+ * The two forms trace the same path (spring.test.ts holds them within 0.5% of the distance). Motion hands each new
+ * animation the current velocity, but Motion 14 drops it on duration/bounce (and visualDuration) springs; the physics
+ * form keeps it, so only the physics form turns smoothly when redirected.
+ * `at40`: ms until the spring has covered 40% of the distance.
  */
 export const PHYSICS: Record<V['duration'], Record<V['bounce'], Physics>> = {
   '0.3': {
@@ -75,6 +76,8 @@ const POINTS = 25
 
 const REST_MS = 400
 const HOLD_MS = 600
+// The demo sends the card back at 40% of the way, but never before this, so the short springs show an outbound leg.
+const MIN_BACK_MS = 90
 
 type Side = 'a' | 'b'
 
@@ -108,7 +111,14 @@ function Track({ size, label, twin }: { size: DemoProps['size']; label?: string;
             {face}
           </div>
         ) : detail ? (
-          <button type="button" data-spring-card="" data-side="a" aria-label="Send the card to the other end" className={`${card} cursor-pointer touch-manipulation`}>
+          <button
+            type="button"
+            data-spring-card=""
+            data-side="a"
+            aria-pressed="false"
+            aria-label="Send the card to the other end"
+            className={`${card} cursor-pointer touch-manipulation`}
+          >
             {face}
           </button>
         ) : (
@@ -158,10 +168,11 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
     return x
   }
 
-  // A new animate() on a value replaces the running one from the current position. Motion 14 does not hand the old
-  // velocity on by itself, so the spring gets it explicitly (physics springs use it; duration/bounce ones ignore it).
-  // The twin's curve starts over from where it is. Slow motion stretches time: stiffness by timeScale², damping by
-  // timeScale; the measured velocity is already in slowed time.
+  // A new animate() on a value replaces the running one from the current position. Motion hands it the current
+  // velocity, and the physics spring keeps it (duration/bounce springs would drop it). The velocity is also passed
+  // explicitly, read before the old animation stops: started from inside a frame callback, Motion's own reading (taken
+  // after the stop) measured 0. The twin's curve starts over from where it is.
+  // Slow motion stretches time: stiffness by timeScale², damping by timeScale; the measured velocity is already slowed.
   const send = (side: Side, instant = false) => {
     const root = rootRef.current
     if (!root) return
@@ -169,6 +180,7 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
     running.current = []
     for (const card of root.querySelectorAll<HTMLElement>('[data-spring-card], [data-twin-card]')) {
       card.dataset.side = side
+      if (card.hasAttribute('aria-pressed')) card.setAttribute('aria-pressed', String(side === 'b'))
       const x = xOf(card)
       const to = side === 'b' ? travel(card) : 0
       if (instant) {
@@ -184,13 +196,13 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
   }
 
   // One cycle: home (a no-op unless a replay lands mid-move), a beat, off toward the far end, and at 40% of the way
-  // sent back home. Both cards get each command at the same instant. The still frame is home.
+  // (never before 90ms) sent back home. Both cards get each command at the same instant. The still frame is home.
   useCycle(
     () => {
       const go = (side: Side) => () => {
         if (!taken.current) send(side)
       }
-      const backAt = REST_MS + physics.at40
+      const backAt = REST_MS + Math.max(physics.at40, MIN_BACK_MS)
       return {
         steps: [
           [
@@ -252,7 +264,7 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
     >
       <Track size={size} label={compare ? 'spring' : undefined} />
       {compare && <Track size={size} label="ease-out" twin />}
-      {detail && <p className="font-mono text-[11px] text-ink-muted">Click the card mid-move</p>}
+      {detail && <p className="font-mono text-[11px] text-ink-muted">Click the card, then again mid-move</p>}
     </div>
   )
 }
@@ -273,9 +285,9 @@ const physicsText = (v: V) => {
 }
 
 function bounceLine(v: V): string {
-  if (v.bounce === '0') return 'Bounce 0: never passes the target.'
-  if (v.bounce === '0.2') return 'Bounce 0.2: passes the target by about 1.5% once, then settles.'
-  return 'Bounce 0.4: passes the target by about 9.5%; above the 0.3 cap.'
+  if (v.bounce === '0') return 'Bounce 0, the product UI default: never passes the target.'
+  if (v.bounce === '0.2') return 'Bounce 0.2: about 1.5% past the target, once; product UI ships 0.'
+  return 'Bounce 0.4: about 9.5% past the target, over the 0.3 cap.'
 }
 
 function cssCode(v: V): string {
@@ -287,9 +299,9 @@ function cssCode(v: V): string {
     `/* The spring { type: "spring", duration: ${v.duration}, bounce: ${v.bounce} }, sampled into`,
     '   linear() with Motion\'s spring() generator. CSS can only replay it as a',
     '   fixed curve and keeps no velocity: a transition reversed mid-move starts',
-    '   the curve again from rest, so the card stops, then turns. Fine for moves',
-    '   nothing interrupts; for anything the user can redirect, use the JS or',
-    '   Motion tab. */',
+    '   the curve over toward the other end and flips direction at speed. Fine',
+    '   for moves nothing interrupts; for anything the user can redirect, use',
+    '   the JS or Motion tab. */',
     ':root {',
     '  --spring: linear(',
     ...rows,
@@ -322,7 +334,7 @@ function cssCode(v: V): string {
     '  transition: none;',
     '}',
     '',
-    '/* Reduced motion: the card jumps to the other spot. */',
+    '/* Reduced motion: the card rests at its target at once, no travel. */',
     '@media (prefers-reduced-motion: reduce) {',
     '  .card {',
     '    transition: none;',
@@ -336,9 +348,9 @@ function jsCode(v: V): string {
   return [
     "import { animate, motionValue } from 'motion'",
     '',
-    `// { type: 'spring', duration: ${v.duration}, bounce: ${v.bounce} } as physics: the same path, but`,
-    '// only the physics form takes a starting velocity. Motion 14 ignores',
-    '// `velocity` on duration/bounce springs.',
+    `// { type: 'spring', duration: ${v.duration}, bounce: ${v.bounce} } as physics: the same path. Motion`,
+    '// hands each new animation the current velocity, but Motion 14 drops it on',
+    '// duration/bounce (and visualDuration) springs; the physics form keeps it.',
     `const spring = { type: 'spring', stiffness: ${p.stiffness}, damping: ${p.damping}, mass: 1 }`,
     "const reduced = matchMedia('(prefers-reduced-motion: reduce)')",
     '',
@@ -357,9 +369,10 @@ function jsCode(v: V): string {
     '  // Reduced motion, or a click from the keyboard (Enter or Space report',
     '  // detail 0): jump to the other spot.',
     '  if (reduced.matches || event.detail === 0) return x.jump(to)',
-    '  // Retargets mid-move from the current position. Motion 14 does not hand the',
-    '  // running velocity to the next animation by itself: pass it, or the card',
-    '  // stops dead and starts over.',
+    '  // Retargets mid-move from the current position and velocity. Passing the',
+    '  // velocity makes the handoff explicit (Motion reads its own after stopping',
+    '  // the old animation, which inside a frame callback can come out 0). Never',
+    '  // wait for the move to end.',
     '  animate(x, to, { ...spring, velocity: x.getVelocity() })',
     '})',
     ...(v.compare === 'ease-out'
@@ -379,10 +392,11 @@ function motionCode(v: V): string {
     "import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'",
     "import { useState, type MouseEvent } from 'react'",
     '',
-    `// { type: 'spring', duration: ${v.duration}, bounce: ${v.bounce} } as physics: the same path, but`,
-    '// only the physics form takes a starting velocity. For a one-shot move',
-    `// nothing interrupts, transition={{ type: 'spring', duration: ${v.duration}, bounce: ${v.bounce} }}`,
-    '// on a motion.div works as written.',
+    `// { type: 'spring', duration: ${v.duration}, bounce: ${v.bounce} } as physics: the same path. Motion`,
+    '// hands each new animation the current velocity, but Motion 14 drops it on',
+    '// duration/bounce (and visualDuration) springs; the physics form keeps it.',
+    `// For a one-shot move nothing interrupts, transition={{ type: 'spring',`,
+    `// duration: ${v.duration}, bounce: ${v.bounce} }} on a motion.div works as written.`,
     `const spring = { type: 'spring', stiffness: ${p.stiffness}, damping: ${p.damping}, mass: 1 } as const`,
     ...(v.compare === 'ease-out'
       ? [
@@ -405,9 +419,10 @@ function motionCode(v: V): string {
     '    // Reduced motion, or a click from the keyboard (Enter or Space report',
     '    // detail 0): jump to the other spot.',
     '    if (reduced || event.detail === 0) return x.jump(to)',
-    '    // Retargets mid-move from the current position. Motion 14 does not hand',
-    '    // the running velocity to the next animation by itself: pass it, or the',
-    '    // card stops dead and starts over. Never wait for the move to finish.',
+    '    // Retargets mid-move from the current position and velocity. Passing the',
+    '    // velocity makes the handoff explicit (Motion reads its own after stopping',
+    '    // the old animation, which inside a frame callback can come out 0). Never',
+    '    // wait for the move to end.',
     '    animate(x, to, { ...spring, velocity: x.getVelocity() })',
     '  }',
     '',
@@ -435,7 +450,7 @@ export default defineTerm({
   definition: 'Motion driven by physics instead of a fixed duration, so it can carry velocity and settle naturally.',
   aliases: ['physics-based animation', 'springy motion', 'bouncy', 'it bounces a bit', 'spring physics', 'stiffness and damping'],
   description:
-    'A spring moves an element the way a weight on a spring would, instead of following a curve over a set time. It always knows its own velocity, so a new target mid-move picks up from where the element is and how fast it is going: it slows, turns and settles, where a curve would stop dead and start over. Describe it with duration and bounce, which are easy to reason about, rather than mass, stiffness and damping. Duration is roughly how long it takes to settle; bounce 0 settles without passing the target and is the default for product UI.',
+    'A spring moves an element the way a weight on a spring would, instead of following a curve over a set time. It always knows its own velocity, so a new target mid-move picks up from where the element is and how fast it is going: it slows, turns and settles, where a curve would drop its speed and snap into reverse, or stop and start over. Duration and bounce are the easy way to reason about it: duration is roughly how long it takes to settle, and bounce 0 settles without passing the target, the default for product UI. Design it in duration and bounce; when it can be redirected, ship the matching stiffness and damping, because Motion 14 drops velocity on duration/bounce springs.',
   useWhen: [
     'Gesture-driven motion: sheets, swipe to dismiss, a drag released with momentum.',
     'Anything the user can interrupt or reverse mid-move, like a toggle clicked twice quickly.',
@@ -450,7 +465,7 @@ export default defineTerm({
   demo: {
     component: SpringDemo,
     label:
-      'A card sits at the left end of a track. It springs toward the right end and, 40% of the way there, is sent back: it keeps its speed for a moment, slows, turns and settles at the start without stopping dead. On the entry page, clicking the card sends it to the other end at any moment. With a comparison picked, a twin card below makes the same moves on a fixed ease-out curve and reverses at full speed.',
+      'A card sits at the left end of a track. It springs toward the right end and, partway there, is sent back: it keeps its speed for a moment, slows, turns and settles at the start without stopping dead. On the entry page, clicking the card sends it to the other end at any moment. With a comparison picked, a twin card below makes the same moves on a fixed ease-out curve and reverses at full speed.',
     controls,
     glyph: SpringGlyph,
   },
@@ -459,36 +474,35 @@ export default defineTerm({
     return [
       'Animate this card between two spots with a spring.',
       '',
-      `- Setup: on click, the card toggles between A (\`x: 0\`) and B (\`x: ${TRAVEL}px\`), even mid-move.`,
-      `- Spring: ${springText(v)}, settled by ${ms}ms; no curve, no \`transition-duration\`. ${bounceLine(v)}`,
-      '- A click mid-move retargets from the current position and velocity; never restart, never queue.',
-      `- Motion route: \`const x = useMotionValue(0)\`, \`style={{ x }}\`; each click \`animate(x, target, { ...spring, velocity: x.getVelocity() })\`, \`spring\` being the physics form ${physicsText(v)}. Motion 14 does not pass velocity on by itself; \`duration\`/\`bounce\` springs and \`transform\` strings ignore it.`,
-      `- One-shots nothing interrupts (entrances): \`animate={{ transform: "translateX(${TRAVEL}px)" }}\` with the duration/bounce form, on the compositor.`,
+      `- Setup: the card is a \`<button type="button">\`; each click toggles it between A (\`x: 0\`) and B (\`x: ${TRAVEL}px\`) and sets \`aria-pressed\`. Mid-move it retargets from where it is; never restart or queue.`,
+      `- Spring: ${springText(v)}, settled by ${ms}ms. ${bounceLine(v)}`,
+      `- Motion route (no curve, no \`transition-duration\`): \`const x = useMotionValue(0)\`, \`style={{ x }}\`; each click \`animate(x, target, { ...spring, velocity: x.getVelocity() })\`, \`spring\` = ${physicsText(v)}. Motion hands each new animation the current velocity, but Motion 14 drops it on \`duration\`/\`bounce\` (and \`visualDuration\`) springs; the physics form keeps it. \`transform\` strings have no velocity.`,
+      `- One-shots (entrances): \`animate={{ transform: "translateX(${TRAVEL}px)" }}\` with the duration/bounce form runs on the compositor.`,
       '- `transform` only; never `left` or `margin`.',
-      `- No JS: \`transition: transform ${ms}ms linear(…)\`, at least 20 points sampled from the spring; one-shot only, a reversal starts from rest.`,
-      '- Bounce: 0 in product UI; 0.1 to 0.3 for gestures and playful moments only; never dialogs, menus, icons.',
+      `- CSS route: \`transition: transform ${ms}ms linear(…)\`, at least 20 points sampled from the spring. No velocity: reversed mid-move it flips direction at speed.`,
       ...(v.compare === 'ease-out'
-        ? [`- Comparison only: a twin card below on \`cubic-bezier(0.23, 1, 0.32, 1)\` (ease-out), ${ms}ms, same instants; redirected, it reverses at full speed.`]
+        ? [`- Comparison only: a twin card below on \`cubic-bezier(0.23, 1, 0.32, 1)\` (ease-out), ${ms}ms, same instants.`]
         : []),
-      '- Reduced motion, or a click from the keyboard (`event.detail === 0`): `x.jump(target)`, no travel. Entrances fade over 150ms instead.',
+      '- Reduced motion, or a keyboard click (`event.detail === 0`): the card is at its target next frame, no travel. Motion: `x.jump(target)`; CSS: `transition: none`. Entrances fade in at their end spot over 150ms instead.',
     ].join('\n')
   },
   acceptance: (v) => {
     const ms = Number(v.duration) * 1000
     const over = OVERSHOOT[v.bounce]
     return [
-      `Motion route: the card has no CSS transition on \`transform\` (computed \`transition-duration\` is \`0s\`); the spring sets every frame.`,
-      `Left alone, a move is settled by ${ms}ms (±1 frame): from then on \`x\` stays within 0.5px of the spot.`,
+      'Motion route: the card has no CSS transition on `transform` (computed `transition-duration` is `0s`).',
+      `All routes: left alone, a move is settled by ${ms}ms (±1 frame): from then on \`x\` stays within 0.5px of the spot.`,
       v.bounce === '0'
-        ? `Sampled every frame, \`x\` never passes the target: at most ${TRAVEL}.5px on the way to B, at least -0.5px on the way to A.`
-        : `Sampled every frame, \`x\` passes the target once by about ${over}% of the distance (${Math.round((TRAVEL * over) / 100)}px of ${TRAVEL}px)${v.bounce === '0.2' ? ', under 5%,' : ''} then settles.`,
-      'Clicked 40% of the way, sampled every frame: for the next 4 frames no step is larger than the step before the click (+1px), and the card keeps going the old way for at least one frame while slowing, then turns. No frame where it stops dead, no reversal at speed.',
-      'Five clicks within a second never jump and never queue: each click retargets at once from where the card is.',
-      'Only `transform` changes: the card\'s `offsetLeft` stays the same throughout.',
+        ? `All routes: sampled every frame, \`x\` never passes the target: at most ${TRAVEL}.5px on the way to B, at least -0.5px on the way to A.`
+        : `All routes: sampled every frame, \`x\` passes the target once by about ${over}% of the distance (${Math.round((TRAVEL * over) / 100)}px of ${TRAVEL}px)${v.bounce === '0.2' ? ', under 5%,' : ''} then settles.`,
+      'Motion route: after a mid-flight click, the next frame still moves toward the old target by less than the frame before; it then turns once and never reverses within a single frame.',
+      'Motion route: five clicks within a second never jump and never queue; each click retargets at once from where the card is.',
+      'CSS route: clicked mid-move, the card heads for the other spot from where it is, with no jump in position; it reverses at speed, since CSS keeps no velocity.',
+      'All routes: only `transform` changes; the card\'s `offsetLeft` stays the same throughout.',
       ...(v.compare === 'ease-out'
         ? [`The comparison card moves at the same instants on \`cubic-bezier(0.23, 1, 0.32, 1)\` over ${ms}ms, and clicked mid-move it reverses within one frame (comparison only).`]
         : []),
-      'With reduced motion on, or activated with Enter or Space, the card is on the other spot within one frame, with no in-between positions.',
+      'All routes: with reduced motion on, or activated with Enter or Space, the card is painted at its target in the first frame after the event, with no in-between positions.',
     ]
   },
   code: (v) => ({ css: cssCode(v), js: jsCode(v), motion: motionCode(v) }),

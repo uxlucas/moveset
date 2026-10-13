@@ -246,9 +246,9 @@
 }
 @keyframes g-spring {
   0%, 8% { transform: translateX(-3px); opacity: 1; }
-  26% { transform: translateX(3.8px); }
-  38% { transform: translateX(2.6px); }
-  48% { transform: translateX(3.2px); }
+  26% { transform: translateX(3.5px); }
+  38% { transform: translateX(2.85px); }
+  48% { transform: translateX(3.05px); }
   56%, 80% { transform: translateX(3px); opacity: 1; }
   90% { transform: translateX(3px); opacity: 0; }
   91% { transform: translateX(-3px); opacity: 0; }

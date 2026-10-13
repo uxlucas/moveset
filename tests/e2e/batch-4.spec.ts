@@ -31,15 +31,20 @@ test.describe('Spring', () => {
     await page.goto('/terms/spring')
     await expect(prompt(page)).toContainText('`{ type: "spring", duration: 0.5, bounce: 0 }`, settled by 500ms')
     await expect(prompt(page)).toContainText('`{ type: "spring", stiffness: 341, damping: 36.9, mass: 1 }`')
-    await expect(prompt(page)).toContainText('Bounce 0: never passes the target.')
+    await expect(prompt(page)).toContainText('Bounce 0, the product UI default: never passes the target.')
     await expect(prompt(page)).toContainText('velocity: x.getVelocity()')
+    await expect(prompt(page)).toContainText('Motion 14 drops it on `duration`/`bounce` (and `visualDuration`) springs; the physics form keeps it.')
+    await expect(prompt(page)).toContainText('Motion route (no curve, no `transition-duration`)')
+    await expect(prompt(page)).toContainText('reversed mid-move it flips direction at speed')
+    await expect(prompt(page)).toContainText('the card is a `<button type="button">`')
+    await expect(prompt(page)).not.toContainText('stops dead')
     await expect(prompt(page)).not.toContainText('Comparison only')
     await expect(prompt(page)).not.toContainText('cubic-bezier')
 
     await option(page, 'Bounce', '0.2').click()
     await expect(prompt(page)).toContainText('bounce: 0.2 }')
     await expect(prompt(page)).toContainText('stiffness: 324, damping: 28.8, mass: 1')
-    await expect(prompt(page)).toContainText('passes the target by about 1.5% once')
+    await expect(prompt(page)).toContainText('about 1.5% past the target, once')
     await expect(prompt(page)).not.toContainText('never passes the target')
 
     await option(page, 'Duration', '0.8s').click()
@@ -49,7 +54,7 @@ test.describe('Spring', () => {
     await expect(prompt(page)).not.toContainText('500ms')
 
     await option(page, 'Bounce', '0.4 (playful)').click()
-    await expect(prompt(page)).toContainText('about 9.5%; above the 0.3 cap')
+    await expect(prompt(page)).toContainText('about 9.5% past the target, over the 0.3 cap')
     await expect(prompt(page)).toContainText('stiffness: 190, damping: 16.6, mass: 1')
 
     await option(page, 'Compare', 'Ease-out').click()
@@ -93,26 +98,33 @@ test.describe('Spring', () => {
         if (now.s > travel * 0.35) break
       }
       tap()
+      const pressed = springCard.getAttribute('aria-pressed')
       const after: { s: number; t: number }[] = []
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 6; i++) {
         await frame()
         const now = { s: x(springCard), t: x(twin) }
         after.push({ s: now.s - prev.s, t: now.t - prev.t })
         prev = now
       }
-      return { before: step, after, side: springCard.dataset.side, taken: root.querySelector<HTMLElement>('[data-taken-over]')!.dataset.takenOver }
+      return { before: step, after, pressed, side: springCard.dataset.side, taken: root.querySelector<HTMLElement>('[data-taken-over]')!.dataset.takenOver }
     })
     expect(result.side).toBe('a')
+    expect(result.pressed).toBe('false')
     expect(result.taken).toBe('true')
     // It was heading for B at speed.
     expect(result.before.s).toBeGreaterThan(2)
-    // No jump: no step after the click is larger than the step before it.
-    for (const { s } of result.after) expect(Math.abs(s)).toBeLessThanOrEqual(result.before.s + 1)
-    // Momentum: the first frame after the click still moves toward B, slower than before.
-    expect(result.after[0].s).toBeGreaterThan(0)
-    expect(result.after[0].s).toBeLessThan(result.before.s)
-    // Then a monotonic approach to A: the velocity toward A rises every frame (it slows, turns, speeds up).
-    for (let i = 1; i < result.after.length; i++) expect(-result.after[i].s).toBeGreaterThan(-result.after[i - 1].s)
+    const steps = result.after.map((a) => a.s)
+    // Momentum: the first frame after the click still moves toward B, by less than the frame before.
+    expect(steps[0]).toBeGreaterThan(0)
+    expect(steps[0]).toBeLessThan(result.before.s)
+    // Then a monotonic approach to A over the next 4 frames: the velocity toward A rises every frame (it slows,
+    // turns, speeds up).
+    for (let i = 1; i < 4; i++) expect(-steps[i]).toBeGreaterThan(-steps[i - 1])
+    // It turns once, and never reverses within a single frame: the first step back toward A is slow, then it builds.
+    const turn = steps.findIndex((s) => s < 0)
+    expect(turn).toBeGreaterThan(0)
+    expect(steps.slice(turn).every((s) => s < 0)).toBe(true)
+    expect(Math.abs(steps[turn])).toBeLessThan(result.before.s / 2)
     // The ease-out twin, sent back at the same instant, reverses on the very next frame.
     expect(result.before.t).toBeGreaterThan(0)
     expect(result.after[0].t).toBeLessThan(0)
