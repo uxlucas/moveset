@@ -254,6 +254,7 @@ With JavaScript off, or when the script fails, every card must be visible: hide 
 
 - [Scroll-linked](https://moveset.lucaslima.design/terms/scroll-linked)
 - [Stagger](https://moveset.lucaslima.design/terms/stagger)
+- [Enter and Exit](https://moveset.lucaslima.design/terms/enter-and-exit)
 
 ## Often confused with
 

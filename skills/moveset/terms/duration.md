@@ -153,6 +153,7 @@ Duration has no accessibility cost of its own as long as nothing waits for it: m
 
 - [Ease-out](https://moveset.lucaslima.design/terms/ease-out)
 - [Ease-in-out](https://moveset.lucaslima.design/terms/ease-in-out)
+- [Enter and Exit](https://moveset.lucaslima.design/terms/enter-and-exit)
 - [Spring](https://moveset.lucaslima.design/terms/spring)
 - [Stagger](https://moveset.lucaslima.design/terms/stagger)
 

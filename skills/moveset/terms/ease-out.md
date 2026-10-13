@@ -147,6 +147,7 @@ Keep the closed menu out of the tab order and the accessibility tree: inert whil
 
 - [Ease-in-out](https://moveset.lucaslima.design/terms/ease-in-out)
 - [Duration](https://moveset.lucaslima.design/terms/duration)
+- [Enter and Exit](https://moveset.lucaslima.design/terms/enter-and-exit)
 - [Spring](https://moveset.lucaslima.design/terms/spring)
 
 ## Often confused with

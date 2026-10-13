@@ -488,7 +488,7 @@ export default defineTerm({
   name: 'Icon Swap',
   category: 'transitions',
   order: 7,
-  status: 'review',
+  status: 'published',
   definition: 'One icon turns into another in place with a quick scale, fade and blur, like copy becoming a check.',
   aliases: ['icon transition', 'copy to check', 'play to pause', 'icon cross-fade', 'icon change animation'],
   description:
