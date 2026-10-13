@@ -88,11 +88,16 @@ test.describe('Enter and Exit', () => {
   test('controls rewrite the prompt and the labels', async ({ page }) => {
     await page.goto('/terms/enter-and-exit')
     await expect(prompt(page)).toContainText('Give this toast an enter and an exit.')
-    await expect(prompt(page)).toContainText('Enter: `opacity` 0 to 1 and `transform: translateY(16px)` to `none`, from the bottom edge where it lives, 200ms (`var(--duration-2)`), `var(--ease-out)`.')
+    await expect(prompt(page)).toContainText('Bottom edge of its container, inset 16px.')
+    await expect(prompt(page)).toContainText('Enter: `opacity` 0 to 1 and `transform: translateY(16px)` to `none`, 200ms (`var(--duration-2)`), `var(--ease-out)`.')
     await expect(prompt(page)).toContainText('Exit: `opacity` 1 to 0 and `translateY(0)` to `translateY(4px)`, toward the edge it came from, 150ms (`calc(var(--duration-2) * 0.75)`), same curve. A few pixels, never the full 16px back.')
     await expect(prompt(page)).toContainText('First paint: nothing already on screen gets an entrance.')
-    await expect(prompt(page)).toContainText('`closing` (the exit values, `visibility: hidden`, 150ms; `transition-property: opacity, transform, visibility`, so it stays visible through the exit), then `closed` on its `transitionend` (`translateY(16px)`, the enter origin). The base rule times the exit, `[data-state="open"]` the enter.')
-    await expect(prompt(page)).toContainText('`<AnimatePresence initial={false}>` (no entrance at first paint); `initial={{ opacity: 0, y: 16 }}`, `animate={{ opacity: 1, y: 0 }}`, `transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}`, `exit={{ opacity: 0, y: 4, transition: { duration: 0.15, ease: [0.23, 1, 0.32, 1] } }}`; it unmounts after the exit.')
+    await expect(prompt(page)).toContainText('(Enter on the trigger or Dismiss)')
+    await expect(prompt(page)).not.toContainText('Escape')
+    await expect(prompt(page)).toContainText(
+      "`closing`: the exit values, `visibility: hidden`, 150ms, `transition-property: opacity, transform, visibility`. `closed`, set on its own `opacity` `transitionend` (`event.target` is the toast, `propertyName === 'opacity'`): `translateY(16px)`, the enter origin, `transition-duration: 0ms`. The base rule times the exit, `[data-state=\"open\"]` the enter. Focus inside: `trigger.focus({ preventScroll: true })` before closing.",
+    )
+    await expect(prompt(page)).toContainText('`<AnimatePresence initial={false}>`; `initial={{ opacity: 0, y: 16 }}`, `animate={{ opacity: 1, y: 0 }}`, `transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}`, `exit={{ opacity: 0, y: 4, transition: { duration: 0.15, ease: [0.23, 1, 0.32, 1] } }}`; it unmounts after the exit.')
     await expect(prompt(page)).toContainText('Reduced motion: `opacity` only, same durations. CSS: `transform: none` in every state; Motion: `useReducedMotion()` zeroes `y`.')
     await expect(prompt(page)).not.toContainText('the house ships')
     await expect(enterLabel(page)).toHaveText('enter 200ms, 16px')
@@ -100,14 +105,14 @@ test.describe('Enter and Exit', () => {
 
     await option(page, 'Exit', 'Mirrored').click()
     await expect(prompt(page)).toContainText('Exit: `opacity` 1 to 0 and `translateY(0)` to `translateY(16px)`, 200ms, same curve: the enter played backwards (the house ships 4px over 150ms, 0.75 × the enter).')
-    await expect(prompt(page)).toContainText('`closing` (the exit values, `visibility: hidden`, 200ms;')
+    await expect(prompt(page)).toContainText('`closing`: the exit values, `visibility: hidden`, 200ms,')
     await expect(prompt(page)).toContainText('`exit={{ opacity: 0, y: 16, transition: { duration: 0.2, ease: [0.23, 1, 0.32, 1] } }}`')
     await expect(prompt(page)).not.toContainText('translateY(4px)')
     await expect(exitLabel(page)).toHaveText('exit 200ms, 16px')
 
     await option(page, 'Exit', 'None').click()
     await expect(prompt(page)).toContainText('Exit: no transition; it is gone in the next frame (the house ships `opacity` to 0 and 4px toward the edge over 150ms, 0.75 × the enter).')
-    await expect(prompt(page)).toContainText('`closed` at once (`transition-duration: 0ms`, `visibility: hidden`, `translateY(16px)`, the enter origin)')
+    await expect(prompt(page)).toContainText('`closed` at once: `translateY(16px)`, the enter origin, `visibility: hidden`, `transition-duration: 0ms`.')
     await expect(prompt(page)).toContainText('`exit={{ opacity: 0, transition: { duration: 0 } }}`')
     await expect(prompt(page)).not.toContainText('transitionend')
     await expect(exitLabel(page)).toHaveText('exit none')
@@ -118,12 +123,15 @@ test.describe('Enter and Exit', () => {
     await expect(prompt(page)).toContainText('never the full 8px back.')
     await expect(prompt(page)).toContainText('`initial={{ opacity: 0, y: 8 }}`')
     await expect(prompt(page)).toContainText('`exit={{ opacity: 0, y: 4, transition: { duration: 0.15')
-    await expect(prompt(page)).not.toContainText('16px')
+    // The travel is 8px everywhere; the 16px that remains is the container inset in the setup line.
+    await expect(prompt(page)).not.toContainText('translateY(16px)')
+    await expect(prompt(page)).not.toContainText('y: 16')
+    await expect(prompt(page)).not.toContainText('full 16px')
     await expect(enterLabel(page)).toHaveText('enter 200ms, 8px')
     await expect(exitLabel(page)).toHaveText('exit 150ms, 4px')
   })
 
-  test('the toast runs the enter duration open and the exit duration of the chosen exit otherwise', async ({ page }) => {
+  test('the toast runs the enter duration open, the exit duration of the chosen exit closing, and none closed', async ({ page }) => {
     // Reduced motion keeps the demo on its still frame (open), so the cycle never flips the state behind the test.
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/terms/enter-and-exit')
@@ -148,7 +156,8 @@ test.describe('Enter and Exit', () => {
       await expect.poll(async () => (await durations()).closing).toBeCloseTo(ms, 1)
       const d = await durations()
       expect(d.open).toBeCloseTo(200, 1)
-      expect(d.closed).toBeCloseTo(ms, 1)
+      // `closed` is reached in no time, so a show right after the exit starts from the full travel.
+      expect(d.closed).toBe(0)
     }
   })
 
@@ -251,7 +260,7 @@ test.describe('Enter and Exit', () => {
     expect(Math.max(...rec.map((f) => ty(f.m)))).toBeLessThanOrEqual(4.5)
   })
 
-  test('from the keyboard, Enter on Dismiss plays the exit and Space on Show toast plays the enter', async ({ page, isMobile }) => {
+  test('from the keyboard, Enter on Dismiss plays the exit and hands focus to Show toast; Space on Show toast plays the enter', async ({ page, isMobile }) => {
     test.skip(isMobile, 'keyboard')
     await page.goto('/terms/enter-and-exit')
     await settled(page)
@@ -260,6 +269,8 @@ test.describe('Enter and Exit', () => {
     await page.keyboard.press('Enter')
     await expect(toast(page)).toHaveAttribute('data-state', 'closed')
     await expect(stage(page, 'enter-and-exit')).toHaveAttribute('data-taken-over', 'true')
+    // Focus was inside the toast, so it moves to the trigger rather than dropping to body.
+    await expect(show(page)).toBeFocused()
     await page.waitForTimeout(700)
     expect(between(animated(await recorded(page)))).toBe(true)
     // Closed, the Dismiss button is out of the tab order: Tab from the trigger lands past it.
@@ -273,7 +284,7 @@ test.describe('Enter and Exit', () => {
     expect(ty(enter[0].m)).toBeCloseTo(16, 0)
   })
 
-  test('with reduced motion, the still frame rests in place and a gesture fades without moving', async ({ page }) => {
+  test('with reduced motion, the still frame rests in place and Play keeps the travel', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/terms/enter-and-exit')
     await expect(demo(page, 'enter-and-exit')).toHaveAttribute('data-playing', 'false')
@@ -282,6 +293,29 @@ test.describe('Enter and Exit', () => {
     expect(still.o).toBe('1')
     expect(inPlace(still.m)).toBe(true)
     expect(still.running).toBe(0)
+
+    // Play once is the visitor asking for the demo: the exit and the enter keep their travel, so the exit options
+    // still differ. The cycle exits at once and enters 600ms later from 16px below.
+    await startRecording(toast(page), 1400)
+    await page.getByRole('button', { name: 'Play Enter and Exit demo' }).click()
+    await expect(demo(page, 'enter-and-exit')).toHaveAttribute('data-playing', 'true')
+    await expect(stage(page, 'enter-and-exit')).toHaveAttribute('data-taken-over', 'false')
+    await page.waitForTimeout(1500)
+    const play = animated(await recorded(page))
+    expect(between(play)).toBe(true)
+    const visible = play.filter((f) => f.o > 0.05)
+    expect(Math.max(...visible.map((f) => ty(f.m)))).toBeGreaterThan(2)
+    expect(Math.max(...play.map((f) => ty(f.m)))).toBeCloseTo(16, 0)
+    expect(play.at(-1)!.o).toBe(1)
+  })
+
+  test('with reduced motion, a gesture fades without moving', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/terms/enter-and-exit')
+    await expect(demo(page, 'enter-and-exit')).toHaveAttribute('data-playing', 'false')
+    await expect(toast(page)).toHaveAttribute('data-state', 'open')
+    // The still frame is also the server HTML; the Play button only renders once hydrated, so the click lands.
+    await expect(page.getByRole('button', { name: 'Play Enter and Exit demo' })).toBeVisible()
 
     await startRecording(toast(page), 600)
     await dismiss(page).click()
@@ -308,6 +342,7 @@ test.describe('Icon Swap', () => {
   const button = (page: Page) => demo(page, 'icon-swap').locator('[data-icon-swap]')
   const icon = (page: Page, which: 'a' | 'b') => demo(page, 'icon-swap').locator(`[data-icon="${which}"]`)
   const label = (page: Page) => demo(page, 'icon-swap').locator('[data-swap-label]')
+  const status = (page: Page) => demo(page, 'icon-swap').locator('[data-swap-status]')
   const styles = (page: Page, which: 'a' | 'b') =>
     icon(page, which).evaluate((el) => {
       const s = getComputedStyle(el)
@@ -317,23 +352,24 @@ test.describe('Icon Swap', () => {
   test('controls rewrite the prompt and the label', async ({ page }) => {
     await page.goto('/terms/icon-swap')
     await expect(prompt(page)).toContainText("Swap this button's icon when its state changes: copy to check.")
-    await expect(prompt(page)).toContainText('The swap: the incoming icon `scale` 0.3 to 1, `opacity` 0 to 1, `filter: blur(3px)` to `blur(0px)`; the outgoing icon the reverse, at the same time, in the same spot. Bounce 0, no back curve.')
-    await expect(prompt(page)).toContainText('the hidden one holds `opacity: 0; transform: scale(0.3); filter: blur(3px);`. `transition-property: opacity, transform, filter`, 300ms, `cubic-bezier(0.25, 0.1, 0, 1)`.')
-    await expect(prompt(page)).toContainText('`<AnimatePresence mode="popLayout" initial={false}>` around one `motion.span` keyed by the state; `initial` and `exit` `{ opacity: 0, scale: 0.3, filter: \'blur(3px)\' }`, `animate` `{ opacity: 1, scale: 1, filter: \'blur(0px)\' }`, `transition={{ type: "spring", duration: 0.35, bounce: 0 }}`.')
-    await expect(prompt(page)).toContainText('No swap on page load: the icon for the first state is painted at rest (`initial={false}`).')
-    await expect(prompt(page)).toContainText('a 44px hit area, `aria-label` `Copy`, then `Copied`, set on the click, not when the swap settles. Enter and Space swap it like a click.')
+    await expect(prompt(page)).toContainText('The incoming icon `scale` 0.3 to 1, `opacity` 0 to 1, `filter: blur(3px)` to `blur(0px)`; the outgoing icon the reverse, together, in the same spot. Bounce 0, no back curve.')
+    await expect(prompt(page)).toContainText('The button: `<button type="button">`, `position: relative; display: grid; place-items: center`, 44px square; icons 16px.')
+    await expect(prompt(page)).toContainText('CSS route: both icons in the button, one in flow, the other `position: absolute; inset: 0; margin: auto`; nothing unmounts. `data-on="true"` on the swapped button picks the shown one; the hidden one holds `opacity: 0; transform: scale(0.3); filter: blur(3px);`. `transition-property: opacity, transform, filter`, 300ms, `cubic-bezier(0.25, 0.1, 0, 1)`.')
+    await expect(prompt(page)).toContainText('Motion route: in the button, `<AnimatePresence mode="popLayout" initial={false}>` around one `motion.span` keyed by the state; `initial` and `exit` `{ opacity: 0, scale: 0.3, filter: \'blur(3px)\' }`, `animate` `{ opacity: 1, scale: 1, filter: \'blur(0px)\' }`, `transition={{ type: "spring", duration: 0.35, bounce: 0 }}`.')
+    await expect(prompt(page)).toContainText("No swap on page load: the first state's icon is painted at rest (`initial={false}`).")
+    await expect(prompt(page)).toContainText('`aria-label="Copy"` stays. Set copied and announce `Copied` (`role="status"`) on the click, not when the swap settles; revert after 1.5s (a second click restarts it). Enter and Space act like a click.')
     await expect(prompt(page)).toContainText('Reduced motion: `opacity` only, same duration. CSS: `transform: none; filter: none` on both icons; Motion: `useReducedMotion()` drops `scale` and `filter`.')
     await expect(prompt(page)).not.toContainText('the house')
     await expect(label(page)).toHaveText('scale 0.3 · blur 3px · 300ms')
 
     await option(page, 'Depth', '0.8 (timid)').click()
-    await expect(prompt(page)).toContainText('`scale` 0.8 to 1 (timid: it reads as a glitch; the house ships 0.3), `opacity` 0 to 1, `filter: blur(3px)` to `blur(0px)`')
+    await expect(prompt(page)).toContainText('`scale` 0.8 to 1 (timid, a glitch; the house ships 0.3), `opacity` 0 to 1, `filter: blur(3px)` to `blur(0px)`')
     await expect(prompt(page)).toContainText('transform: scale(0.8);')
     await expect(prompt(page)).toContainText('`{ opacity: 0, scale: 0.8, filter: \'blur(3px)\' }`')
     await expect(label(page)).toHaveText('scale 0.8 · blur 3px · 300ms')
 
     await option(page, 'Depth', 'None (fade only)').click()
-    await expect(prompt(page)).toContainText('`opacity` 0 to 1 only, no scale (it reads as a flicker; the house ships `scale` 0.3 to 1), `filter: blur(3px)` to `blur(0px)`')
+    await expect(prompt(page)).toContainText('`opacity` 0 to 1 only, no scale (a flicker; the house ships `scale` 0.3 to 1), `filter: blur(3px)` to `blur(0px)`')
     await expect(prompt(page)).toContainText('the hidden one holds `opacity: 0; filter: blur(3px);`')
     await expect(prompt(page)).toContainText('`{ opacity: 0, filter: \'blur(3px)\' }`')
     await expect(prompt(page)).toContainText('Motion: `useReducedMotion()` drops `filter`.')
@@ -355,16 +391,19 @@ test.describe('Icon Swap', () => {
 
     await option(page, 'Pair', 'Play → pause').click()
     await expect(prompt(page)).toContainText('play to pause.')
-    await expect(prompt(page)).toContainText('`aria-label` `Play`, then `Pause`')
+    await expect(prompt(page)).toContainText('`aria-label` `Play`, then `Pause`, set on the click, not when the swap settles; a second click swaps back.')
+    await expect(prompt(page)).not.toContainText('role="status"')
     await expect(label(page)).toHaveText('scale 0.3 · blur 3px · 300ms')
     await option(page, 'Pair', 'Heart → filled').click()
     await expect(prompt(page)).toContainText('heart to filled heart.')
-    await expect(prompt(page)).toContainText('`aria-label="Like"` and `aria-pressed` for the state')
+    await expect(prompt(page)).toContainText('`aria-label="Like"` and `aria-pressed` for the state, set on the click, not when the swap settles; a second click unsets it.')
     await expect(prompt(page)).not.toContainText('then `')
   })
 
   test('each depth and blur sets the hidden icon; both icons share the duration and curve', async ({ page }) => {
     await page.goto('/terms/icon-swap')
+    // Play toggles, so the second press below swaps straight back.
+    await option(page, 'Pair', 'Play → pause').click()
     for (const { depth, blur, m, f } of [
       { depth: '0.3 (house)', blur: true, m: 'matrix(0.3, 0, 0, 0.3, 0, 0)', f: 'blur(3px)' },
       { depth: '0.8 (timid)', blur: true, m: 'matrix(0.8, 0, 0, 0.8, 0, 0)', f: 'blur(3px)' },
@@ -401,16 +440,17 @@ test.describe('Icon Swap', () => {
 
   test('a press swaps the icon with depth, updates the label at once and takes the stage', async ({ page }) => {
     await page.goto('/terms/icon-swap')
+    await option(page, 'Pair', 'Play → pause').click()
     await expect(demo(page, 'icon-swap')).toHaveAttribute('data-playing', 'true')
     await expect.poll(() => button(page).getAttribute('data-on')).toBe('false')
     const box = (await button(page).boundingBox())!
     expect(box.width).toBeGreaterThanOrEqual(44)
     expect(box.height).toBeGreaterThanOrEqual(44)
     const sizeBefore = await button(page).evaluate((el: HTMLElement) => [el.offsetWidth, el.offsetHeight])
-    await expect(button(page)).toHaveAttribute('aria-label', 'Copy')
+    await expect(button(page)).toHaveAttribute('aria-label', 'Play')
     await startRecording(icon(page, 'b'), 600)
     await button(page).click()
-    await expect(button(page)).toHaveAttribute('aria-label', 'Copied')
+    await expect(button(page)).toHaveAttribute('aria-label', 'Pause')
     await expect(stage(page, 'icon-swap')).toHaveAttribute('data-taken-over', 'true')
     await page.waitForTimeout(700)
     const rec = animated(await recorded(page))
@@ -430,8 +470,26 @@ test.describe('Icon Swap', () => {
     await page.waitForTimeout(1300)
     await expect(button(page)).toHaveAttribute('data-on', 'true')
     await button(page).click()
-    await expect(button(page)).toHaveAttribute('aria-label', 'Copy')
+    await expect(button(page)).toHaveAttribute('aria-label', 'Play')
     await expect(button(page)).toHaveAttribute('data-on', 'false')
+  })
+
+  test('copy is not a toggle: the name stays, a status region says Copied, and the icon reverts on a timer', async ({ page }) => {
+    await page.goto('/terms/icon-swap')
+    await expect(demo(page, 'icon-swap')).toHaveAttribute('data-playing', 'true')
+    await expect.poll(() => button(page).getAttribute('data-on')).toBe('false')
+    await expect(status(page)).toHaveText('')
+    await button(page).click()
+    await expect(button(page)).toHaveAttribute('data-on', 'true')
+    await expect(button(page)).toHaveAttribute('aria-label', 'Copy')
+    await expect(button(page)).not.toHaveAttribute('aria-pressed')
+    await expect(status(page)).toHaveText('Copied')
+    // About 1.5s after the press the check gives way to the copy icon again, and the announcement clears.
+    await page.waitForTimeout(800)
+    await expect(button(page)).toHaveAttribute('data-on', 'true')
+    await expect(button(page)).toHaveAttribute('data-on', 'false', { timeout: 2000 })
+    await expect(status(page)).toHaveText('')
+    await expect(button(page)).toHaveAttribute('aria-label', 'Copy')
   })
 
   test('the pairs report their state: play and pause by name, the heart by aria-pressed', async ({ page }) => {
@@ -453,6 +511,7 @@ test.describe('Icon Swap', () => {
 
   test('pressed again mid-swap, the icons turn back from where they are', async ({ page }) => {
     await page.goto('/terms/icon-swap')
+    await option(page, 'Pair', 'Play → pause').click()
     await expect(demo(page, 'icon-swap')).toHaveAttribute('data-playing', 'true')
     await expect.poll(() => button(page).getAttribute('data-on')).toBe('false')
     await startRecording(icon(page, 'b'), 600)
@@ -474,26 +533,29 @@ test.describe('Icon Swap', () => {
   test('from the keyboard, Enter and Space swap it with the same animation', async ({ page, isMobile }) => {
     test.skip(isMobile, 'keyboard')
     await page.goto('/terms/icon-swap')
+    await option(page, 'Pair', 'Play → pause').click()
     await expect(demo(page, 'icon-swap')).toHaveAttribute('data-playing', 'true')
     await expect.poll(() => button(page).getAttribute('data-on')).toBe('false')
     await button(page).focus()
     await startRecording(icon(page, 'b'), 600)
     await page.keyboard.press('Enter')
     await expect(button(page)).toHaveAttribute('data-on', 'true')
-    await expect(button(page)).toHaveAttribute('aria-label', 'Copied')
+    await expect(button(page)).toHaveAttribute('aria-label', 'Pause')
     await page.waitForTimeout(700)
     const rec = animated(await recorded(page))
     expect(between(rec)).toBe(true)
     expect(sc(rec[0].m)).toBeCloseTo(0.3, 1)
     await page.keyboard.press('Space')
     await expect(button(page)).toHaveAttribute('data-on', 'false')
-    await expect(button(page)).toHaveAttribute('aria-label', 'Copy')
+    await expect(button(page)).toHaveAttribute('aria-label', 'Play')
   })
 
   test('with reduced motion, nothing runs on the still frame and a press fades without scale or blur', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/terms/icon-swap')
     await expect(demo(page, 'icon-swap')).toHaveAttribute('data-playing', 'false')
+    // The still frame is also the server HTML; the Play button only renders once hydrated, so the press lands.
+    await expect(page.getByRole('button', { name: 'Play Icon Swap demo' })).toBeVisible()
     const still = await demo(page, 'icon-swap').evaluate((root) => {
       const icons = [...root.querySelectorAll<HTMLElement>('[data-icon]')]
       return { running: icons.map((el) => el.getAnimations().length), opacity: icons.map((el) => getComputedStyle(el).opacity) }

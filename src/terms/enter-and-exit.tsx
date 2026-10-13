@@ -53,11 +53,12 @@ function exitOf(v: V): { ms: number; px: number } {
 }
 
 // The toast's three states. The base rule is `closing`: faded, at --c below its spot, and hidden to the tab order once
-// the transition ends (visibility stays visible for the whole exit). `closed` is the enter origin, --t below. `open`
-// is in place. A transition takes the duration of the state it heads to: --x closing, --d opening. Under reduced
-// motion both offsets are 0, so every state is a fade over the same durations.
+// the transition ends (visibility stays visible for the whole exit). `closed` is the enter origin, --t below, reached
+// in no time, so a show right after the exit starts from the full travel. `open` is in place. A transition takes the
+// duration of the state it heads to: --x closing, --d opening. Under reduced motion a visitor's gesture drops both
+// offsets, so it fades in place over the same durations; Play keeps the travel, so the exit options still differ.
 const TOAST =
-  'invisible opacity-0 transition-[opacity,transform,visibility] duration-(--x) ease-(--ease-out) [transform:translateY(var(--c))] data-[state=closed]:[transform:translateY(var(--t))] data-[state=open]:visible data-[state=open]:opacity-100 data-[state=open]:duration-(--d) data-[state=open]:[transform:none] group-data-[snap=true]/stage:transition-none motion-reduce:[--c:0px] motion-reduce:[--t:0px]'
+  'invisible opacity-0 transition-[opacity,transform,visibility] duration-(--x) ease-(--ease-out) [transform:translateY(var(--c))] data-[state=closed]:[transform:translateY(var(--t))] data-[state=closed]:duration-0 data-[state=open]:visible data-[state=open]:opacity-100 data-[state=open]:duration-(--d) data-[state=open]:[transform:none] group-data-[snap=true]/stage:transition-none motion-reduce:group-data-[taken-over=true]/stage:[--c:0px] motion-reduce:group-data-[taken-over=true]/stage:[--t:0px]'
 
 function Frame({ size }: { size: DemoProps['size'] }) {
   const detail = size === 'detail'
@@ -90,7 +91,7 @@ function Frame({ size }: { size: DemoProps['size'] }) {
             type="button"
             data-toast-dismiss=""
             aria-label="Dismiss toast"
-            className="hit ml-auto inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-ink-muted transition-colors duration-150 ease-[ease] hover:text-ink"
+            className="hit ml-auto inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-ink-muted transition-[color] duration-150 ease-[ease] hover:text-ink"
           >
             <X size={12} aria-hidden />
           </button>
@@ -130,9 +131,12 @@ function EnterAndExitDemo({ values, playing, replayKey, size, timeScale, onCycle
     if (rootRef.current) rootRef.current.dataset.takenOver = String(on)
   }
 
-  // Dismissing heads for `closing`; the exit's transitionend (below) then rests it at `closed`, the enter origin.
+  // Dismissing heads for `closing`; the exit's transitionend (below) then rests it at `closed`, the enter origin. Focus
+  // inside the toast moves to the trigger first, so a keyboard Dismiss does not drop it on body.
   const dismiss = () => {
-    if (toastOf()?.dataset.state !== 'open') return
+    const toast = toastOf()
+    if (toast?.dataset.state !== 'open') return
+    if (toast.contains(document.activeElement)) rootRef.current?.querySelector<HTMLElement>('[data-toast-trigger]')?.focus({ preventScroll: true })
     setState('closing')
   }
 
@@ -254,18 +258,18 @@ function exitLine(v: V): string {
 function cssRoute(v: V): string {
   const t = travelOf(v)
   const x = exitOf(v)
-  const closing =
+  const states =
     v.exit === 'none'
-      ? `\`closed\` at once (\`transition-duration: 0ms\`, \`visibility: hidden\`, \`translateY(${t}px)\`, the enter origin)`
-      : `\`closing\` (the exit values, \`visibility: hidden\`, ${x.ms}ms; \`transition-property: opacity, transform, visibility\`, so it stays visible through the exit), then \`closed\` on its \`transitionend\` (\`translateY(${t}px)\`, the enter origin)`
-  return `- CSS route: keep it mounted. \`data-state\` on the toast: \`open\` (in place, \`visibility: visible\`, \`transition-duration: ${ENTER_MS}ms\`), ${closing}. The base rule times the exit, \`[data-state="open"]\` the enter.`
+      ? `\`closed\` at once: \`translateY(${t}px)\`, the enter origin, \`visibility: hidden\`, \`transition-duration: 0ms\``
+      : `\`closing\`: the exit values, \`visibility: hidden\`, ${x.ms}ms, \`transition-property: opacity, transform, visibility\`. \`closed\`, set on its own \`opacity\` \`transitionend\` (\`event.target\` is the toast, \`propertyName === 'opacity'\`): \`translateY(${t}px)\`, the enter origin, \`transition-duration: 0ms\``
+  return `- CSS route: keep it mounted; \`data-state\` on the toast. \`open\`: in place, \`visibility: visible\`, \`transition-duration: ${ENTER_MS}ms\`. ${states}. The base rule times the exit, \`[data-state="open"]\` the enter. Focus inside: \`trigger.focus({ preventScroll: true })\` before closing.`
 }
 
 function motionRoute(v: V): string {
   const t = travelOf(v)
   const x = exitOf(v)
   const exit = v.exit === 'none' ? `exit={{ opacity: 0, transition: { duration: 0 } }}` : `exit={{ opacity: 0, y: ${x.px}, transition: { duration: ${s(x.ms)}, ease: ${EASE.motion} } }}`
-  return `- Motion route: \`<AnimatePresence initial={false}>\` (no entrance at first paint); \`initial={{ opacity: 0, y: ${t} }}\`, \`animate={{ opacity: 1, y: 0 }}\`, \`transition={{ duration: ${s(ENTER_MS)}, ease: ${EASE.motion} }}\`, \`${exit}\`; it unmounts after the exit.`
+  return `- Motion route: \`<AnimatePresence initial={false}>\`; \`initial={{ opacity: 0, y: ${t} }}\`, \`animate={{ opacity: 1, y: 0 }}\`, \`transition={{ duration: ${s(ENTER_MS)}, ease: ${EASE.motion} }}\`, \`${exit}\`; it unmounts after the exit.`
 }
 
 function cssCode(v: V): string {
@@ -279,19 +283,36 @@ function cssCode(v: V): string {
     '}',
     '',
     '/* Markup: <div class="toast" data-state="closed">…<button>Dismiss</button></div>.',
-    '   It stays mounted. Show: data-state="open". Dismiss: data-state="closing",',
+    '   Kept mounted, not display + @starting-style: that also plays on first paint.',
+    '   Show: data-state="open". Dismiss: data-state="closing",',
     ...(none
-      ? ['   which here is the same as "closed": no exit transition. */']
-      : ['   and on its transitionend (opacity) data-state="closed", the enter origin,', `   so the next show starts from ${t}px below. */`]),
+      ? ['   which here is the same as "closed": no exit transition.']
+      : [
+          '   and on its own transitionend (event.target the toast, propertyName',
+          '   "opacity") data-state="closed", the enter origin, so the next show',
+          `   starts from ${t}px below.`,
+        ]),
+    '   Focus inside the toast: trigger.focus({ preventScroll: true }) before',
+    '   closing, or it drops to body. */',
     '.toast {',
     ...(none
       ? ['  /* Gone in the next frame. The house ships a 150ms fade, 4px toward the', '     edge: see the Quiet exit. */', '  opacity: 0;', `  transform: translateY(${t}px);`, '  visibility: hidden;', '  transition-property: opacity, transform, visibility;', '  transition-duration: 0ms;']
       : [
-          '  /* The exit target: faded, nudged toward the bottom edge, and out of the',
-          '     tab order once the transition ends. visibility is transitioned too, so',
-          '     the toast stays visible for the whole exit. A transition takes the',
-          '     duration of the state it heads to: this rule times the exit, the open',
-          '     rule the enter. */',
+          ...(v.exit === 'mirrored'
+            ? [
+                '  /* The exit target: faded, slid the full travel back to the bottom edge, and',
+                '     out of the tab order once the transition ends. visibility is transitioned',
+                '     too, so the toast stays visible for the whole exit. A transition takes',
+                '     the duration of the state it heads to: this rule times the exit, the',
+                '     open rule the enter. */',
+              ]
+            : [
+                '  /* The exit target: faded, nudged toward the bottom edge, and out of the',
+                '     tab order once the transition ends. visibility is transitioned too, so',
+                '     the toast stays visible for the whole exit. A transition takes the',
+                '     duration of the state it heads to: this rule times the exit, the open',
+                '     rule the enter. */',
+              ]),
           '  opacity: 0;',
           `  transform: translateY(${x.px}px);`,
           '  visibility: hidden;',
@@ -301,8 +322,23 @@ function cssCode(v: V): string {
     '  transition-timing-function: var(--ease-out);',
     '}',
     ...(v.exit === 'quiet'
-      ? ['.toast[data-state="closed"] {', `  /* The enter origin: ${t}px below its spot, where the exit nudges toward. */`, `  transform: translateY(${t}px);`, '}']
-      : []),
+      ? [
+          '.toast[data-state="closed"] {',
+          `  /* The enter origin: ${t}px below its spot, where the exit nudges toward. In`,
+          '     no time, so a show right after the exit starts from the full travel. */',
+          `  transform: translateY(${t}px);`,
+          '  transition-duration: 0ms;',
+          '}',
+        ]
+      : v.exit === 'mirrored'
+        ? [
+            '.toast[data-state="closed"] {',
+            '  /* The enter origin, where the exit already ended. In no time, so a show',
+            '     right after the exit starts from the full travel. */',
+            '  transition-duration: 0ms;',
+            '}',
+          ]
+        : []),
     '.toast[data-state="open"] {',
     '  opacity: 1;',
     '  transform: none;',
@@ -355,6 +391,7 @@ function motionCode(v: V): string {
     ...exit,
     '        >',
     '          {children}',
+    '          {/* Dismissing with focus inside: trigger.focus({ preventScroll: true }) first, or focus drops to body. */}',
     '          <button type="button" onClick={onDismiss}>',
     '            Dismiss',
     '          </button>',
@@ -391,17 +428,17 @@ export default defineTerm({
   demo: {
     component: EnterAndExitDemo,
     label:
-      'A toast rests at the bottom edge of a page frame. It fades out with a nudge of a few pixels toward the edge, quick and quiet; a beat later it enters again: it fades in while rising 16px into place over 200ms, then holds. Under the frame, the two sets of numbers: the enter and the exit. On the entry page a Show toast button in the frame plays the enter and the Dismiss button on the toast plays the exit. With the Mirrored exit the toast slides the full 16px back down at the enter duration; with None it disappears in one frame.',
+      'A toast rests at the bottom edge of a page frame. It fades out with a nudge of a few pixels toward the edge, quick and quiet; a beat later it enters again: it fades in while rising 16px into place over 200ms, then holds. Beside the frame, the two sets of numbers: the enter and the exit. On the entry page a Show toast button in the frame plays the enter and the Dismiss button on the toast plays the exit. With the Mirrored exit the toast slides the full 16px back down at the enter duration; with None it disappears in one frame.',
     controls,
     glyph: EnterAndExitGlyph,
   },
   prompt: (v) =>
     [
-      'Give this toast an enter and an exit.',
+      'Give this toast an enter and an exit. Bottom edge of its container, inset 16px.',
       '',
-      `- Enter: \`opacity\` 0 to 1 and \`transform: translateY(${travelOf(v)}px)\` to \`none\`, from the bottom edge where it lives, ${ENTER_MS}ms (\`var(--duration-2)\`), \`var(--ease-out)\`.`,
+      `- Enter: \`opacity\` 0 to 1 and \`transform: translateY(${travelOf(v)}px)\` to \`none\`, ${ENTER_MS}ms (\`var(--duration-2)\`), \`var(--ease-out)\`.`,
       exitLine(v),
-      '- First paint: nothing already on screen gets an entrance. Enters and exits play only for a change the user caused, including from the keyboard (Enter on the trigger, Escape or Enter on Dismiss); highlight moves inside a component get none.',
+      '- First paint: nothing already on screen gets an entrance. Enters and exits play only for a change the user caused, including from the keyboard (Enter on the trigger or Dismiss); highlight moves inside a component get none.',
       cssRoute(v),
       motionRoute(v),
       '- Reduced motion: `opacity` only, same durations. CSS: `transform: none` in every state; Motion: `useReducedMotion()` zeroes `y`.',
@@ -411,24 +448,25 @@ export default defineTerm({
     const x = exitOf(v)
     return [
       `CSS route: the toast's computed \`transition-duration\` is \`${s(ENTER_MS)}s\` with \`data-state="open"\` and \`${s(x.ms)}s\` without. Motion route: the \`transition\` durations are ${s(ENTER_MS)} in and ${s(x.ms)} out.`,
-      `Entering, it starts ${t}px below its resting spot at \`opacity\` 0 (the computed values the moment it is shown), rises and fades in with no frame moving down or dimming, and is in place at \`opacity\` 1 by ${ENTER_MS}ms from the first animated frame.`,
+      `Entering, it starts ${t}px below its resting spot at \`opacity\` 0 (the computed values the moment it is shown), rises and fades in with no frame moving down or dimming, and is settled at \`opacity\` 1 and \`transform: none\` by ${ENTER_MS}ms from the first animated frame.`,
       {
-        quiet: `Exiting, \`opacity\` is 0 by ${QUIET_MS}ms from the first animated frame; the toast ends ${QUIET_PX}px (±0.5) below its spot, never farther and never above it.`,
-        mirrored: `Exiting, \`opacity\` is 0 by ${ENTER_MS}ms from the first animated frame and the toast ends ${t}px (±0.5) below its spot (the house stops at ${QUIET_PX}px by ${QUIET_MS}ms).`,
+        quiet: `Exiting, \`opacity\` is 0 by ${QUIET_MS}ms from the first animated frame. While visible (\`closing\`) the toast ends ${QUIET_PX}px (±0.5) below its spot, never farther and never above it; \`closed\` sits at the enter origin, hidden.`,
+        mirrored: `Exiting, \`opacity\` is 0 by ${ENTER_MS}ms from the first animated frame and the toast ends ${t}px (±0.5) below its spot, the enter origin (the house stops at ${QUIET_PX}px by ${QUIET_MS}ms).`,
         none: 'Dismissed, the toast is gone in the next frame: no in-between opacity or position (the house fades it over 150ms with a 4px nudge).',
       }[v.exit],
       v.exit === 'none'
-        ? 'Shown again while entering, it continues from where it is: no jump, no restart.'
+        ? 'Dismissed while entering, it is gone in the next frame.'
         : 'Dismissed while entering, or shown again while exiting, it turns back from where it is: no jump, no restart.',
       'Loaded with the toast already open, no frame shows it below its spot or under `opacity` 1, and `getAnimations()` on it is empty.',
       'Shown or dismissed from the keyboard, it plays the same enter and exit.',
+      'Dismissed from the keyboard, focus lands on the trigger, not `body`.',
       'CSS route: closed, its computed `visibility` is `hidden` and its Dismiss button is not in the tab order.',
       'With reduced motion on, computed `transform` is `none` in every frame while `opacity` fades over the same durations.',
     ]
   },
   code: (v) => ({ css: cssCode(v), motion: motionCode(v) }),
   a11y:
-    'The toast is usable from the first frame of its enter: announce it with `role="status"` on the click, not when the animation ends, and give its Dismiss button a label. Closed, keep it out of the tab order (`visibility: hidden` once the exit transition ends, or unmount it). Opening or dismissing from the keyboard animates like a click. Under reduced motion, drop the travel and keep the fade over the same durations.',
+    'The toast is usable from the first frame of its enter: put it in a `role="status"` region that is always mounted, so the announcement comes with the click, not after the enter, and give its Dismiss button a label. Dismissed with focus inside it (a keyboard Dismiss), move focus to the trigger with `preventScroll` before closing, so it does not fall to `body`. Closed, keep it out of the tab order (`visibility: hidden` once the exit transition ends, or unmount it). Opening or dismissing from the keyboard animates like a click. Under reduced motion, drop the travel and keep the fade over the same durations.',
   related: ['duration', 'ease-out', 'stagger', 'scroll-triggered', 'toast'],
   sources: [
     { label: 'Emil Kowalski: Building a Toast Component', url: 'https://emilkowal.ski/ui/building-a-toast-component' },

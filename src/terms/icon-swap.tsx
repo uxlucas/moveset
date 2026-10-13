@@ -1,5 +1,5 @@
 import { Check, Copy, Heart, Pause, Play, type LucideProps } from 'lucide-react'
-import { useRef, type ComponentType, type CSSProperties, type MouseEvent } from 'react'
+import { useEffect, useRef, type ComponentType, type CSSProperties, type MouseEvent } from 'react'
 import { scaled } from '@/components/demo/playback'
 import { snap, useCycle } from '@/components/demo/use-cycle'
 import { GlyphSvg } from '@/components/site/glyph'
@@ -44,6 +44,8 @@ type PairSpec = {
   /** the button's accessible name off and on; a toggle keeps one name and reports its state in aria-pressed */
   label: [string, string]
   toggle: boolean
+  /** announced in a role="status" region on the press; the state then reverts on a timer, and the name never changes */
+  status?: string
   /** the Motion tab's state name, component name and lucide imports */
   state: string
   component: string
@@ -51,7 +53,7 @@ type PairSpec = {
 }
 
 const PAIRS: Record<Pair, PairSpec> = {
-  copy: { from: 'copy', to: 'check', A: Copy, B: Check, label: ['Copy', 'Copied'], toggle: false, state: 'copied', component: 'CopyButton', icons: ['Copy', 'Check'] },
+  copy: { from: 'copy', to: 'check', A: Copy, B: Check, label: ['Copy', 'Copy'], toggle: false, status: 'Copied', state: 'copied', component: 'CopyButton', icons: ['Copy', 'Check'] },
   play: { from: 'play', to: 'pause', A: Play, B: Pause, label: ['Play', 'Pause'], toggle: false, state: 'playing', component: 'PlayButton', icons: ['Play', 'Pause'] },
   heart: {
     from: 'heart',
@@ -80,6 +82,8 @@ const EASE = 'cubic-bezier(0.25, 0.1, 0, 1)'
 const REST_MS = 500
 const ON_MS = 1100
 const HOLD_MS = 700
+// Copy is not a toggle: a press shows the check, and this long after it the icon reverts (the site's copy button).
+const REVERT_MS = 1500
 const HINT = 'Press the button to swap it'
 
 const scaleOf = (v: V) => (v.depth === 'fade' ? 1 : Number(v.depth))
@@ -111,20 +115,31 @@ function IconSwapDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
   // Pausing (off screen, hidden tab) and resuming keeps the visitor in charge.
   const taken = useRef(false)
   const takenIn = useRef('')
+  // The copy pair's pending revert, dropped by any other change of state.
+  const revert = useRef<ReturnType<typeof setTimeout>>(undefined)
   const pair = PAIRS[values.pair]
   const cycleKey = `${replayKey}|${values.pair}|${values.depth}|${values.blur}`
   const detail = size === 'detail'
+  useEffect(() => () => clearTimeout(revert.current), [])
 
   const buttonOf = () => rootRef.current?.querySelector<HTMLElement>('[data-icon-swap]') ?? null
 
+  // Only a visitor's press is announced; the cycle swaps in silence.
+  const announce = (text: string) => {
+    const region = rootRef.current?.querySelector<HTMLElement>('[data-swap-status]')
+    if (region) region.textContent = text
+  }
+
   // The state lives on the button: data-on for the icons, and the accessible name or aria-pressed for assistive tech,
-  // set on the press, never when the swap settles.
+  // set on the press, never when the swap settles. The copy pair keeps its name (the announcement is separate).
   const setOn = (on: boolean) => {
+    clearTimeout(revert.current)
     const button = buttonOf()
     if (!button) return
     button.dataset.on = String(on)
     if (button.hasAttribute('aria-pressed')) button.setAttribute('aria-pressed', String(on))
-    else if (button.hasAttribute('aria-label')) button.setAttribute('aria-label', pair.label[on ? 1 : 0])
+    else if (button.hasAttribute('aria-label') && pair.label[0] !== pair.label[1]) button.setAttribute('aria-label', pair.label[on ? 1 : 0])
+    if (!on) announce('')
   }
 
   const setTaken = (on: boolean) => {
@@ -176,12 +191,19 @@ function IconSwapDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
   )
 
   // A press swaps the icon and ends the cycle; the stage then rests as the visitor leaves it. It is a real button, so
-  // Enter and Space swap it too, with the same animation: the change is one the user caused.
+  // Enter and Space swap it too, with the same animation: the change is one the user caused. Play and the heart
+  // toggle; copy sets the check, announces it, and reverts on a timer (a repeat press restarts the timer).
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     const button = (e.target as HTMLElement).closest<HTMLElement>('[data-icon-swap]')
     if (!detail || !button) return
     if (!taken.current) setTaken(true)
-    setOn(button.dataset.on !== 'true')
+    if (!pair.status) {
+      setOn(button.dataset.on !== 'true')
+      return
+    }
+    setOn(true)
+    announce(pair.status)
+    revert.current = setTimeout(() => setOn(false), scaled(REVERT_MS, timeScale))
   }
 
   const vars = {
@@ -210,17 +232,21 @@ function IconSwapDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
               <span className="h-1.5 w-1/2 rounded-full bg-demo-2" />
             </div>
             {detail ? (
-              // 44px: the whole button is the hit area. The name says what pressing it does, and changes with the state.
-              <button
-                type="button"
-                data-icon-swap=""
-                data-on="false"
-                aria-label={pair.label[0]}
-                aria-pressed={pair.toggle ? false : undefined}
-                className={`${face} press cursor-pointer`}
-              >
-                <Icons pair={values.pair} size={size} />
-              </button>
+              // 44px: the whole button is the hit area. The name says what pressing it does; the state is reported by
+              // the name (play), aria-pressed (heart) or the always-mounted status region beside it (copy).
+              <>
+                <button
+                  type="button"
+                  data-icon-swap=""
+                  data-on="false"
+                  aria-label={pair.label[0]}
+                  aria-pressed={pair.toggle ? false : undefined}
+                  className={`${face} press cursor-pointer`}
+                >
+                  <Icons pair={values.pair} size={size} />
+                </button>
+                <span role="status" data-swap-status="" className="sr-only" />
+              </>
             ) : (
               <div data-icon-swap="" data-on="false" className={face}>
                 <Icons pair={values.pair} size={size} />
@@ -246,7 +272,10 @@ function IconSwapGlyph({ active }: GlyphProps) {
   return (
     <GlyphSvg kind="icon-swap" active={active}>
       <circle className="m a" cx="6" cy="6" r="1.7" fill="currentColor" />
-      <rect className="m b" x="4.3" y="4.3" width="3.4" height="3.4" rx=".6" fill="currentColor" opacity="0" transform="rotate(45 6 6)" />
+      {/* The rotation sits on a group: the keyframes own the rect's transform, so a rotate there would be overridden. */}
+      <g transform="rotate(45 6 6)">
+        <rect className="m b" x="4.3" y="4.3" width="3.4" height="3.4" rx=".6" fill="currentColor" opacity="0" />
+      </g>
     </GlyphSvg>
   )
 }
@@ -254,8 +283,8 @@ function IconSwapGlyph({ active }: GlyphProps) {
 /** The incoming icon's move, as the prompt states it. */
 function swapText(v: V): string {
   const parts: string[] = []
-  if (v.depth === 'fade') parts.push('`opacity` 0 to 1 only, no scale (it reads as a flicker; the house ships `scale` 0.3 to 1)')
-  else if (v.depth === '0.8') parts.push('`scale` 0.8 to 1 (timid: it reads as a glitch; the house ships 0.3), `opacity` 0 to 1')
+  if (v.depth === 'fade') parts.push('`opacity` 0 to 1 only, no scale (a flicker; the house ships `scale` 0.3 to 1)')
+  else if (v.depth === '0.8') parts.push('`scale` 0.8 to 1 (timid, a glitch; the house ships 0.3), `opacity` 0 to 1')
   else parts.push('`scale` 0.3 to 1, `opacity` 0 to 1')
   parts.push(v.blur ? '`filter: blur(3px)` to `blur(0px)`' : 'no blur (the house adds `filter: blur(3px)` to `blur(0px)`)')
   return parts.join(', ')
@@ -277,24 +306,46 @@ function motionStates(v: V): { hidden: string; shown: string } {
   return { hidden: `{ ${hidden.join(', ')} }`, shown: `{ ${shown.join(', ')} }` }
 }
 
+/** The button's reporting and what a second click does, per pair. */
 function ariaText(v: V): string {
   const p = PAIRS[v.pair]
-  return p.toggle ? `\`aria-label="${p.label[0]}"\` and \`aria-pressed\` for the state` : `\`aria-label\` \`${p.label[0]}\`, then \`${p.label[1]}\``
+  if (p.status) {
+    return `\`aria-label="${p.label[0]}"\` stays. Set ${p.state} and announce \`${p.status}\` (\`role="status"\`) on the click, not when the swap settles; revert after ${REVERT_MS / 1000}s (a second click restarts it).`
+  }
+  if (p.toggle) return `\`aria-label="${p.label[0]}"\` and \`aria-pressed\` for the state, set on the click, not when the swap settles; a second click unsets it.`
+  return `\`aria-label\` \`${p.label[0]}\`, then \`${p.label[1]}\`, set on the click, not when the swap settles; a second click swaps back.`
 }
 
 function cssCode(v: V): string {
   const p = PAIRS[v.pair]
   const hidden = hiddenCss(v)
   const reducedLines = [...(v.depth === 'fade' ? [] : ['    transform: none;']), ...(v.blur ? ['    filter: none;'] : [])]
+  const onClick = p.status
+    ? [
+        `   </button>. On click, set data-on="true", announce ${p.status} in a role="status"`,
+        `   region and revert after ${REVERT_MS / 1000}s (a second click restarts the timer). The`,
+        `   name stays ${p.label[0]}. Both icons stay mounted, so the revert animates the same`,
+        '   way, and a click during it turns back from where it is. */',
+      ]
+    : p.toggle
+      ? [
+          '   </button>. On click, toggle data-on="true" and aria-pressed. Both icons stay',
+          '   mounted, so the swap back animates the same way, and a second click',
+          '   mid-swap turns back from where it is. */',
+        ]
+      : [
+          `   </button>. On click, toggle data-on="true" and set aria-label to ${p.label[1]},`,
+          `   back to ${p.label[0]} on the next. Both icons stay mounted, so the swap back`,
+          '   animates the same way, and a second click mid-swap turns back from where',
+          '   it is. */',
+        ]
   return [
     `/* Markup: <button class="icon-button" type="button" ${p.toggle ? `aria-label="${p.label[0]}" aria-pressed="false"` : `aria-label="${p.label[0]}"`}>`,
-    `     <svg class="icon icon-a">…</svg>  <!-- ${p.from}, in flow: it sets the size -->`,
+    `     <svg class="icon icon-a">…</svg>  <!-- ${p.from}, in flow -->`,
     `     <svg class="icon icon-b">…</svg>  <!-- ${p.to}, layered over it -->`,
-    `   </button>. On click, toggle data-on and ${p.toggle ? 'aria-pressed' : `set aria-label to ${p.label[1]}`}. Both icons`,
-    '   stay mounted, so the swap back animates the same way, and a second click',
-    '   mid-swap turns back from where it is. */',
+    ...onClick,
     '.icon-button {',
-    '  position: relative;',
+    '  position: relative; /* .icon-b is placed against the button */',
     '  display: inline-grid;',
     '  place-items: center;',
     '  width: 44px; /* the hit area */',
@@ -319,10 +370,10 @@ function cssCode(v: V): string {
         : ['/* The hidden icon: shrunk deep, faded, soft. 0.3, not 0.8: a timid scale', '   reads as a glitch. */']),
     ...(v.blur ? [] : ['/* No blur here; the house adds filter: blur(3px), which bridges the two. */']),
     '.icon-b,',
-    '.icon-button[data-on] .icon-a {',
+    '.icon-button[data-on="true"] .icon-a {',
     ...hidden.map((l) => `  ${l}`),
     '}',
-    '.icon-button[data-on] .icon-b {',
+    '.icon-button[data-on="true"] .icon-b {',
     '  opacity: 1;',
     ...(v.depth === 'fade' ? [] : ['  transform: none;']),
     ...(v.blur ? ['  filter: blur(0px);'] : []),
@@ -331,7 +382,7 @@ function cssCode(v: V): string {
     `/* Reduced motion: a fade over the same ${SWAP_MS}ms${reducedLines.length > 0 ? ', no scale and no blur' : ''}. */`,
     '@media (prefers-reduced-motion: reduce) {',
     ...(reducedLines.length > 0
-      ? ['  .icon-b,', '  .icon-button[data-on] .icon-a {', ...reducedLines, '  }']
+      ? ['  .icon-b,', '  .icon-button[data-on="true"] .icon-a {', ...reducedLines, '  }']
       : ['  /* Already opacity only: nothing to drop. */', '  .icon {', `    transition-duration: ${SWAP_MS}ms;`, '  }']),
     '}',
   ].join('\n')
@@ -345,16 +396,58 @@ function motionCode(v: V): string {
   const iconB = p.toggle ? `<${IconB} size={16} fill="currentColor" aria-hidden />` : `<${IconB} size={16} aria-hidden />`
   const setter = `set${cap(p.state)}`
   const fadeOnly = v.depth === 'fade' && !v.blur
+  const reverts = Boolean(p.status)
+  // The copy pair sets its state and reverts on a timer; the others toggle.
+  const click = reverts
+    ? [
+        `  // Not a toggle: the check shows, then reverts after ${REVERT_MS / 1000}s; a second click restarts`,
+        `  // the timer. The name stays ${p.label[0]}; the status region announces ${p.status}.`,
+        '  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)',
+        `  const ${p.from} = () => {`,
+        `    ${setter}(true)`,
+        '    clearTimeout(timer.current)',
+        `    timer.current = setTimeout(() => ${setter}(false), ${REVERT_MS})`,
+        '  }',
+      ]
+    : []
+  const button = [
+    '<button',
+    '  type="button"',
+    '  className="icon-button"',
+    ...(p.toggle
+      ? [`  aria-label="${p.label[0]}"`, `  aria-pressed={${p.state}}`]
+      : reverts
+        ? [`  aria-label="${p.label[0]}"`]
+        : [`  aria-label={${p.state} ? '${p.label[1]}' : '${p.label[0]}'}`]),
+    reverts ? `  onClick={${p.from}}` : `  onClick={() => ${setter}(!${p.state})}`,
+    '>',
+    '  {/* initial={false}: the first icon is painted at rest, no swap on page load.',
+    '      popLayout takes the leaving icon out of flow, so the two overlap. */}',
+    '  <AnimatePresence mode="popLayout" initial={false}>',
+    `    <motion.span key={${p.state} ? '${p.to}' : '${p.from}'} initial={hidden} animate={shown} exit={hidden} transition={swap}>`,
+    `      {${p.state} ? ${iconB} : ${iconA}}`,
+    '    </motion.span>',
+    '  </AnimatePresence>',
+    '</button>',
+  ]
+  const tree = reverts
+    ? ['    <>', ...button.map((l) => `      ${l}`), `      <span role="status" className="sr-only">{${p.state} ? '${p.status}' : ''}</span>`, '    </>']
+    : button.map((l) => `    ${l}`)
   return [
     `import { ${[...new Set(p.icons)].join(', ')} } from 'lucide-react'`,
     fadeOnly ? "import { AnimatePresence, motion } from 'motion/react'" : "import { AnimatePresence, motion, useReducedMotion } from 'motion/react'",
-    "import { useState } from 'react'",
+    reverts ? "import { useRef, useState } from 'react'" : "import { useState } from 'react'",
     '',
     '// Bounce 0: an icon is not a toy.',
     `const swap = ${SPRING.replace(/"/g, "'")} as const`,
+    '// The button needs a box of its own, or the span is inline and the swap shifts',
+    '// the layout: .icon-button { position: relative; display: grid; place-items: center }',
+    '// at 44px square, icons 16px. popLayout places the leaving icon against it, so',
+    '// the two coincide.',
     '',
     `export function ${p.component}() {`,
     `  const [${p.state}, ${setter}] = useState(false)`,
+    ...click,
     ...(fadeOnly
       ? [
           '  // Already opacity only, so reduced motion changes nothing here; useReducedMotion()',
@@ -364,22 +457,7 @@ function motionCode(v: V): string {
         ]
       : ['  // Reduced motion: opacity only, same duration.', '  const reduced = useReducedMotion()', `  const hidden = reduced ? { opacity: 0 } : ${hidden}`, `  const shown = reduced ? { opacity: 1 } : ${shown}`]),
     '  return (',
-    '    <button',
-    '      type="button"',
-    '      className="icon-button"',
-    ...(p.toggle
-      ? [`      aria-label="${p.label[0]}"`, `      aria-pressed={${p.state}}`]
-      : [`      aria-label={${p.state} ? '${p.label[1]}' : '${p.label[0]}'}`]),
-    `      onClick={() => ${setter}(!${p.state})}`,
-    '    >',
-    '      {/* initial={false}: the first icon is painted at rest, no swap on page load.',
-    '          popLayout takes the leaving icon out of flow, so the two overlap. */}',
-    '      <AnimatePresence mode="popLayout" initial={false}>',
-    `        <motion.span key={${p.state} ? '${p.to}' : '${p.from}'} className="icon" initial={hidden} animate={shown} exit={hidden} transition={swap}>`,
-    `          {${p.state} ? ${iconB} : ${iconA}}`,
-    '        </motion.span>',
-    '      </AnimatePresence>',
-    '    </button>',
+    ...tree,
     '  )',
     '}',
   ].join('\n')
@@ -392,7 +470,7 @@ export default defineTerm({
   order: 7,
   status: 'review',
   definition: 'One icon turns into another in place with a quick scale, fade and blur, like copy becoming a check.',
-  aliases: ['icon transition', 'copy to check', 'play to pause', 'icon morph', 'icon cross-fade', 'icon change animation'],
+  aliases: ['icon transition', 'copy to check', 'play to pause', 'icon cross-fade', 'icon change animation'],
   description:
     'An icon that changes with state deserves more than a visibility toggle, and less than a flourish. The incoming icon grows from 30% while it fades in, with a 3px blur sharpening away; the outgoing one does the reverse at the same time, in the same spot, so the change reads as one icon becoming another. The depth of the scale does the work: 0.3 reads as a swap, 0.8 reads as a glitch, and no scale reads as a flicker. The blur bridges the two shapes. A bounce-free spring, or a firm 300ms ease-out, carries it; bounce on an icon is a toy. Nothing swaps on page load: the icon for the first state is just there.',
   useWhen: [
@@ -405,12 +483,12 @@ export default defineTerm({
     'The first paint. The icon for the initial state is rendered at rest, with no entrance.',
     'Text labels. Swap words with a crossfade or a plain change, not a scale.',
     'Any bounce or overshoot. An icon that wobbles reads as a toy.',
-    'A timid scale (0.8 to 0.9) or no blur, which read as a glitch or a flicker.',
+    'A timid scale (0.8 to 0.9) or none, which read as a glitch or a flicker. Without blur, the two shapes show at once.',
   ],
   demo: {
     component: IconSwapDemo,
     label:
-      'A single icon button sits in a frame, showing a copy icon. The icon shrinks deep, fades and blurs away while a check grows into its place, sharp and settled within 300ms; it holds, then swaps back the same way. Under the frame, the values of the swap. On the entry page the button is real: pressing it swaps the icon and updates its label. The pair can be copy to check, play to pause or an outline heart filling in; the depth runs from the house 0.3 to a timid 0.8 to no scale at all, and the blur can be switched off.',
+      'A single icon button sits in a frame, showing a copy icon. The icon shrinks deep, fades and blurs away while a check grows into its place, sharp and settled within 300ms; it holds, then swaps back the same way. Beside the frame, the values of the swap. On the entry page the button is real: pressing it swaps the icon and reports the state (the copy button announces Copied and reverts after 1.5 seconds). The pair can be copy to check, play to pause or an outline heart filling in; the depth runs from the house 0.3 to a timid 0.8 to no scale at all, and the blur can be switched off.',
     controls,
     glyph: IconSwapGlyph,
   },
@@ -421,11 +499,11 @@ export default defineTerm({
     return [
       `Swap this button's icon when its state changes: ${p.from} to ${p.to}.`,
       '',
-      `- The swap: the incoming icon ${swapText(v)}; the outgoing icon the reverse, at the same time, in the same spot. Bounce 0, no back curve.`,
-      `- CSS route: render both icons; the resting one in flow (it sets the size), the other \`position: absolute; inset: 0\`; nothing unmounts. \`data-on\` on the button picks the shown one; the hidden one holds \`${hidden.join(' ')}\`. \`transition-property: opacity, transform, filter\`, ${SWAP_MS}ms, \`${EASE}\`.`,
-      `- Motion route: \`<AnimatePresence mode="popLayout" initial={false}>\` around one \`motion.span\` keyed by the state; \`initial\` and \`exit\` \`${mHidden}\`, \`animate\` \`${mShown}\`, \`transition={${SPRING}}\`.`,
-      '- No swap on page load: the icon for the first state is painted at rest (`initial={false}`).',
-      `- The button: \`<button type="button">\`, a 44px hit area, ${ariaText(v)}, set on the click, not when the swap settles. Enter and Space swap it like a click.`,
+      `- The incoming icon ${swapText(v)}; the outgoing icon the reverse, together, in the same spot. Bounce 0, no back curve.`,
+      `- The button: \`<button type="button">\`, \`position: relative; display: grid; place-items: center\`, 44px square; icons 16px. ${ariaText(v)} Enter and Space act like a click.`,
+      `- CSS route: both icons in the button, one in flow, the other \`position: absolute; inset: 0; margin: auto\`; nothing unmounts. \`data-on="true"\` on the swapped button picks the shown one; the hidden one holds \`${hidden.join(' ')}\`. \`transition-property: opacity, transform, filter\`, ${SWAP_MS}ms, \`${EASE}\`.`,
+      `- Motion route: in the button, \`<AnimatePresence mode="popLayout" initial={false}>\` around one \`motion.span\` keyed by the state; \`initial\` and \`exit\` \`${mHidden}\`, \`animate\` \`${mShown}\`, \`transition={${SPRING}}\`.`,
+      "- No swap on page load: the first state's icon is painted at rest (`initial={false}`).",
       v.depth === 'fade' && !v.blur
         ? '- Reduced motion: already `opacity` only; keep the same duration.'
         : `- Reduced motion: \`opacity\` only, same duration. CSS: \`transform: none; filter: none\` on both icons; Motion: \`useReducedMotion()\` drops${v.depth === 'fade' ? '' : ' `scale`'}${v.depth !== 'fade' && v.blur ? ' and' : ''}${v.blur ? ' `filter`' : ''}.`,
@@ -443,19 +521,23 @@ export default defineTerm({
         : `Sampled every frame from the click, the incoming icon's scale rises from about ${sc} toward 1 without passing it and its \`opacity\` from 0 to 1; both are settled (within 0.01) by ${SWAP_MS}ms (Motion: 350ms) from the first animated frame.`,
       "The button's `offsetWidth` and `offsetHeight` never change during the swap, and the two icons' boxes coincide.",
       'On page load nothing animates: `getAnimations()` on both icons is empty and the resting icon has `opacity` 1 in the first frame.',
-      'Clicked again mid-swap, it turns back from where it is: no jump to either end.',
+      p.status
+        ? 'Clicked again during the revert, it turns back from where it is: no jump to either end.'
+        : 'Clicked again mid-swap, it turns back from where it is: no jump to either end.',
       'Enter and Space swap it with the same animation.',
-      p.toggle
-        ? `\`aria-label\` stays \`${p.label[0]}\` and \`aria-pressed\` reads \`false\` before the click and \`true\` after; the button's hit area is at least 44 × 44px.`
-        : `\`aria-label\` reads \`${p.label[0]}\` before the click and \`${p.label[1]}\` after; the button's hit area is at least 44 × 44px.`,
+      p.status
+        ? `\`aria-label\` stays \`${p.label[0]}\`; the \`role="status"\` region reads \`${p.status}\` on the click, and the icon reverts about ${REVERT_MS / 1000}s later; the button's hit area is at least 44 × 44px.`
+        : p.toggle
+          ? `\`aria-label\` stays \`${p.label[0]}\` and \`aria-pressed\` reads \`false\` before the click, \`true\` after and \`false\` after the next; the button's hit area is at least 44 × 44px.`
+          : `\`aria-label\` reads \`${p.label[0]}\` before the click, \`${p.label[1]}\` after and \`${p.label[0]}\` after the next; the button's hit area is at least 44 × 44px.`,
       v.depth === 'fade' && !v.blur
-        ? `With reduced motion on, the swap is unchanged: \`opacity\` fades over ${SWAP_MS}ms.`
-        : `With reduced motion on, computed \`transform\` and \`filter\` are \`none\` in every frame while \`opacity\` still fades over ${SWAP_MS}ms.`,
+        ? `With reduced motion on, the swap is unchanged: \`opacity\` fades over the route's own duration (${SWAP_MS}ms CSS, 0.35s Motion), from the first animated frame.`
+        : `With reduced motion on, computed \`transform\` is \`none\` and \`filter\` is \`none\` or \`blur(0px)\` in every frame, while \`opacity\` fades over the route's own duration (${SWAP_MS}ms CSS, 0.35s Motion), from the first animated frame.`,
     ]
   },
   code: (v) => ({ css: cssCode(v), motion: motionCode(v) }),
   a11y:
-    'An icon-only button needs an `aria-label` that names the action, and a 44px hit area whatever the icon size. When the icon swaps, update the label (`Copy` to `Copied`) or `aria-pressed` for a toggle on the click, not when the animation settles, so assistive tech never waits for it. Enter and Space swap it like a click. Under reduced motion, keep the fade and drop the scale and blur.',
+    'An icon-only button needs an `aria-label` that names the action, and a 44px hit area whatever the icon size. Report the swap on the click, not when the animation settles, so assistive tech never waits for it: a copy button keeps its name and announces `Copied` in an always-mounted `role="status"` region, then reverts after about 1.5s; play to pause swaps the name; a toggle like Like keeps its name and flips `aria-pressed`. Enter and Space swap it like a click. Under reduced motion, keep the fade and drop the scale and blur.',
   related: ['overshoot', 'duration', 'ease-out', 'press-scale', 'crossfade'],
   confusedWith: [
     {
@@ -464,7 +546,8 @@ export default defineTerm({
     },
   ],
   sources: [
-    { label: 'Emil Kowalski: Great Animations', url: 'https://emilkowal.ski/ui/great-animations' },
+    { label: 'Jakub Krehel: Details that make interfaces feel better', url: 'https://jakub.kr/writing/details-that-make-interfaces-feel-better' },
+    { label: 'Emil Kowalski: 7 Practical Animation Tips', url: 'https://emilkowal.ski/ui/7-practical-animation-tips' },
     { label: 'Motion: AnimatePresence', url: 'https://motion.dev/docs/react-animate-presence' },
   ],
 })
