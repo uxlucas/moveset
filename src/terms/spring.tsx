@@ -519,7 +519,7 @@ export default defineTerm({
   name: 'Spring',
   category: 'motion',
   order: 3,
-  status: 'review',
+  status: 'published',
   definition: 'Motion driven by physics instead of a fixed duration, so it can carry velocity and settle naturally.',
   aliases: ['physics-based animation', 'springy motion', 'bouncy', 'it bounces a bit', 'spring physics', 'stiffness and damping'],
   description:

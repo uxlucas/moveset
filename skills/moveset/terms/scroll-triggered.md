@@ -253,6 +253,7 @@ With JavaScript off, or when the script fails, every card must be visible: hide 
 ## Related
 
 - [Scroll-linked](https://moveset.lucaslima.design/terms/scroll-linked)
+- [Stagger](https://moveset.lucaslima.design/terms/stagger)
 
 ## Often confused with
 

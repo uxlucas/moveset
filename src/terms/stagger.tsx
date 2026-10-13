@@ -386,7 +386,7 @@ export default defineTerm({
   name: 'Stagger',
   category: 'motion',
   order: 4,
-  status: 'review',
+  status: 'published',
   definition: 'Several items animate one after another with a small delay between each, creating a cascade.',
   aliases: ['cascade', 'staggered entrance', 'one after another', 'sequential reveal', 'staggerChildren', 'waterfall'],
   description:
