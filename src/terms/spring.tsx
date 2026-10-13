@@ -79,6 +79,13 @@ const HOLD_MS = 600
 // The demo sends the card back at 40% of the way, but never before this, so the short springs show an outbound leg.
 const MIN_BACK_MS = 90
 
+/** ms until the spring has covered `fraction` of the distance, from Motion's own generator. */
+function timeTo(p: Physics, fraction: number): number {
+  const gen = spring({ keyframes: [0, 1], stiffness: p.stiffness, damping: p.damping, mass: 1 })
+  for (let t = 0; t < 2000; t++) if (gen.next(t).value >= fraction) return t
+  return 2000
+}
+
 type Side = 'a' | 'b'
 
 /** The spring sampled into a CSS linear() easing over its duration, by Motion's own spring generator. */
@@ -170,8 +177,7 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
 
   // A new animate() on a value replaces the running one from the current position. Motion hands it the current
   // velocity, and the physics spring keeps it (duration/bounce springs would drop it). The velocity is also passed
-  // explicitly, read before the old animation stops: started from inside a frame callback, Motion's own reading (taken
-  // after the stop) measured 0. The twin's curve starts over from where it is.
+  // explicitly, so the handoff does not depend on when Motion samples it. The twin's curve starts over from where it is.
   // Slow motion stretches time: stiffness by timeScale², damping by timeScale; the measured velocity is already slowed.
   const send = (side: Side, instant = false) => {
     const root = rootRef.current
@@ -196,13 +202,14 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
   }
 
   // One cycle: home (a no-op unless a replay lands mid-move), a beat, off toward the far end, and at 40% of the way
-  // (never before 90ms) sent back home. Both cards get each command at the same instant. The still frame is home.
+  // sent back home: never before 90ms, so the short springs show an outbound leg, but always before 75% of the way, so
+  // the card is still mid-flight. Both cards get each command at the same instant. The still frame is home.
   useCycle(
     () => {
       const go = (side: Side) => () => {
         if (!taken.current) send(side)
       }
-      const backAt = REST_MS + Math.max(physics.at40, MIN_BACK_MS)
+      const backAt = REST_MS + Math.min(Math.max(physics.at40, MIN_BACK_MS), timeTo(physics, 0.75))
       return {
         steps: [
           [
@@ -369,10 +376,9 @@ function jsCode(v: V): string {
     '  // Reduced motion, or a click from the keyboard (Enter or Space report',
     '  // detail 0): jump to the other spot.',
     '  if (reduced.matches || event.detail === 0) return x.jump(to)',
-    '  // Retargets mid-move from the current position and velocity. Passing the',
-    '  // velocity makes the handoff explicit (Motion reads its own after stopping',
-    '  // the old animation, which inside a frame callback can come out 0). Never',
-    '  // wait for the move to end.',
+    '  // Retargets mid-move from the current position and velocity. The velocity',
+    '  // is passed explicitly so the handoff does not depend on when Motion',
+    '  // samples it. Never wait for the move to end.',
     '  animate(x, to, { ...spring, velocity: x.getVelocity() })',
     '})',
     ...(v.compare === 'ease-out'
@@ -419,10 +425,9 @@ function motionCode(v: V): string {
     '    // Reduced motion, or a click from the keyboard (Enter or Space report',
     '    // detail 0): jump to the other spot.',
     '    if (reduced || event.detail === 0) return x.jump(to)',
-    '    // Retargets mid-move from the current position and velocity. Passing the',
-    '    // velocity makes the handoff explicit (Motion reads its own after stopping',
-    '    // the old animation, which inside a frame callback can come out 0). Never',
-    '    // wait for the move to end.',
+    '    // Retargets mid-move from the current position and velocity. The velocity',
+    '    // is passed explicitly so the handoff does not depend on when Motion',
+    '    // samples it. Never wait for the move to end.',
     '    animate(x, to, { ...spring, velocity: x.getVelocity() })',
     '  }',
     '',
