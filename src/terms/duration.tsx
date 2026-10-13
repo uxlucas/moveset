@@ -52,9 +52,12 @@ function verdict(ms: number, kind: Kind): string {
 const CLOSED_MS = 400
 const HOLD_MS = 1000
 const HINT = 'Hold a frame to play it'
+const HINT_HOVER = 'Hover a trigger to play it'
 const HINT_HELD = 'Let go to close it'
+const HINT_HOVERING = 'Move away to close it'
 
-type Hold = { pointerId: number; item: HTMLElement }
+// One gesture owns the stage at a time: a mouse hovering the tooltip's trigger, or a pointer holding a frame.
+type Gesture = { type: 'hover' | 'hold'; pointerId: number; item: HTMLElement }
 
 // Each element's closed and open look. The duration of the state it heads to times the move: --x closing, --d opening.
 // Under reduced motion a held element does not move; it fades over the same durations. Play keeps its full cycle.
@@ -79,8 +82,9 @@ function Element({ kind, ms, detail }: { kind: Kind; ms: number; detail: boolean
             <span className={`h-1.5 rounded-full bg-surface ${detail ? 'w-12' : 'w-7'}`} />
           </span>
         </span>
+        {/* The trigger. On the entry page a mouse hovers it, so `hit` gives the cursor a 44px-tall zone to cross. */}
         <span className={`absolute inset-x-0 top-[58%] flex justify-center`}>
-          <span className={`rounded-md bg-surface shadow-card ${detail ? 'h-7 w-14' : 'h-5 w-9'}`} />
+          <span data-duration-trigger="" className={`rounded-md bg-surface shadow-card ${detail ? 'hit h-7 w-14' : 'h-5 w-9'}`} />
         </span>
       </>
     )
@@ -141,16 +145,17 @@ function Column({ kind, ms, exit, timeScale, detail }: { kind: Kind; ms: number;
     <div data-duration-column="" data-ms={ms} data-verdict={word} className={`flex min-w-0 flex-1 flex-col ${detail ? 'max-w-44 gap-2' : 'max-w-[92px] gap-1.5'}`}>
       <p className={`font-mono tabular-nums ${text} ${word === 'right' ? 'text-ink' : 'text-ink-muted'}`}>{ms}ms</p>
       {detail ? (
-        // On the entry page the frame is held to open its element. The items start open, so the button starts pressed.
-        // A still hold must not select text or open the long-press menu; a vertical swipe still scrolls the page
-        // (the browser then cancels the pointer, which closes the element).
+        // On the entry page the frame is held to open its element (the tooltip, with a mouse, is hovered instead, and
+        // tooltips never change the cursor). The items start open, so the button starts pressed. A still hold must
+        // not select text or open the long-press menu; a vertical swipe still scrolls the page (the browser then
+        // cancels the pointer, which closes the element).
         <button
           type="button"
           data-duration-frame=""
           aria-pressed="true"
           aria-label={`${ms}ms ${KINDS[kind].name}`}
           style={vars}
-          className={`${frame} cursor-pointer touch-pan-y select-none [-webkit-touch-callout:none]`}
+          className={`${frame} touch-pan-y select-none [-webkit-touch-callout:none] ${kind === 'tooltip' ? '' : 'cursor-pointer'}`}
         >
           <Element kind={kind} ms={ms} detail={detail} />
         </button>
@@ -173,11 +178,11 @@ function setOpen(item: HTMLElement, open: boolean) {
 
 function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }: DemoProps<V>) {
   const rootRef = useRef<HTMLDivElement>(null)
-  // Set when the visitor holds a frame; the cycle then leaves the stage alone until a replay or a control change.
-  // Pausing (off screen, hidden tab) and resuming keeps the visitor in charge.
+  // Set when the visitor hovers or holds a frame; the cycle then leaves the stage alone until a replay or a control
+  // change. Pausing (off screen, hidden tab) and resuming keeps the visitor in charge.
   const taken = useRef(false)
   const takenIn = useRef('')
-  const hold = useRef<Hold | null>(null)
+  const gesture = useRef<Gesture | null>(null)
   const hintRef = useRef<HTMLParagraphElement>(null)
   const kind = values.element
   const slowestExit = exitOf(COLUMNS[COLUMNS.length - 1], values)
@@ -185,26 +190,41 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
 
   const items = () => [...(rootRef.current?.querySelectorAll<HTMLElement>('[data-duration-item]') ?? [])]
 
-  const setHeld = (held: Hold | null) => {
-    hold.current = held
-    if (hintRef.current) hintRef.current.textContent = held ? HINT_HELD : HINT
+  // The hint shows the line for the gesture under way (data-gesture), or its resting lines for the pointer at hand.
+  const setGesture = (g: Gesture | null) => {
+    gesture.current = g
+    if (!hintRef.current) return
+    if (g) hintRef.current.dataset.gesture = g.type
+    else delete hintRef.current.dataset.gesture
   }
 
   const setTaken = (on: boolean) => {
     taken.current = on
     takenIn.current = on ? cycleKey : ''
     if (rootRef.current) rootRef.current.dataset.takenOver = String(on)
-    if (!on) setHeld(null)
+    if (!on) setGesture(null)
   }
 
-  // The first gesture ends the cycle and hands the stage over closed: the pressed element snaps shut, so its open is
-  // seen in full from the first hold, and the other two close at their exit durations.
+  // The first gesture, hover or hold, ends the cycle and hands the stage over closed: the gestured element snaps
+  // shut, so its open is seen in full from the first gesture, and the other two close at their exit durations.
   const takeOver = (item: HTMLElement) => {
     const root = rootRef.current
     if (taken.current || !root) return
     setTaken(true)
     snap(root, () => setOpen(item, false))
     for (const el of items()) if (el !== item) setOpen(el, false)
+  }
+
+  // Hover and hold are one gesture with two triggers: begin takes the stage and opens the element at its duration,
+  // end closes it at its exit duration. One gesture at a time.
+  const begin = (type: Gesture['type'], pointerId: number, item: HTMLElement) => {
+    takeOver(item)
+    setGesture({ type, pointerId, item })
+    setOpen(item, true)
+  }
+  const end = (g: Gesture) => {
+    setGesture(null)
+    setOpen(g.item, false)
   }
 
   // One cycle: all three close at once (if open), a beat closed, all three open at the same instant, and hold.
@@ -246,34 +266,51 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
 
   const frameOf = (target: EventTarget) => (target as HTMLElement).closest<HTMLElement>('[data-duration-frame]')
   const itemOf = (frame: HTMLElement) => frame.querySelector<HTMLElement>('[data-duration-item]')
+  const triggerOf = (target: EventTarget) => (target as HTMLElement).closest<HTMLElement>('[data-duration-trigger]')
+  // A mouse plays the tooltip by hovering its trigger, as a tooltip is used; every other case is a hold.
+  const hovers = (e: PointerEvent<HTMLDivElement>) => kind === 'tooltip' && e.pointerType === 'mouse'
 
-  // Press and hold opens that frame's element at its duration; letting go closes it at its exit duration, as hover in
-  // and hover out would for a tooltip. The capture keeps the release on the frame wherever the pointer has gone.
-  // Under reduced motion the transition still runs, with no scale or slide: a fade over the same durations (ITEM).
+  // The trigger has no children, so pointerover on it is the mouse arriving and pointerout the mouse leaving.
+  const onPointerOver = (e: PointerEvent<HTMLDivElement>) => {
+    const trigger = triggerOf(e.target)
+    const frame = trigger && frameOf(trigger)
+    const item = frame && itemOf(frame)
+    if (size !== 'detail' || !trigger || !item || !hovers(e) || gesture.current) return
+    begin('hover', e.pointerId, item)
+  }
+
+  const onPointerOut = (e: PointerEvent<HTMLDivElement>) => {
+    const g = gesture.current
+    if (!g || g.type !== 'hover' || e.pointerId !== g.pointerId || !triggerOf(e.target)) return
+    end(g)
+  }
+
+  // Press and hold opens that frame's element at its duration; letting go closes it at its exit duration. The capture
+  // keeps the release on the frame wherever the pointer has gone. With a mouse the tooltip's press does nothing: hover
+  // owns it. Under reduced motion the transition still runs, with no scale or slide: a fade over the same durations
+  // (ITEM).
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     const frame = frameOf(e.target)
     const item = frame && itemOf(frame)
-    if (size !== 'detail' || !frame || !item || !e.isPrimary || e.button !== 0 || hold.current) return
+    if (size !== 'detail' || !frame || !item || !e.isPrimary || e.button !== 0 || hovers(e) || gesture.current) return
     frame.setPointerCapture(e.pointerId)
-    takeOver(item)
-    setHeld({ pointerId: e.pointerId, item })
-    setOpen(item, true)
+    begin('hold', e.pointerId, item)
   }
 
   // pointerup, pointercancel, or the capture lost: whichever comes first ends the hold.
   const onRelease = (e: PointerEvent<HTMLDivElement>) => {
-    const held = hold.current
-    if (!held || e.pointerId !== held.pointerId) return
-    setHeld(null)
-    setOpen(held.item, false)
+    const g = gesture.current
+    if (!g || g.type !== 'hold' || e.pointerId !== g.pointerId) return
+    end(g)
   }
 
-  // Pointer clicks are handled as presses above. A click from the keyboard (Enter or Space reports detail 0) toggles
-  // the element open and closed. Opening something with Enter still animates, so these run at the same durations.
+  // Pointer clicks are handled as presses or hovers above. A click from the keyboard (Enter or Space reports detail 0)
+  // toggles the element open and closed. Opening something with Enter still animates, so these run at the same
+  // durations.
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     const frame = frameOf(e.target)
     const item = frame && itemOf(frame)
-    if (size !== 'detail' || !frame || !item || e.detail !== 0 || hold.current) return
+    if (size !== 'detail' || !frame || !item || e.detail !== 0 || gesture.current) return
     takeOver(item)
     setOpen(item, item.dataset.open !== 'true')
   }
@@ -287,12 +324,14 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
       style={ease}
       data-taken-over="false"
       onClick={onClick}
+      onPointerOver={onPointerOver}
+      onPointerOut={onPointerOut}
       onPointerDown={onPointerDown}
       onPointerUp={onRelease}
       onPointerCancel={onRelease}
       onLostPointerCapture={onRelease}
       onContextMenu={(e) => {
-        if (hold.current) e.preventDefault()
+        if (gesture.current?.type === 'hold') e.preventDefault()
       }}
       className={`group/stage flex h-full flex-col items-center justify-center ${detail ? 'gap-3 px-4' : 'px-3'}`}
     >
@@ -307,8 +346,19 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
         ))}
       </div>
       {detail && (
-        <p ref={hintRef} aria-hidden className="mt-3 font-mono text-[11px] text-ink-muted">
-          {HINT}
+        // Resting, the tooltip's hint names the gesture for the pointer at hand (a fine pointer hovers, a coarse one
+        // holds); the other elements are always held. While a gesture is under way (data-gesture) its line shows.
+        <p ref={hintRef} aria-hidden className="group/hint mt-3 font-mono text-[11px] text-ink-muted">
+          {kind === 'tooltip' ? (
+            <>
+              <span className="pointer-coarse:hidden group-data-[gesture]/hint:hidden">{HINT_HOVER}</span>
+              <span className="hidden pointer-coarse:inline group-data-[gesture]/hint:hidden">{HINT}</span>
+            </>
+          ) : (
+            <span className="group-data-[gesture]/hint:hidden">{HINT}</span>
+          )}
+          <span className="hidden group-data-[gesture=hover]/hint:inline">{HINT_HOVERING}</span>
+          <span className="hidden group-data-[gesture=hold]/hint:inline">{HINT_HELD}</span>
         </p>
       )}
     </div>
@@ -507,7 +557,7 @@ export default defineTerm({
   demo: {
     component: DurationDemo,
     label:
-      'Three identical frames side by side, labelled 150ms, 300ms and 500ms. In each, the same dropdown opens at the same instant on the same curve, so the 150ms one lands first and the 500ms one last; under each, a verdict says whether that duration suits the element. They hold, then close about 25% faster. On the entry page, holding a frame opens that one element at its duration, and letting go closes it at its exit duration. Switching to a tooltip or a full-height sheet changes the element and the verdicts: 150ms is right for a tooltip and abrupt for a sheet.',
+      'Three identical frames side by side, labelled 150ms, 300ms and 500ms. In each, the same dropdown opens at the same instant on the same curve, so the 150ms one lands first and the 500ms one last; under each, a verdict says whether that duration suits the element. They hold, then close about 25% faster. On the entry page, holding a frame opens that one element at its duration, and letting go closes it at its exit duration; the tooltip plays on hover with a mouse (onto its trigger to open, away to close) and on hold on touch. Switching to a tooltip or a full-height sheet changes the element and the verdicts: 150ms is right for a tooltip and abrupt for a sheet.',
     controls,
     glyph: DurationGlyph,
   },
