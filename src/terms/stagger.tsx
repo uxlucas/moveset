@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from 'react'
+import { useRef } from 'react'
 import { scaled } from '@/components/demo/playback'
 import { snap, useCycle } from '@/components/demo/use-cycle'
 import { GlyphSvg } from '@/components/site/glyph'
@@ -62,7 +62,7 @@ function steps(order: V['order'], count = COUNT): number[] {
 
 const LINE = ['w-3/4', 'w-1/2', 'w-2/3', 'w-2/5', 'w-3/5', 'w-1/2']
 
-function List({ size, n, label, kind }: { size: DemoProps['size']; n: number[]; label?: string; kind: 'stagger' | 'all' }) {
+function List({ size, label, kind }: { size: DemoProps['size']; label?: string; kind: 'stagger' | 'all' }) {
   const detail = size === 'detail'
   return (
     <div data-list={kind} className={detail ? 'w-[136px] sm:w-52' : 'w-[104px]'}>
@@ -74,18 +74,17 @@ function List({ size, n, label, kind }: { size: DemoProps['size']; n: number[]; 
         data-stagger-list=""
         className={`flex flex-col transition-[opacity,transform] duration-0 ease-(--ease-out) group-data-[phase=leave]/stage:duration-(--x) group-data-[phase=leave]/stage:opacity-0 group-data-[phase=leave]/stage:[transform:translateY(-4px)] group-data-[phase=out]/stage:duration-(--x) group-data-[phase=out]/stage:opacity-0 group-data-[phase=out]/stage:[transform:translateY(-4px)] ${detail ? 'gap-2' : 'gap-1'}`}
       >
-        {n.map((step, i) => (
+        {LINE.map((line, i) => (
           <li
             key={i}
             data-stagger-item=""
-            data-n={step}
-            style={{ '--n': step } as CSSProperties}
             // A one-shot entrance, so keyframes: `both` holds the hidden frame through the delay. The item keeps its
-            // space the whole time. Leaving mid-cascade, each item freezes where it is while the list fades.
+            // space the whole time. Leaving mid-cascade, each item freezes where it is while the list fades. Its step
+            // (`--n`, `data-n`) is written by the cycle, not rendered: see StaggerDemo.
             className={`flex items-center rounded-lg bg-surface shadow-card [animation-delay:calc(var(--n)*var(--step))] [animation-duration:var(--d)] [animation-fill-mode:both] [animation-timing-function:var(--ease-out)] group-data-[phase=in]/stage:[animation-name:demo-stagger-in] group-data-[phase=leave]/stage:[animation-name:demo-stagger-in] group-data-[phase=leave]/stage:[animation-play-state:paused] ${detail ? 'h-7 gap-2 px-2.5' : 'h-[18px] gap-1.5 px-1.5'}`}
           >
             <span className={`shrink-0 rounded-sm ${kind === 'stagger' ? 'bg-demo-subject' : 'bg-demo-2'} ${detail ? 'size-3' : 'size-2'}`} />
-            <span className={`h-1.5 rounded-full bg-demo-2 ${LINE[i]}`} />
+            <span className={`h-1.5 rounded-full bg-demo-2 ${line}`} />
           </li>
         ))}
       </ul>
@@ -104,21 +103,44 @@ function StaggerDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }
   // items keep their entrance, paused where it is; `in` restarts the entrance. Just before it, `reset` (set and cleared
   // in the same task, never painted) drops the old animation, since the same keyframes name would not replay, and puts
   // the list back in place in the same flip.
+  // The timing the items run on (`--n`, `--step`, `--d`) is written here, never rendered: a control change re-renders
+  // at once, and new timing on a paused entrance would re-time it in the frame the list is still fully visible. So the
+  // leaving cycle keeps the old values until `in` (or the still frame) writes the new ones. `--x`, the list's exit, is
+  // written as the exit starts.
   useCycle(
     () => {
       const root = rootRef.current
       const phase = (p: 'still' | 'in' | 'out' | 'leave' | 'reset') => {
         if (root) root.dataset.phase = p
       }
+      const timing = () => {
+        if (!root) return
+        root.style.setProperty('--step', `${scaled(delay, timeScale)}ms`)
+        root.style.setProperty('--d', `${scaled(ENTER_MS, timeScale)}ms`)
+        for (const list of root.querySelectorAll<HTMLElement>('[data-list]')) {
+          list.querySelectorAll<HTMLElement>('[data-stagger-item]').forEach((item, i) => {
+            const k = list.dataset.list === 'all' ? 0 : n[i]
+            item.style.setProperty('--n', String(k))
+            item.dataset.n = String(k)
+          })
+        }
+      }
+      const exit = () => root?.style.setProperty('--x', `${scaled(EXIT_MS, timeScale)}ms`)
       const inAt = EXIT_MS + GAP_MS
       return {
         steps: [
-          [0, () => phase(root?.dataset.phase === 'in' || root?.dataset.phase === 'leave' ? 'leave' : 'out')],
+          [
+            0,
+            () => {
+              exit()
+              phase(root?.dataset.phase === 'in' || root?.dataset.phase === 'leave' ? 'leave' : 'out')            },
+          ],
           [
             inAt,
             () => {
               if (!root) return
               phase('reset')
+              timing()
               void root.offsetWidth
               phase('in')
             },
@@ -126,7 +148,12 @@ function StaggerDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }
         ],
         endMs: inAt + Math.min(Math.max(...n), CAP) * delay + ENTER_MS + HOLD_MS,
         still: () => {
-          if (root) snap(root, () => phase('still'))
+          if (!root) return
+          snap(root, () => {
+            exit()
+            timing()
+            phase('still')
+          })
         },
       }
     },
@@ -134,21 +161,15 @@ function StaggerDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }
     `${values.delay}|${values.order}|${values.compare}`,
   )
 
-  const vars = {
-    '--step': `${scaled(delay, timeScale)}ms`,
-    '--d': `${scaled(ENTER_MS, timeScale)}ms`,
-    '--x': `${scaled(EXIT_MS, timeScale)}ms`,
-  } as CSSProperties
   const compare = values.compare === 'all'
   return (
     <div
       ref={rootRef}
       data-phase="still"
-      style={vars}
       className={`group/stage flex h-full items-center justify-center ${size === 'detail' ? 'gap-4 sm:gap-16' : 'gap-6'}`}
     >
-      <List size={size} n={n} kind="stagger" label={compare ? `${delay}ms stagger` : undefined} />
-      {compare && <List size={size} n={n.map(() => 0)} kind="all" label="all at once" />}
+      <List size={size} kind="stagger" label={compare ? `${delay}ms stagger` : undefined} />
+      {compare && <List size={size} kind="all" label="all at once" />}
     </div>
   )
 }
@@ -166,7 +187,7 @@ function StaggerGlyph({ active }: GlyphProps) {
 const ORDER_TEXT: Record<V['order'], string> = {
   forward: 'first item first (`--n` = index)',
   reverse: 'last item first (`--n` = count - 1 - index)',
-  center: 'middle out (`--n` for 6 items: 2, 1, 0, 0, 1, 2)',
+  center: 'middle out: `--n` = distance from the middle, rounded down (6 items: 2, 1, 0, 0, 1, 2)',
 }
 
 // The Motion child-delay function for each order: Motion passes (index, total). Inline in `transition` the parameters
@@ -402,7 +423,7 @@ export default defineTerm({
       '- Plays on mount or when state shows the list; remounts replay, re-renders do not.',
       '- Hidden items keep their space (`opacity`, not `display: none`), clickable and focusable: no `pointer-events: none` or `inert`.',
       `- Exit: the whole list as one, ${EXIT_MS}ms ease-out, to \`opacity: 0; translate: 0 -4px\`; never per item. CSS: \`data-leaving\` on the list (a transition), items \`animation-play-state: paused\`, unmount on \`transitionend\`. Motion: \`exit\` on the list.`,
-      ...(v.compare === 'all' ? ['- Comparison only: a twin list, every delay 0, started together.'] : []),
+      ...(v.compare === 'all' ? ['- Comparison only: a twin list, every delay 0.'] : []),
       '- Reduced motion: no stagger, movement or blur; items fade in together over 150ms, the exit only fades. CSS: `animation: fade-in 150ms both` on items, `translate: none` on `[data-leaving]`. Motion: `useReducedMotion()`, `opacity` only.',
     ].join('\n')
   },

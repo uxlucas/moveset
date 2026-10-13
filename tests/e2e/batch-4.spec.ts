@@ -190,12 +190,12 @@ test.describe('Stagger', () => {
     await expect(prompt(page)).toContainText('`stagger(0.03, { from: "last" })`, uncapped')
     await expect(prompt(page)).not.toContainText('first item first')
     await option(page, 'Order', 'Center out').click()
-    await expect(prompt(page)).toContainText('middle out (`--n` for 6 items: 2, 1, 0, 0, 1, 2)')
+    await expect(prompt(page)).toContainText('middle out: `--n` = distance from the middle, rounded down (6 items: 2, 1, 0, 0, 1, 2)')
     await expect(prompt(page)).toContainText('Math.min(Math.floor(Math.abs(i - (total - 1) / 2)), 6) * 0.03')
     await expect(prompt(page)).not.toContainText('from: "last"')
 
     await option(page, 'Compare', 'All at once').click()
-    await expect(prompt(page)).toContainText('Comparison only: a twin list, every delay 0, started together.')
+    await expect(prompt(page)).toContainText('Comparison only: a twin list, every delay 0.')
     await option(page, 'Compare', 'None').click()
     await expect(prompt(page)).not.toContainText('Comparison only')
   })
@@ -250,47 +250,71 @@ test.describe('Stagger', () => {
     expect(names).toEqual(Array.from({ length: 6 }, () => 'demo-stagger-in'))
   })
 
-  test('a replay mid-cascade never flashes the items still waiting; the list leaves as one', async ({ page }) => {
-    await page.goto('/terms/stagger')
-    await expect(demo(page, 'stagger')).toHaveAttribute('data-playing', 'true')
-    // A control change starts a new cycle with the 100ms step; wait for its cascade on the frame clock.
-    await option(page, 'Delay', '100ms (slow)').click()
-    const stage = demo(page, 'stagger').locator('[data-phase]')
-    await expect(stage).toHaveAttribute('data-phase', /^(out|leave)$/)
-    const result = await stage.evaluate(async (root: HTMLElement) => {
-      const frame = () => new Promise((r) => requestAnimationFrame(r))
-      const items = [...root.querySelectorAll<HTMLElement>('[data-list="stagger"] [data-stagger-item]')]
-      const list = root.querySelector<HTMLElement>('[data-list="stagger"] [data-stagger-list]')!
-      const opacities = () => items.map((el) => Number(getComputedStyle(el).opacity))
-      // 250ms into the cascade, timed from the frame it starts.
-      while (root.dataset.phase !== 'in') await frame()
-      const start = performance.now()
-      while (performance.now() - start < 250) await frame()
-      const before = opacities()
-      document.querySelector<HTMLButtonElement>('button[aria-label="Replay"]')!.click()
-      // Frames until the replay lands (React runs the new cycle after the click), keeping the last cascade frame.
-      let last = before
-      while (root.dataset.phase === 'in') {
-        last = opacities()
+  // Anything that starts a new cycle mid-cascade: Replay, and the controls (a change re-renders the demo at once).
+  for (const interrupt of [
+    { name: 'a replay', group: null, button: 'Replay' },
+    { name: 'an Order change', group: 'Order', button: 'Reverse' },
+    { name: 'a Delay change', group: 'Delay', button: '60ms' },
+  ]) {
+    test(`${interrupt.name} mid-cascade never flashes or re-times the items; the list leaves as one`, async ({ page }) => {
+      await page.goto('/terms/stagger')
+      await expect(demo(page, 'stagger')).toHaveAttribute('data-playing', 'true')
+      // A control change starts a new cycle with the 100ms step; wait for its cascade on the frame clock.
+      await option(page, 'Delay', '100ms (slow)').click()
+      const stage = demo(page, 'stagger').locator('[data-phase]')
+      await expect(stage).toHaveAttribute('data-phase', /^(out|leave)$/)
+      const result = await stage.evaluate(async (root: HTMLElement, { group, button }) => {
+        const frame = () => new Promise((r) => requestAnimationFrame(r))
+        const items = [...root.querySelectorAll<HTMLElement>('[data-list="stagger"] [data-stagger-item]')]
+        const list = root.querySelector<HTMLElement>('[data-list="stagger"] [data-stagger-list]')!
+        const opacities = () => items.map((el) => Number(getComputedStyle(el).opacity))
+        const target = group
+          ? [...document.querySelectorAll<HTMLButtonElement>(`[role="group"][aria-label="${group}"] button`)].find((b) => b.textContent === button)!
+          : document.querySelector<HTMLButtonElement>(`button[aria-label="${button}"]`)!
+        // 250ms into the cascade, timed from the frame it starts.
+        while (root.dataset.phase !== 'in') await frame()
+        const start = performance.now()
+        while (performance.now() - start < 250) await frame()
+        const before = opacities()
+        target.click()
+        // Frames until the new cycle lands (React runs it after the click), keeping the last cascade frame.
+        let last = before
+        // Any painted frame between the click and the switch: no item may drop, or jump up faster than the
+        // entrance itself allows (a re-timed item would pop in or out here).
+        let worstDrop = 0
+        let worstJump = 0
+        while (root.dataset.phase === 'in') {
+          const now = opacities()
+          now.forEach((o, i) => {
+            worstDrop = Math.max(worstDrop, last[i] - o)
+            worstJump = Math.max(worstJump, o - last[i])
+          })
+          last = now
+          await frame()
+        }
+        const atSwitch = opacities()
         await frame()
-      }
-      const atSwitch = opacities()
-      await frame()
-      const next = opacities()
-      await frame()
-      const listOpacity = Number(getComputedStyle(list).opacity)
-      return { phase: String(root.getAttribute('data-phase')), before, last, atSwitch, next, listOpacity }
+        const next = opacities()
+        await frame()
+        const listOpacity = Number(getComputedStyle(list).opacity)
+        return { phase: String(root.getAttribute('data-phase')), before, last, atSwitch, next, listOpacity, worstDrop, worstJump }
+      }, interrupt)
+      expect(result.phase).toBe('leave')
+      expect(result.worstDrop).toBeLessThanOrEqual(0.001)
+      expect(result.worstJump).toBeLessThan(0.75)
+      // Mid-cascade: some items in, some still waiting.
+      expect(result.before.some((o) => o > 0.9)).toBe(true)
+      expect(result.before.some((o) => o === 0)).toBe(true)
+      result.atSwitch.forEach((o, i) => {
+        // No visible item drops out, and the waiting ones stay at 0: nothing was re-timed.
+        expect(o).toBeGreaterThanOrEqual(result.last[i] - 0.001)
+        if (result.last[i] === 0) expect(o).toBe(0)
+        // Once the list is leaving, every item holds: no opacity rises on the next frame.
+        expect(result.next[i]).toBeLessThanOrEqual(o + 0.001)
+        expect(result.next[i]).toBeGreaterThanOrEqual(o - 0.001)
+      })
+      // The list itself is fading.
+      expect(result.listOpacity).toBeLessThan(1)
     })
-    expect(result.phase).toBe('leave')
-    // Mid-cascade: some items in, some still waiting.
-    expect(result.before.some((o) => o > 0.9)).toBe(true)
-    expect(result.before.some((o) => o === 0)).toBe(true)
-    // No item's opacity rises once the list is leaving, and the waiting ones stay at 0.
-    result.atSwitch.forEach((o, i) => {
-      expect(result.next[i]).toBeLessThanOrEqual(o + 0.001)
-      if (result.last[i] === 0) expect(o).toBe(0)
-    })
-    // The list itself is fading.
-    expect(result.listOpacity).toBeLessThan(1)
-  })
+  }
 })
