@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { expectNoHorizontalOverflow, trackErrors } from './helpers'
 
 const card = (page: Page, slug: string) => page.locator(`[data-testid="term-card"][data-slug="${slug}"]`)
@@ -6,6 +6,26 @@ const demo = (page: Page, slug: string) => page.locator(`main [data-demo="${slug
 const prompt = (page: Page) => page.getByRole('main').locator('pre').first()
 const option = (page: Page, control: string, name: string) =>
   page.getByRole('group', { name: control }).getByRole('button', { name, exact: true })
+
+/** A mouse on desktop; a real touch (through CDP) on mobile, so `touch-action` and touch pointer events are in play. */
+async function pointerOn(page: Page, target: Locator, isMobile: boolean) {
+  const box = (await target.boundingBox())!
+  const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  const cdp = isMobile ? await page.context().newCDPSession(page) : null
+  return {
+    down: async () => {
+      if (cdp) await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] })
+      else {
+        await page.mouse.move(at.x, at.y)
+        await page.mouse.down()
+      }
+    },
+    up: async () => {
+      if (cdp) await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      else await page.mouse.up()
+    },
+  }
+}
 
 for (const { slug, name, subject } of [
   { slug: 'duration', name: 'Duration', subject: '[data-duration-item]' },
@@ -133,6 +153,163 @@ test.describe('Duration', () => {
     expect(b).toBeLessThan(c)
     expect(c - a).toBeGreaterThan(150)
     expect(c).toBeLessThan(600)
+  })
+
+  const frame = (page: Page, ms: number, kind = 'dropdown') => demo(page, 'duration').getByRole('button', { name: `Open the ${ms}ms ${kind}` })
+  const hint = (page: Page) => demo(page, 'duration').locator('p[aria-hidden]')
+  const stage = (page: Page) => demo(page, 'duration').locator('[data-taken-over]')
+  /** data-open of the three items, by column. */
+  const opens = (page: Page) =>
+    demo(page, 'duration').locator('[data-duration-item]').evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.open))
+  /** The computed transition-duration of one item, in ms. */
+  const durationOf = (page: Page, ms: number) =>
+    demo(page, 'duration')
+      .locator(`[data-duration-item][data-ms="${ms}"]`)
+      .evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration) * 1000)
+
+  type Opened = { t: number; o: number }[]
+  /** From the next pointerdown or click on, records the item's opacity every frame until it is fully opaque. */
+  const recordOpen = (page: Page, ms: number) =>
+    demo(page, 'duration')
+      .locator(`[data-duration-item][data-ms="${ms}"]`)
+      .evaluate((el) => {
+        const rec: Opened = []
+        ;(window as unknown as { rec: Opened }).rec = rec
+        const start = () => {
+          const t0 = performance.now()
+          const tick = () => {
+            const o = Number(getComputedStyle(el).opacity)
+            rec.push({ t: performance.now() - t0, o })
+            if (o < 0.999 && performance.now() - t0 < 1500) requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        }
+        window.addEventListener('pointerdown', start, { once: true, capture: true })
+        window.addEventListener('keydown', start, { once: true, capture: true })
+      })
+  const recorded = (page: Page) => page.evaluate(() => (window as unknown as { rec: Opened }).rec)
+
+  test('held, a frame opens its own element at its duration and the other two stay closed; let go, it closes at its exit duration', async ({ page, isMobile }) => {
+    await page.goto('/terms/duration')
+    await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
+    await expect(hint(page)).toHaveText('Hold a frame to open it')
+    await expect(frame(page, 150)).toBeVisible()
+    await expect(frame(page, 500)).toBeVisible()
+    await recordOpen(page, 300)
+    const pointer = await pointerOn(page, frame(page, 300), isMobile)
+    await pointer.down()
+    await expect(hint(page)).toHaveText('Let go to close it')
+    await expect(frame(page, 300)).toHaveAttribute('aria-pressed', 'true')
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+    expect(await opens(page)).toEqual(['false', 'true', 'false'])
+    expect(await durationOf(page, 300)).toBeCloseTo(300, 1)
+    await page.waitForTimeout(600)
+    const rec = await recorded(page)
+    // It faded in over its own duration: in-between frames, never a jump, fully there between 150ms and 300ms (+slack).
+    expect(rec.some((f) => f.o > 0.05 && f.o < 0.95)).toBe(true)
+    for (let i = 1; i < rec.length; i++) expect(rec[i].o).toBeGreaterThanOrEqual(rec[i - 1].o - 0.001)
+    const landed = rec.find((f) => f.o >= 0.999)!
+    expect(landed.t).toBeGreaterThan(150)
+    expect(landed.t).toBeLessThan(450)
+    // Still held: the other two have not been opened by the cycle.
+    expect(await opens(page)).toEqual(['false', 'true', 'false'])
+    await pointer.up()
+    await expect(frame(page, 300)).toHaveAttribute('aria-pressed', 'false')
+    await expect(hint(page)).toHaveText('Hold a frame to open it')
+    expect(await opens(page)).toEqual(['false', 'false', 'false'])
+    expect(await durationOf(page, 300)).toBeCloseTo(225, 1)
+    // The stage rests as the visitor left it.
+    await page.waitForTimeout(300)
+    expect(await opens(page)).toEqual(['false', 'false', 'false'])
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+    await expect(frame(page, 300)).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('a hold ends the running cycle; Replay hands the stage back to it', async ({ page, isMobile }) => {
+    await page.goto('/terms/duration')
+    await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
+    const pointer = await pointerOn(page, frame(page, 150), isMobile)
+    // The replay closes all three for 775ms before opening them. Hold during that beat.
+    await page.getByRole('button', { name: 'Replay' }).click()
+    await expect.poll(() => opens(page)).toEqual(['false', 'false', 'false'])
+    await pointer.down()
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+    expect(await opens(page)).toEqual(['true', 'false', 'false'])
+    // Past the moment the cycle would have opened all three: it did not.
+    await page.waitForTimeout(1300)
+    expect(await opens(page)).toEqual(['true', 'false', 'false'])
+    await pointer.up()
+    await expect.poll(() => opens(page)).toEqual(['false', 'false', 'false'])
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+    // Replay: a new cycle, all three open together again, and the buttons report it.
+    await page.getByRole('button', { name: 'Replay' }).click()
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'false')
+    await expect.poll(() => opens(page), { timeout: 3000 }).toEqual(['true', 'true', 'true'])
+    await expect(frame(page, 150)).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('from the keyboard, Enter opens the frame (and it still animates) and Space closes it', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'keyboard')
+    await page.goto('/terms/duration')
+    await option(page, 'Element', 'Tooltip').click()
+    await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
+    await expect(frame(page, 500, 'tooltip')).toBeVisible()
+    await frame(page, 500, 'tooltip').focus()
+    await recordOpen(page, 500)
+    await page.keyboard.press('Enter')
+    await expect(frame(page, 500, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+    expect(await opens(page)).toEqual(['false', 'false', 'true'])
+    expect(await durationOf(page, 500)).toBeCloseTo(500, 1)
+    // The house focus ring, in the accent.
+    const ring = await frame(page, 500, 'tooltip').evaluate((el) => {
+      const s = getComputedStyle(el)
+      // The accent, resolved by the same engine, so the two serialise alike.
+      const probe = document.body.appendChild(document.createElement('span'))
+      probe.style.color = 'var(--accent)'
+      const accent = getComputedStyle(probe).color
+      probe.remove()
+      return { style: s.outlineStyle, width: s.outlineWidth, color: s.outlineColor, accent }
+    })
+    expect(ring.style).toBe('solid')
+    expect(ring.width).toBe('2px')
+    expect(ring.color).toBe(ring.accent)
+    await page.waitForTimeout(700)
+    const rec = await recorded(page)
+    // Opening from the keyboard animates like a pointer open: in-between frames, landing after 300ms.
+    expect(rec.some((f) => f.o > 0.05 && f.o < 0.95)).toBe(true)
+    expect(rec.find((f) => f.o >= 0.999)!.t).toBeGreaterThan(300)
+    await page.keyboard.press('Space')
+    await expect(frame(page, 500, 'tooltip')).toHaveAttribute('aria-pressed', 'false')
+    expect(await opens(page)).toEqual(['false', 'false', 'false'])
+    expect(await durationOf(page, 500)).toBeCloseTo(375, 1)
+    await page.keyboard.press('Enter')
+    await expect(frame(page, 500, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('with reduced motion, the still frame stays and a hold fades the element over its duration', async ({ page, isMobile }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/terms/duration')
+    await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'false')
+    expect(await opens(page)).toEqual(['true', 'true', 'true'])
+    await recordOpen(page, 500)
+    const pointer = await pointerOn(page, frame(page, 500), isMobile)
+    await pointer.down()
+    await expect(frame(page, 500)).toHaveAttribute('aria-pressed', 'true')
+    expect(await opens(page)).toEqual(['false', 'false', 'true'])
+    await page.waitForTimeout(700)
+    const rec = await recorded(page)
+    expect(rec.some((f) => f.o > 0.05 && f.o < 0.95)).toBe(true)
+    expect(rec.find((f) => f.o >= 0.999)!.t).toBeGreaterThan(300)
+    await pointer.up()
+    await expect(frame(page, 500)).toHaveAttribute('aria-pressed', 'false')
+    expect(await opens(page)).toEqual(['false', 'false', 'false'])
+  })
+
+  test('the card on the index has no buttons in its frames', async ({ page }) => {
+    await page.goto('/')
+    await expect(card(page, 'duration').locator('[data-duration-frame]')).toHaveCount(3)
+    await expect(card(page, 'duration').locator('button')).toHaveCount(0)
   })
 })
 
