@@ -232,8 +232,11 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
           ],
         ],
         endMs: openAt + COLUMNS[COLUMNS.length - 1] + HOLD_MS,
+        // The still frame honours a hold made in this cycle; a new cycle (replay, control change) takes the stage back.
         still: () => {
-          if (root && !taken.current) snap(root, () => setAll(true))
+          if (!root || (taken.current && takenIn.current === cycleKey)) return
+          setTaken(false)
+          snap(root, () => setAll(true))
         },
       }
     },

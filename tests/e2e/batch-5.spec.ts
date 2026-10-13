@@ -316,6 +316,9 @@ test.describe('Duration', () => {
     // The sheet: no slide under reduced motion, a fade in place over the same durations.
     await option(page, 'Element', 'Sheet').click()
     await expect(frame(page, 500, 'sheet')).toBeVisible()
+    // The control change hands the stage back: all three open and reported as pressed, not taken over any more.
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'false')
+    for (const ms of [150, 300, 500]) await expect(frame(page, ms, 'sheet')).toHaveAttribute('aria-pressed', 'true')
     await recordOpen(page, 500)
     const sheet = await pointerOn(page, frame(page, 500, 'sheet'), isMobile)
     await sheet.down()
