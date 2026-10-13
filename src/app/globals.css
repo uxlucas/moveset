@@ -203,6 +203,10 @@
   .gl[data-glyph='duration'][data-active='true'] .m {
     animation-name: g-dur;
   }
+  /* Past the line, back onto it, a hold, then fades back to the start. */
+  .gl[data-glyph='overshoot'][data-active='true'] .m {
+    animation-name: g-over;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .gl .m {
@@ -281,6 +285,14 @@
   0%, 10% { transform: translateX(-2.6px); }
   42%, 66% { transform: translateX(2.6px); }
   90%, 100% { transform: translateX(-2.6px); }
+}
+@keyframes g-over {
+  0%, 8% { transform: none; opacity: 1; }
+  28% { transform: translateX(5.3px); }
+  44%, 80% { transform: translateX(4px); opacity: 1; }
+  90% { transform: translateX(4px); opacity: 0; }
+  91% { transform: none; opacity: 0; }
+  100% { transform: none; opacity: 1; }
 }
 
 /* Stagger demo (src/terms/stagger.tsx): the one-shot entrance each item runs. The exit is a transition on the list. */
