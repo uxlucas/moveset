@@ -250,7 +250,7 @@ function exitLine(v: V): string {
   const t = travelOf(v)
   return {
     quiet: `- Exit: \`opacity\` 1 to 0 and \`translateY(0)\` to \`translateY(${QUIET_PX}px)\`, toward the edge it came from, ${QUIET_MS}ms (\`calc(var(--duration-2) * 0.75)\`), same curve. A few pixels, never the full ${t}px back.`,
-    mirrored: `- Exit: \`opacity\` 1 to 0 and \`translateY(0)\` to \`translateY(${t}px)\`, ${ENTER_MS}ms, same curve: the enter played backwards (the house ships ${QUIET_PX}px over ${QUIET_MS}ms, 0.75 × the enter).`,
+    mirrored: `- Exit: \`opacity\` 1 to 0 and \`translateY(0)\` to \`translateY(${t}px)\`, ${ENTER_MS}ms: same curve and duration, the full travel back (\`--ease-out\`, not reversed; the house ships ${QUIET_PX}px over ${QUIET_MS}ms, 0.75 × the enter).`,
     none: `- Exit: no transition; it is gone in the next frame (the house ships \`opacity\` to 0 and ${QUIET_PX}px toward the edge over ${QUIET_MS}ms, 0.75 × the enter).`,
   }[v.exit]
 }
@@ -260,9 +260,9 @@ function cssRoute(v: V): string {
   const x = exitOf(v)
   const states =
     v.exit === 'none'
-      ? `\`closed\` at once: \`translateY(${t}px)\`, the enter origin, \`visibility: hidden\`, \`transition-duration: 0ms\``
-      : `\`closing\`: the exit values, \`visibility: hidden\`, ${x.ms}ms, \`transition-property: opacity, transform, visibility\`. \`closed\`, set on its own \`opacity\` \`transitionend\` (\`event.target\` is the toast, \`propertyName === 'opacity'\`): \`translateY(${t}px)\`, the enter origin, \`transition-duration: 0ms\``
-  return `- CSS route: keep it mounted; \`data-state\` on the toast. \`open\`: in place, \`visibility: visible\`, \`transition-duration: ${ENTER_MS}ms\`. ${states}. The base rule times the exit, \`[data-state="open"]\` the enter. Focus inside: \`trigger.focus({ preventScroll: true })\` before closing.`
+      ? `\`closed\` at once, the base rule: \`opacity: 0; visibility: hidden; transform: translateY(${t}px)\`, the enter origin, \`transition-duration: 0ms\``
+      : `\`closing\`, the base rule: the exit target \`opacity: 0; visibility: hidden; transform: translateY(${x.px}px)\`, ${x.ms}ms, \`transition-property: opacity, transform, visibility\`. \`closed\`, set on its own \`opacity\` \`transitionend\` (\`event.target\` is the toast, \`propertyName === 'opacity'\`): as \`closing\` at \`translateY(${t}px)\`, the enter origin, \`transition-duration: 0ms\``
+  return `- CSS route: keep it mounted; \`data-state\` on the toast. \`open\`: \`opacity: 1; visibility: visible; transform: none\`, \`transition-duration: ${ENTER_MS}ms\`. ${states}.`
 }
 
 function motionRoute(v: V): string {
@@ -317,7 +317,7 @@ function cssCode(v: V): string {
           `  transform: translateY(${x.px}px);`,
           '  visibility: hidden;',
           '  transition-property: opacity, transform, visibility;',
-          `  transition-duration: ${x.ms}ms;${v.exit === 'mirrored' ? ' /* the enter played backwards; the house ships 150ms, 4px */' : ' /* 0.75 × the enter */'}`,
+          `  transition-duration: ${x.ms}ms;${v.exit === 'mirrored' ? " /* the enter's duration and travel, back; the house ships 150ms, 4px */" : ' /* 0.75 × the enter */'}`,
         ]),
     '  transition-timing-function: var(--ease-out);',
     '}',
@@ -333,8 +333,8 @@ function cssCode(v: V): string {
       : v.exit === 'mirrored'
         ? [
             '.toast[data-state="closed"] {',
-            '  /* The enter origin, where the exit already ended. In no time, so a show',
-            '     right after the exit starts from the full travel. */',
+            "  /* Same values as the exit's end; 0ms only so it matches the Quiet route,",
+            '     where closed is reached in no time. */',
             '  transition-duration: 0ms;',
             '}',
           ]
@@ -364,7 +364,7 @@ function motionCode(v: V): string {
       ? ['          // No exit: gone in the next frame. The house ships { opacity: 0, y: 4 }', '          // over 0.15s, 0.75 × the enter.', '          exit={{ opacity: 0, transition: { duration: 0 } }}']
       : [
           v.exit === 'mirrored'
-            ? '          // The enter played backwards. The house ships y: 4 over 0.15s, 0.75 × the enter.'
+            ? "          // The enter's duration and travel, back on the same curve. The house ships y: 4 over 0.15s, 0.75 × the enter."
             : '          // Quieter and faster: a few pixels toward the edge it came from, 0.75 × the enter.',
           `          exit={{ opacity: 0, y: y(${x.px}), transition: { duration: ${s(x.ms)}, ease } }}`,
         ]
@@ -434,11 +434,11 @@ export default defineTerm({
   },
   prompt: (v) =>
     [
-      'Give this toast an enter and an exit. Bottom edge of its container, inset 16px.',
+      'Give this toast an enter and an exit. Bottom centre of its `position: relative` container, 16px up.',
       '',
       `- Enter: \`opacity\` 0 to 1 and \`transform: translateY(${travelOf(v)}px)\` to \`none\`, ${ENTER_MS}ms (\`var(--duration-2)\`), \`var(--ease-out)\`.`,
       exitLine(v),
-      '- First paint: nothing already on screen gets an entrance. Enters and exits play only for a change the user caused, including from the keyboard (Enter on the trigger or Dismiss); highlight moves inside a component get none.',
+      '- First paint: nothing already on screen gets an entrance. Enters and exits play only for a change the user caused, including from the keyboard (Enter on the trigger or Dismiss). Dismissed with focus inside, `trigger.focus({ preventScroll: true })` before closing.',
       cssRoute(v),
       motionRoute(v),
       '- Reduced motion: `opacity` only, same durations. CSS: `transform: none` in every state; Motion: `useReducedMotion()` zeroes `y`.',
@@ -446,17 +446,23 @@ export default defineTerm({
   acceptance: (v) => {
     const t = travelOf(v)
     const x = exitOf(v)
+    // `closed` is reached in 0s on every route (`none` is 0s throughout), so the checklist says so: a correct build
+    // read on a closed toast must not fail it.
+    const durations =
+      v.exit === 'none'
+        ? `\`${s(ENTER_MS)}s\` with \`data-state="open"\` and \`0s\` without`
+        : `\`${s(ENTER_MS)}s\` with \`data-state="open"\`, \`${s(x.ms)}s\` while \`closing\`, and \`0s\` once \`closed\``
     return [
-      `CSS route: the toast's computed \`transition-duration\` is \`${s(ENTER_MS)}s\` with \`data-state="open"\` and \`${s(x.ms)}s\` without. Motion route: the \`transition\` durations are ${s(ENTER_MS)} in and ${s(x.ms)} out.`,
-      `Entering, it starts ${t}px below its resting spot at \`opacity\` 0 (the computed values the moment it is shown), rises and fades in with no frame moving down or dimming, and is settled at \`opacity\` 1 and \`transform: none\` by ${ENTER_MS}ms from the first animated frame.`,
+      `CSS route: the toast's computed \`transition-duration\` is ${durations}. Motion route: the \`transition\` durations are ${s(ENTER_MS)} in and ${s(x.ms)} out.`,
+      `Entering, it starts ${t}px below its resting spot at \`opacity\` 0 (the computed values the moment it is shown), rises and fades in with no frame moving down or dimming, and is settled at \`opacity\` 1 and \`transform: none\` within ${ENTER_MS}ms (±1 frame) of the first animated frame (the first frame where its \`opacity\` moves).`,
       {
-        quiet: `Exiting, \`opacity\` is 0 by ${QUIET_MS}ms from the first animated frame. While visible (\`closing\`) the toast ends ${QUIET_PX}px (±0.5) below its spot, never farther and never above it; \`closed\` sits at the enter origin, hidden.`,
-        mirrored: `Exiting, \`opacity\` is 0 by ${ENTER_MS}ms from the first animated frame and the toast ends ${t}px (±0.5) below its spot, the enter origin (the house stops at ${QUIET_PX}px by ${QUIET_MS}ms).`,
+        quiet: `Exiting, \`opacity\` is 0 within ${QUIET_MS}ms (±1 frame) of the first animated frame. While visible (\`closing\`) the toast ends ${QUIET_PX}px (±0.5) below its spot, never farther and never above it; \`closed\` sits at the enter origin, hidden.`,
+        mirrored: `Exiting, \`opacity\` is 0 within ${ENTER_MS}ms (±1 frame) of the first animated frame and the toast ends ${t}px (±0.5) below its spot, the enter origin (the house stops at ${QUIET_PX}px by ${QUIET_MS}ms).`,
         none: 'Dismissed, the toast is gone in the next frame: no in-between opacity or position (the house fades it over 150ms with a 4px nudge).',
       }[v.exit],
       v.exit === 'none'
         ? 'Dismissed while entering, it is gone in the next frame.'
-        : 'Dismissed while entering, or shown again while exiting, it turns back from where it is: no jump, no restart.',
+        : "Dismissed while entering, or shown again while exiting, it turns back from where it is with no restart and no jump: no frame steps more than the exit's own largest step.",
       'Loaded with the toast already open, no frame shows it below its spot or under `opacity` 1, and `getAnimations()` on it is empty.',
       'Shown or dismissed from the keyboard, it plays the same enter and exit.',
       'Dismissed from the keyboard, focus lands on the trigger, not `body`.',

@@ -284,7 +284,7 @@ function IconSwapGlyph({ active }: GlyphProps) {
 function swapText(v: V): string {
   const parts: string[] = []
   if (v.depth === 'fade') parts.push('`opacity` 0 to 1 only, no scale (a flicker; the house ships `scale` 0.3 to 1)')
-  else if (v.depth === '0.8') parts.push('`scale` 0.8 to 1 (timid, a glitch; the house ships 0.3), `opacity` 0 to 1')
+  else if (v.depth === '0.8') parts.push('`scale` 0.8 to 1 (a glitch; the house ships 0.3), `opacity` 0 to 1')
   else parts.push('`scale` 0.3 to 1, `opacity` 0 to 1')
   parts.push(v.blur ? '`filter: blur(3px)` to `blur(0px)`' : 'no blur (the house adds `filter: blur(3px)` to `blur(0px)`)')
   return parts.join(', ')
@@ -297,6 +297,21 @@ function hiddenCss(v: V): string[] {
     ...(v.depth === 'fade' ? [] : [`transform: scale(${scaleOf(v)});`]),
     ...(v.blur ? [`filter: blur(${BLUR_PX}px);`] : []),
   ]
+}
+
+/** Only the properties that change: a fade-only swap transitions `opacity` alone. */
+function transitioned(v: V): string {
+  return ['opacity', ...(v.depth === 'fade' ? [] : ['transform']), ...(v.blur ? ['filter'] : [])].join(', ')
+}
+
+/** The properties reduced motion must not transition, as the prompt names them. */
+function dropped(v: V): string[] {
+  return [...(v.depth === 'fade' ? [] : ['`scale`']), ...(v.blur ? ['`filter`'] : [])]
+}
+
+/** The reduced-motion override, CSS route: only what the variant animates. */
+function reducedCss(v: V): string {
+  return [...(v.depth === 'fade' ? [] : ['transform: none']), ...(v.blur ? ['filter: none'] : [])].join('; ')
 }
 
 /** The hidden and shown states, Motion route. */
@@ -359,7 +374,7 @@ function cssCode(v: V): string {
     '.icon {',
     '  width: 16px;',
     '  height: 16px;',
-    '  transition-property: opacity, transform, filter;',
+    `  transition-property: ${transitioned(v)};`,
     `  transition-duration: ${SWAP_MS}ms;`,
     `  transition-timing-function: ${EASE}; /* a firm ease-out, standing in for the spring */`,
     '}',
@@ -379,7 +394,9 @@ function cssCode(v: V): string {
     ...(v.blur ? ['  filter: blur(0px);'] : []),
     '}',
     '',
-    `/* Reduced motion: a fade over the same ${SWAP_MS}ms${reducedLines.length > 0 ? ', no scale and no blur' : ''}. */`,
+    ...(reducedLines.length > 0
+      ? [`/* Reduced motion: a fade over the same ${SWAP_MS}ms, no scale and no blur. The state`, '   selectors are repeated, so this outranks them. */']
+      : [`/* Reduced motion: a fade over the same ${SWAP_MS}ms. */`]),
     '@media (prefers-reduced-motion: reduce) {',
     ...(reducedLines.length > 0
       ? ['  .icon-b,', '  .icon-button[data-on="true"] .icon-a {', ...reducedLines, '  }']
@@ -403,6 +420,7 @@ function motionCode(v: V): string {
         `  // Not a toggle: the check shows, then reverts after ${REVERT_MS / 1000}s; a second click restarts`,
         `  // the timer. The name stays ${p.label[0]}; the status region announces ${p.status}.`,
         '  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)',
+        '  useEffect(() => () => clearTimeout(timer.current), [])',
         `  const ${p.from} = () => {`,
         `    ${setter}(true)`,
         '    clearTimeout(timer.current)',
@@ -413,7 +431,7 @@ function motionCode(v: V): string {
   const button = [
     '<button',
     '  type="button"',
-    '  className="icon-button"',
+    '  style={box}',
     ...(p.toggle
       ? [`  aria-label="${p.label[0]}"`, `  aria-pressed={${p.state}}`]
       : reverts
@@ -424,26 +442,28 @@ function motionCode(v: V): string {
     '  {/* initial={false}: the first icon is painted at rest, no swap on page load.',
     '      popLayout takes the leaving icon out of flow, so the two overlap. */}',
     '  <AnimatePresence mode="popLayout" initial={false}>',
-    `    <motion.span key={${p.state} ? '${p.to}' : '${p.from}'} initial={hidden} animate={shown} exit={hidden} transition={swap}>`,
+    `    <motion.span key={${p.state} ? '${p.to}' : '${p.from}'} style={{ display: 'grid' }} initial={hidden} animate={shown} exit={hidden} transition={swap}>`,
     `      {${p.state} ? ${iconB} : ${iconA}}`,
     '    </motion.span>',
     '  </AnimatePresence>',
     '</button>',
   ]
   const tree = reverts
-    ? ['    <>', ...button.map((l) => `      ${l}`), `      <span role="status" className="sr-only">{${p.state} ? '${p.status}' : ''}</span>`, '    </>']
+    ? ['    <>', ...button.map((l) => `      ${l}`), `      <span role="status" style={hiddenText}>{${p.state} ? '${p.status}' : ''}</span>`, '    </>']
     : button.map((l) => `    ${l}`)
   return [
     `import { ${[...new Set(p.icons)].join(', ')} } from 'lucide-react'`,
     fadeOnly ? "import { AnimatePresence, motion } from 'motion/react'" : "import { AnimatePresence, motion, useReducedMotion } from 'motion/react'",
-    reverts ? "import { useRef, useState } from 'react'" : "import { useState } from 'react'",
+    reverts ? "import { useEffect, useRef, useState } from 'react'" : "import { useState } from 'react'",
     '',
     '// Bounce 0: an icon is not a toy.',
     `const swap = ${SPRING.replace(/"/g, "'")} as const`,
-    '// The button needs a box of its own, or the span is inline and the swap shifts',
-    '// the layout: .icon-button { position: relative; display: grid; place-items: center }',
-    '// at 44px square, icons 16px. popLayout places the leaving icon against it, so',
-    '// the two coincide.',
+    '// The button is a 44px grid box, so the span is a box too and popLayout places',
+    '// the leaving icon against it: the two coincide, and the layout never shifts.',
+    "const box = { position: 'relative', display: 'grid', placeItems: 'center', inlineSize: 44, blockSize: 44 } as const",
+    ...(reverts
+      ? ['// Visually hidden, still read by assistive tech.', "const hiddenText = { position: 'absolute', inlineSize: 1, blockSize: 1, overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' } as const"]
+      : []),
     '',
     `export function ${p.component}() {`,
     `  const [${p.state}, ${setter}] = useState(false)`,
@@ -499,14 +519,14 @@ export default defineTerm({
     return [
       `Swap this button's icon when its state changes: ${p.from} to ${p.to}.`,
       '',
-      `- The incoming icon ${swapText(v)}; the outgoing icon the reverse, together, in the same spot. Bounce 0, no back curve.`,
-      `- The button: \`<button type="button">\`, \`position: relative; display: grid; place-items: center\`, 44px square; icons 16px. ${ariaText(v)} Enter and Space act like a click.`,
-      `- CSS route: both icons in the button, one in flow, the other \`position: absolute; inset: 0; margin: auto\`; nothing unmounts. \`data-on="true"\` on the swapped button picks the shown one; the hidden one holds \`${hidden.join(' ')}\`. \`transition-property: opacity, transform, filter\`, ${SWAP_MS}ms, \`${EASE}\`.`,
-      `- Motion route: in the button, \`<AnimatePresence mode="popLayout" initial={false}>\` around one \`motion.span\` keyed by the state; \`initial\` and \`exit\` \`${mHidden}\`, \`animate\` \`${mShown}\`, \`transition={${SPRING}}\`.`,
-      "- No swap on page load: the first state's icon is painted at rest (`initial={false}`).",
+      `- The incoming icon ${swapText(v)}; the outgoing icon the reverse, together, in the same spot. Bounce 0.`,
+      `- The button: \`<button type="button">\`, \`position: relative; display: grid; place-items: center\`, 44px square; icons 16px. ${ariaText(v)}`,
+      `- CSS route: both icons in the button, the first state's in flow, the other \`position: absolute; inset: 0; margin: auto; width: 16px; height: 16px\`; nothing unmounts. \`data-on="true"\` on the button (\`"false"\` off) picks the shown one; the hidden one holds \`${hidden.join(' ')}\`. \`transition-property: ${transitioned(v)}\`, ${SWAP_MS}ms, \`${EASE}\`.`,
+      `- Motion route: in the button, \`<AnimatePresence mode="popLayout" initial={false}>\` around one \`motion.span\`, \`display: grid\`, keyed by the state; \`initial\` and \`exit\` \`${mHidden}\`, \`animate\` \`${mShown}\`, \`transition={${SPRING}}\`.`,
+      "- No swap on page load: the first icon is painted at rest (`initial={false}`).",
       v.depth === 'fade' && !v.blur
-        ? '- Reduced motion: already `opacity` only; keep the same duration.'
-        : `- Reduced motion: \`opacity\` only, same duration. CSS: \`transform: none; filter: none\` on both icons; Motion: \`useReducedMotion()\` drops${v.depth === 'fade' ? '' : ' `scale`'}${v.depth !== 'fade' && v.blur ? ' and' : ''}${v.blur ? ' `filter`' : ''}.`,
+        ? '- Reduced motion: as the default, `opacity` only over the same duration; no `transform` or `filter` transition is declared.'
+        : `- Reduced motion: \`opacity\` only, same duration. CSS: \`${reducedCss(v)}\`, repeating the state selectors (or \`!important\`), or \`[data-on="true"]\` wins; Motion: \`useReducedMotion()\` drops ${dropped(v).join(' and ')}.`,
     ].join('\n')
   },
   acceptance: (v) => {
@@ -514,25 +534,29 @@ export default defineTerm({
     const sc = scaleOf(v)
     const hiddenTransform = v.depth === 'fade' ? '`none`' : `\`matrix(${sc}, 0, 0, ${sc}, 0, 0)\``
     const hiddenFilter = v.blur ? `\`blur(${BLUR_PX}px)\`` : '`none`'
+    const shownFilter = v.blur ? '`none` (or `blur(0px)`)' : '`none`'
+    // One-sided settle times let a 150ms swap pass: the curve's 90% point is near 200ms, so that is the floor.
+    const settle = `settled (within 0.01) by ${SWAP_MS}ms (Motion: 350ms) and not before 200ms from the first animated frame (the first frame where the incoming icon's \`opacity\` is above 0)`
+    const noJump = "no frame steps more than the swap's own largest step"
     return [
-      `CSS route: the hidden icon's computed \`opacity\` is \`0\`, \`transform\` ${hiddenTransform} and \`filter\` ${hiddenFilter}; the shown icon's are \`1\`, \`none\` and \`none\` (or \`blur(0px)\`); both have \`transition-duration\` \`${SWAP_MS / 1000}s\`.`,
+      `CSS route: the hidden icon's computed \`opacity\` is \`0\`, \`transform\` ${hiddenTransform} and \`filter\` ${hiddenFilter}; the shown icon's are \`1\`, \`none\` and ${shownFilter}; both have \`transition-duration\` \`${SWAP_MS / 1000}s\`${v.depth === 'fade' && !v.blur ? ' and transition `opacity` alone' : ''}.`,
       v.depth === 'fade'
-        ? `Sampled every frame from the click, the incoming icon's \`opacity\` rises from 0 to 1 and is settled (within 0.01) by ${SWAP_MS}ms (Motion: 350ms) from the first animated frame; its \`transform\` stays \`none\`.`
-        : `Sampled every frame from the click, the incoming icon's scale rises from about ${sc} toward 1 without passing it and its \`opacity\` from 0 to 1; both are settled (within 0.01) by ${SWAP_MS}ms (Motion: 350ms) from the first animated frame.`,
+        ? `Sampled every frame from the click, the incoming icon's \`opacity\` rises from 0 to 1 and is ${settle}; its \`transform\` stays \`none\`.`
+        : `Sampled every frame from the click, the incoming icon's scale rises from about ${sc} toward 1 without passing it and its \`opacity\` from 0 to 1; both are ${settle}.`,
       "The button's `offsetWidth` and `offsetHeight` never change during the swap, and the two icons' boxes coincide.",
       'On page load nothing animates: `getAnimations()` on both icons is empty and the resting icon has `opacity` 1 in the first frame.',
       p.status
-        ? 'Clicked again during the revert, it turns back from where it is: no jump to either end.'
-        : 'Clicked again mid-swap, it turns back from where it is: no jump to either end.',
+        ? `Clicked again while \`${p.status}\` is showing, the timer restarts and nothing visible changes; clicked while swapping back, it turns around from where it is with no jump (${noJump}).`
+        : `Clicked again mid-swap, it turns back from where it is with no jump (${noJump}).`,
       'Enter and Space swap it with the same animation.',
       p.status
-        ? `\`aria-label\` stays \`${p.label[0]}\`; the \`role="status"\` region reads \`${p.status}\` on the click, and the icon reverts about ${REVERT_MS / 1000}s later; the button's hit area is at least 44 × 44px.`
+        ? `\`aria-label\` stays \`${p.label[0]}\`; the \`role="status"\` region reads \`${p.status}\` on the click, and the icon reverts ${REVERT_MS / 1000}s (±100ms) later; the button's hit area is at least 44 × 44px.`
         : p.toggle
           ? `\`aria-label\` stays \`${p.label[0]}\` and \`aria-pressed\` reads \`false\` before the click, \`true\` after and \`false\` after the next; the button's hit area is at least 44 × 44px.`
           : `\`aria-label\` reads \`${p.label[0]}\` before the click, \`${p.label[1]}\` after and \`${p.label[0]}\` after the next; the button's hit area is at least 44 × 44px.`,
       v.depth === 'fade' && !v.blur
-        ? `With reduced motion on, the swap is unchanged: \`opacity\` fades over the route's own duration (${SWAP_MS}ms CSS, 0.35s Motion), from the first animated frame.`
-        : `With reduced motion on, computed \`transform\` is \`none\` and \`filter\` is \`none\` or \`blur(0px)\` in every frame, while \`opacity\` fades over the route's own duration (${SWAP_MS}ms CSS, 0.35s Motion), from the first animated frame.`,
+        ? `With reduced motion on, the swap is unchanged: \`opacity\` fades over the route's own duration (${SWAP_MS}ms CSS, 0.35s Motion) from the first animated frame, and no \`transform\` or \`filter\` transition is declared.`
+        : `With reduced motion on, computed \`transform\` is \`none\` and \`filter\` is ${shownFilter} in every frame, while \`opacity\` fades over the route's own duration (${SWAP_MS}ms CSS, 0.35s Motion) from the first animated frame.`,
     ]
   },
   code: (v) => ({ css: cssCode(v), motion: motionCode(v) }),
