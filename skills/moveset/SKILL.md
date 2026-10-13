@@ -1,6 +1,6 @@
 ---
 name: moveset
-description: "Design engineering vocabulary with copy-ready prompts: turns a vague description of motion or interaction into its exact term and a prompt with acceptance criteria. Use when someone describes an effect loosely (\"the header stays put while I scroll\", \"things fade in as they come into view\"), asks what an effect is called, or wants a precise prompt for building one. Terms: Scroll-triggered, Scroll-linked, Parallax, Sticky, Scroll Snap, Ease-out, Ease-in-out, Spring, Stagger."
+description: "Design engineering vocabulary with copy-ready prompts: turns a vague description of motion or interaction into its exact term and a prompt with acceptance criteria. Use when someone describes an effect loosely (\"the header stays put while I scroll\", \"things fade in as they come into view\"), asks what an effect is called, or wants a precise prompt for building one. Terms: Scroll-triggered, Scroll-linked, Parallax, Sticky, Scroll Snap, Ease-out, Ease-in-out, Spring, Stagger, Duration, Overshoot."
 ---
 
 # moveset
@@ -31,6 +31,8 @@ A visual dictionary of design engineering terms. Each one shows the idea moving,
 - **Ease-in-out**: Motion that speeds up and then slows down, for elements already on screen moving from one spot to another. Also called: speeds up then slows down, smooth both ends, ease in out, acceleration and braking. Read `terms/ease-in-out.md`.
 - **Spring**: Motion driven by physics instead of a fixed duration, so it can carry velocity and settle naturally. Also called: physics-based animation, springy motion, bouncy, it bounces a bit, spring physics, stiffness and damping. Read `terms/spring.md`.
 - **Stagger**: Several items animate one after another with a small delay between each, creating a cascade. Also called: cascade, staggered entrance, one after another, sequential reveal, staggerChildren, waterfall. Read `terms/stagger.md`.
+- **Duration**: How long an animation takes, which decides whether it feels instant, smooth or slow. Also called: timing, how long it takes, animation length, feels slow, too fast, ms, animation speed. Read `terms/duration.md`.
+- **Overshoot**: Motion that travels slightly past its target before settling back, giving a small sense of energy. Also called: bounce-in, back easing, goes a bit past and comes back, elastic, pop in, easeOutBack. Read `terms/overshoot.md`.
 
 ## House motion tokens
 

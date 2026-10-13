@@ -300,7 +300,7 @@ export default defineTerm({
   name: 'Overshoot',
   category: 'motion',
   order: 6,
-  status: 'review',
+  status: 'published',
   definition: 'Motion that travels slightly past its target before settling back, giving a small sense of energy.',
   aliases: ['bounce-in', 'back easing', 'goes a bit past and comes back', 'elastic', 'pop in', 'easeOutBack'],
   description:

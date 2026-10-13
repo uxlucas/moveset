@@ -172,5 +172,10 @@ Make the moving card a real `<button>` and keep its state in `aria-pressed`, upd
 ## Related
 
 - [Ease-out](https://moveset.lucaslima.design/terms/ease-out)
+- [Overshoot](https://moveset.lucaslima.design/terms/overshoot)
+
+## Often confused with
+
+- [Spring vs Overshoot](https://moveset.lucaslima.design/compare/overshoot-vs-spring): A spring is the physics; overshoot is one thing a spring (or a back curve) can do. A spring with bounce 0 never overshoots.
 
 Source: https://moveset.lucaslima.design/terms/spring
