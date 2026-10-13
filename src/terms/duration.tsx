@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from 'react'
+import { useRef, type CSSProperties, type MouseEvent, type PointerEvent } from 'react'
 import { scaled } from '@/components/demo/playback'
 import { snap, useCycle } from '@/components/demo/use-cycle'
 import { GlyphSvg } from '@/components/site/glyph'
@@ -51,73 +51,82 @@ function verdict(ms: number, kind: Kind): string {
 // Closed time between the slowest exit and the next open, and the open hold before the cycle ends.
 const CLOSED_MS = 400
 const HOLD_MS = 1000
+const HINT = 'Hold a frame to play it'
+const HINT_HELD = 'Let go to close it'
+
+type Hold = { pointerId: number; item: HTMLElement }
 
 // Each element's closed and open look. The duration of the state it heads to times the move: --x closing, --d opening.
+// Under reduced motion a held element does not move; it fades over the same durations. Play keeps its full cycle.
 const ITEM =
-  'transition-[opacity,transform] duration-(--x) ease-(--e) data-[open=true]:duration-(--d) group-data-[snap=true]/stage:transition-none'
+  'transition-[opacity,transform] duration-(--x) ease-(--e) data-[open=true]:duration-(--d) group-data-[snap=true]/stage:transition-none motion-reduce:group-data-[taken-over=true]/stage:[transform:none]'
+const SHEET_REDUCED =
+  'motion-reduce:group-data-[taken-over=true]/stage:opacity-0 motion-reduce:group-data-[taken-over=true]/stage:data-[open=true]:opacity-100'
 
+// Spans throughout: on the entry page the frame is a <button>, which holds phrasing content only.
 function Element({ kind, ms, detail }: { kind: Kind; ms: number; detail: boolean }) {
   if (kind === 'tooltip') {
     return (
       <>
-        <div className={`absolute inset-x-0 flex justify-center ${detail ? 'bottom-[calc(42%+8px)]' : 'bottom-[calc(42%+5px)]'}`}>
-          <div
+        <span className={`absolute inset-x-0 flex justify-center ${detail ? 'bottom-[calc(42%+8px)]' : 'bottom-[calc(42%+5px)]'}`}>
+          {/* Inverted, as tooltips are, so the whole body carries the fade against the frame. */}
+          <span
             data-duration-item=""
             data-ms={ms}
             data-open="true"
-            className={`${ITEM} flex origin-bottom items-center rounded-md bg-surface opacity-0 shadow-card [transform:scale(0.97)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'h-7 px-2.5' : 'h-5 px-1.5'}`}
+            className={`${ITEM} flex origin-bottom items-center rounded-md bg-demo-subject opacity-0 shadow-card [transform:scale(0.97)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'h-8 px-3' : 'h-5 px-1.5'}`}
           >
-            <span className={`h-1.5 rounded-full bg-demo-subject ${detail ? 'w-12' : 'w-7'}`} />
-          </div>
-        </div>
-        <div className={`absolute inset-x-0 top-[58%] flex justify-center`}>
+            <span className={`h-1.5 rounded-full bg-surface ${detail ? 'w-12' : 'w-7'}`} />
+          </span>
+        </span>
+        <span className={`absolute inset-x-0 top-[58%] flex justify-center`}>
           <span className={`rounded-md bg-surface shadow-card ${detail ? 'h-7 w-14' : 'h-5 w-9'}`} />
-        </div>
+        </span>
       </>
     )
   }
   if (kind === 'dropdown') {
     return (
       <>
-        <div className={`absolute flex items-center justify-between rounded-md bg-surface shadow-card ${detail ? 'left-3 top-3 h-7 w-[min(80px,calc(100%-24px))] px-2' : 'left-2 top-2 h-5 w-12 px-1.5'}`}>
+        <span className={`absolute flex items-center justify-between rounded-md bg-surface shadow-card ${detail ? 'left-3 top-3 h-7 w-[min(80px,calc(100%-24px))] px-2' : 'left-2 top-2 h-5 w-12 px-1.5'}`}>
           <span className={`h-1.5 rounded-full bg-demo-2 ${detail ? 'w-9' : 'w-5'}`} />
           <span className="size-1.5 rotate-45 border-b border-r border-ink-faint" />
-        </div>
-        <div
+        </span>
+        <span
           data-duration-item=""
           data-ms={ms}
           data-open="true"
-          className={`${ITEM} absolute origin-top-left rounded-lg bg-surface p-1 opacity-0 shadow-card [transform:scale(0.95)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'inset-x-3 top-12' : 'inset-x-2 top-8'}`}
+          className={`${ITEM} absolute block origin-top-left rounded-lg bg-surface p-1 opacity-0 shadow-card [transform:scale(0.95)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'inset-x-3 top-12' : 'inset-x-2 top-8'}`}
         >
           {[0, 1, 2].map((i) => (
-            <div key={i} className={`flex items-center rounded-md ${detail ? 'h-7 gap-2 px-2' : 'h-[18px] gap-1.5 px-1'} ${i === 0 ? 'bg-demo' : ''}`}>
+            <span key={i} className={`flex items-center rounded-md ${detail ? 'h-7 gap-2 px-2' : 'h-[18px] gap-1.5 px-1'} ${i === 0 ? 'bg-demo' : ''}`}>
               <span className={`shrink-0 rounded-sm ${i === 0 ? 'bg-demo-subject' : 'bg-demo-2'} ${detail ? 'size-2.5' : 'size-2'}`} />
               <span className={`h-1.5 rounded-full bg-demo-2 ${['w-3/5', 'w-1/2', 'w-2/3'][i]}`} />
-            </div>
+            </span>
           ))}
-        </div>
+        </span>
       </>
     )
   }
   return (
     <>
       {/* The page behind the sheet. */}
-      <div className={`absolute inset-x-0 top-0 flex flex-col ${detail ? 'gap-2 p-3' : 'gap-1.5 p-2'}`}>
+      <span className={`absolute inset-x-0 top-0 flex flex-col ${detail ? 'gap-2 p-3' : 'gap-1.5 p-2'}`}>
         <span className="h-1.5 w-1/2 rounded-full bg-demo-2" />
         <span className="h-1.5 w-2/3 rounded-full bg-demo-2" />
-      </div>
+      </span>
       {/* Closed it sits 4px below the frame, so its hairline ring never shows along the bottom edge. */}
-      <div
+      <span
         data-duration-item=""
         data-ms={ms}
         data-open="true"
-        className={`${ITEM} absolute inset-x-1 bottom-0 top-[22%] flex flex-col items-center rounded-t-xl bg-surface shadow-card [transform:translateY(calc(100%_+_4px))] data-[open=true]:[transform:none] ${detail ? 'gap-2.5 px-3 pt-2' : 'gap-1.5 px-2 pt-1.5'}`}
+        className={`${ITEM} ${SHEET_REDUCED} absolute inset-x-1 bottom-0 top-[22%] flex flex-col items-center rounded-t-xl bg-surface shadow-card [transform:translateY(calc(100%_+_4px))] data-[open=true]:[transform:none] ${detail ? 'gap-2.5 px-3 pt-2' : 'gap-1.5 px-2 pt-1.5'}`}
       >
         <span className={`h-1 rounded-full bg-demo-2 ${detail ? 'w-8' : 'w-5'}`} />
         <span className={`h-1.5 self-start rounded-full bg-demo-subject ${detail ? 'w-2/3' : 'w-3/4'}`} />
         <span className="h-1.5 w-full rounded-full bg-demo-2" />
         <span className="h-1.5 w-4/5 self-start rounded-full bg-demo-2" />
-      </div>
+      </span>
     </>
   )
 }
@@ -127,38 +136,104 @@ function Column({ kind, ms, exit, timeScale, detail }: { kind: Kind; ms: number;
   const text = detail ? 'text-[11px]' : 'text-[10px]'
   // Timing is scaled so slow motion stretches every column alike; the labels and data-ms keep the real numbers.
   const vars = { '--d': `${scaled(ms, timeScale)}ms`, '--x': `${scaled(exit, timeScale)}ms` } as CSSProperties
+  const frame = `relative overflow-hidden rounded-lg bg-demo ${detail ? 'h-40 sm:h-52' : 'h-[104px]'}`
   return (
     <div data-duration-column="" data-ms={ms} data-verdict={word} className={`flex min-w-0 flex-1 flex-col ${detail ? 'max-w-44 gap-2' : 'max-w-[92px] gap-1.5'}`}>
       <p className={`font-mono tabular-nums ${text} ${word === 'right' ? 'text-ink' : 'text-ink-muted'}`}>{ms}ms</p>
-      <div style={vars} className={`relative overflow-hidden rounded-lg bg-demo ${detail ? 'h-40 sm:h-52' : 'h-[104px]'}`}>
-        <Element kind={kind} ms={ms} detail={detail} />
-      </div>
+      {detail ? (
+        // On the entry page the frame is held to open its element. The items start open, so the button starts pressed.
+        // A still hold must not select text or open the long-press menu; a vertical swipe still scrolls the page
+        // (the browser then cancels the pointer, which closes the element).
+        <button
+          type="button"
+          data-duration-frame=""
+          aria-pressed="true"
+          aria-label={`${ms}ms ${KINDS[kind].name}`}
+          style={vars}
+          className={`${frame} cursor-pointer touch-pan-y select-none [-webkit-touch-callout:none]`}
+        >
+          <Element kind={kind} ms={ms} detail={detail} />
+        </button>
+      ) : (
+        <div data-duration-frame="" style={vars} className={frame}>
+          <Element kind={kind} ms={ms} detail={detail} />
+        </div>
+      )}
       <p className={`font-mono ${text} ${word === 'right' ? 'text-ink' : 'text-ink-muted'}`}>{word}</p>
     </div>
   )
 }
 
+/** Opens or closes one element; the frame around it, when it is a button, reports the state. */
+function setOpen(item: HTMLElement, open: boolean) {
+  item.dataset.open = String(open)
+  const frame = item.closest('[data-duration-frame]')
+  if (frame?.hasAttribute('aria-pressed')) frame.setAttribute('aria-pressed', String(open))
+}
+
 function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }: DemoProps<V>) {
   const rootRef = useRef<HTMLDivElement>(null)
+  // Set when the visitor holds a frame; the cycle then leaves the stage alone until a replay or a control change.
+  // Pausing (off screen, hidden tab) and resuming keeps the visitor in charge.
+  const taken = useRef(false)
+  const takenIn = useRef('')
+  const hold = useRef<Hold | null>(null)
+  const hintRef = useRef<HTMLParagraphElement>(null)
   const kind = values.element
   const slowestExit = exitOf(COLUMNS[COLUMNS.length - 1], values)
+  const cycleKey = `${replayKey}|${values.element}|${values.exitRatio}`
+
+  const items = () => [...(rootRef.current?.querySelectorAll<HTMLElement>('[data-duration-item]') ?? [])]
+
+  const setHeld = (held: Hold | null) => {
+    hold.current = held
+    if (hintRef.current) hintRef.current.textContent = held ? HINT_HELD : HINT
+  }
+
+  const setTaken = (on: boolean) => {
+    taken.current = on
+    takenIn.current = on ? cycleKey : ''
+    if (rootRef.current) rootRef.current.dataset.takenOver = String(on)
+    if (!on) setHeld(null)
+  }
+
+  // The first gesture ends the cycle and hands the stage over closed: the pressed element snaps shut, so its open is
+  // seen in full from the first hold, and the other two close at their exit durations.
+  const takeOver = (item: HTMLElement) => {
+    const root = rootRef.current
+    if (taken.current || !root) return
+    setTaken(true)
+    snap(root, () => setOpen(item, false))
+    for (const el of items()) if (el !== item) setOpen(el, false)
+  }
 
   // One cycle: all three close at once (if open), a beat closed, all three open at the same instant, and hold.
   // It ends open, so the still frame, the card loop and a replay all start from three open elements.
   useCycle(
     () => {
       const root = rootRef.current
-      const setOpen = (open: boolean) =>
-        root?.querySelectorAll<HTMLElement>('[data-duration-item]').forEach((el) => (el.dataset.open = String(open)))
+      const setAll = (open: boolean) => items().forEach((el) => setOpen(el, open))
       const openAt = slowestExit + CLOSED_MS
       return {
         steps: [
-          [0, () => setOpen(false)],
-          [openAt, () => setOpen(true)],
+          [
+            0,
+            () => {
+              if (taken.current && takenIn.current === cycleKey) return
+              setTaken(false)
+              setAll(false)
+            },
+          ],
+          [
+            openAt,
+            () => {
+              if (!taken.current) setAll(true)
+            },
+          ],
         ],
         endMs: openAt + COLUMNS[COLUMNS.length - 1] + HOLD_MS,
         still: () => {
-          if (root) snap(root, () => setOpen(true))
+          if (root && !taken.current) snap(root, () => setAll(true))
         },
       }
     },
@@ -166,11 +241,58 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
     `${values.element}|${values.exitRatio}`,
   )
 
+  const frameOf = (target: EventTarget) => (target as HTMLElement).closest<HTMLElement>('[data-duration-frame]')
+  const itemOf = (frame: HTMLElement) => frame.querySelector<HTMLElement>('[data-duration-item]')
+
+  // Press and hold opens that frame's element at its duration; letting go closes it at its exit duration, as hover in
+  // and hover out would for a tooltip. The capture keeps the release on the frame wherever the pointer has gone.
+  // Under reduced motion the transition still runs, with no scale or slide: a fade over the same durations (ITEM).
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    const frame = frameOf(e.target)
+    const item = frame && itemOf(frame)
+    if (size !== 'detail' || !frame || !item || !e.isPrimary || e.button !== 0 || hold.current) return
+    frame.setPointerCapture(e.pointerId)
+    takeOver(item)
+    setHeld({ pointerId: e.pointerId, item })
+    setOpen(item, true)
+  }
+
+  // pointerup, pointercancel, or the capture lost: whichever comes first ends the hold.
+  const onRelease = (e: PointerEvent<HTMLDivElement>) => {
+    const held = hold.current
+    if (!held || e.pointerId !== held.pointerId) return
+    setHeld(null)
+    setOpen(held.item, false)
+  }
+
+  // Pointer clicks are handled as presses above. A click from the keyboard (Enter or Space reports detail 0) toggles
+  // the element open and closed. Opening something with Enter still animates, so these run at the same durations.
+  const onClick = (e: MouseEvent<HTMLDivElement>) => {
+    const frame = frameOf(e.target)
+    const item = frame && itemOf(frame)
+    if (size !== 'detail' || !frame || !item || e.detail !== 0 || hold.current) return
+    takeOver(item)
+    setOpen(item, item.dataset.open !== 'true')
+  }
+
   const detail = size === 'detail'
   const [lo, hi] = KINDS[kind].range
   const ease = { '--e': KINDS[kind].ease.css } as CSSProperties
   return (
-    <div ref={rootRef} style={ease} className={`group/stage flex h-full flex-col items-center justify-center ${detail ? 'gap-3 px-4' : 'px-3'}`}>
+    <div
+      ref={rootRef}
+      style={ease}
+      data-taken-over="false"
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      onPointerUp={onRelease}
+      onPointerCancel={onRelease}
+      onLostPointerCapture={onRelease}
+      onContextMenu={(e) => {
+        if (hold.current) e.preventDefault()
+      }}
+      className={`group/stage flex h-full flex-col items-center justify-center ${detail ? 'gap-3 px-4' : 'px-3'}`}
+    >
       {detail && (
         <p className="w-full max-w-[560px] font-mono text-[11px] text-ink-muted">
           {KINDS[kind].name} range {lo}–{hi}ms
@@ -181,6 +303,11 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
           <Column key={ms} kind={kind} ms={ms} exit={exitOf(ms, values)} timeScale={timeScale} detail={detail} />
         ))}
       </div>
+      {detail && (
+        <p ref={hintRef} aria-hidden className="mt-3 font-mono text-[11px] text-ink-muted">
+          {HINT}
+        </p>
+      )}
     </div>
   )
 }
@@ -377,7 +504,7 @@ export default defineTerm({
   demo: {
     component: DurationDemo,
     label:
-      'Three identical frames side by side, labelled 150ms, 300ms and 500ms. In each, the same dropdown opens at the same instant on the same curve, so the 150ms one lands first and the 500ms one last; under each, a verdict says whether that duration suits the element. They hold, then close about 25% faster. Switching to a tooltip or a full-height sheet changes the element and the verdicts: 150ms is right for a tooltip and abrupt for a sheet.',
+      'Three identical frames side by side, labelled 150ms, 300ms and 500ms. In each, the same dropdown opens at the same instant on the same curve, so the 150ms one lands first and the 500ms one last; under each, a verdict says whether that duration suits the element. They hold, then close about 25% faster. On the entry page, holding a frame opens that one element at its duration, and letting go closes it at its exit duration. Switching to a tooltip or a full-height sheet changes the element and the verdicts: 150ms is right for a tooltip and abrupt for a sheet.',
     controls,
     glyph: DurationGlyph,
   },
