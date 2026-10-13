@@ -327,7 +327,7 @@ export default defineTerm({
   prompt: (v) => {
     const route =
       v.source === 'spring'
-        ? `- CSS route: \`[data-placed]\` (at the target) holds the arrival, \`${ENTER_MS}ms linear(…)\` with a point every 5ms or closer, sampled from that spring; the base rule holds the return. Motion route: \`animate={{ x }}\`, \`initial={false}\`, the spring as \`transition\` on the way in.`
+        ? `- CSS route: \`[data-placed]\` (at the target) holds the arrival, \`${ENTER_MS}ms linear(…)\` with a point every 5ms or closer, sampled from that spring (\`spring({ duration: ${ENTER_MS}, bounce: ${AMOUNTS[v.amount].bounce} }).next(t).value\` from \`motion\`, last point 1); the base rule holds the return. Motion route: \`animate={{ x }}\`, \`initial={false}\`, the spring as \`transition\` on the way in.`
         : `- CSS route: \`[data-placed]\` (at the target) holds the arrival (${ENTER_MS}ms, the curve above); the base rule holds the return. Motion route: \`animate={{ x }}\`, \`initial={false}\`, \`{ duration: ${s(ENTER_MS)}, ease: ${bezier(v.amount).motion} }\` on the way in.`
     const opener = {
       '0': 'Move this element into place, with no overshoot.',
@@ -344,7 +344,7 @@ export default defineTerm({
       route,
       `- Only \`transform\` (translate or scale) takes the ${v.source === 'spring' ? 'spring' : 'curve'}: never \`opacity\` (it clamps at 1) or layout properties. Not on exits, dialogs, menus or text.`,
       ...(v.compare === 'plain' ? [`- Comparison only: a twin below on \`${EASE_OUT.css}\`, ${ENTER_MS}ms, same instants; it never passes the target.`] : []),
-      '- Keyboard click (`event.detail === 0`) or reduced motion: no animated travel; at the target next frame. CSS: set `data-instant` from `event.detail === 0`, `[data-instant] { transition-property: none }`, plus `@media (prefers-reduced-motion: reduce)`; Motion: `useReducedMotion()`, `duration: 0` chosen in the same render as `x`.',
+      '- Keyboard click (`event.detail === 0`) or reduced motion: no animated travel; at the target next frame. CSS: set `data-instant` from `event.detail === 0`, `[data-instant] { transition-property: none }` after the placed rule, plus `@media (prefers-reduced-motion: reduce)`; Motion: `useReducedMotion()`, `duration: 0` chosen in the same render as `x`.',
     ].join('\n')
   },
   acceptance: (v) => {

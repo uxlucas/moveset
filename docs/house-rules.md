@@ -3,7 +3,7 @@
 The standard every demo, prompt and piece of site chrome is held to. Distilled from Emil Kowalski's animation skills, Rauno Freiberg's Web Interface Guidelines and Gustavo Fior's craft. Where those sources disagree, the decision is noted.
 
 ## Should it animate?
-- Used 100+ times a day, or triggered from the keyboard: no animation.
+- Used 100+ times a day, or driven by the keyboard inside a component (arrow-key highlight, shortcut toggles): no animation. Opening something with Enter still animates.
 - Used tens of times a day (hover, filters, tabs): instant, or a barely-there 150ms color change.
 - Occasional (menus, dialogs, toasts): standard motion under 300ms.
 - Rare (onboarding, success): room for more.

@@ -360,7 +360,7 @@ export default defineTerm({
   definition: 'How long an animation takes, which decides whether it feels instant, smooth or slow.',
   aliases: ['timing', 'how long it takes', 'animation length', 'feels slow', 'too fast', 'ms', 'animation speed'],
   description:
-    'Duration is how long an animation runs from start to finish, and it shapes how an interface feels: a 180ms dropdown reads as a response, the same dropdown at 400ms reads as the interface thinking. Product UI stays under 300ms. Exits run about 25% faster than enters, because the user has already moved on. Size and distance pick the spot inside the range: a tooltip that moves a few pixels needs less time than a sheet crossing the screen, so one number is right for one element and wrong for the next, and something used 100+ times a day gets none.',
+    'Duration is how long an animation runs from start to finish, and it shapes how an interface feels: a 180ms dropdown reads as a response, the same dropdown at 400ms reads as the interface thinking. Product UI stays at or under 300ms. Exits run about 25% faster than enters, because the user has already moved on. Size and distance pick the spot inside the range: a tooltip that moves a few pixels needs less time than a sheet crossing the screen, so one number is right for one element and wrong for the next. Something used 100+ times a day gets no animation at all.',
   useWhen: [
     'Hover, press and color changes: 100 to 150ms.',
     'Tooltips and small popovers: 125 to 200ms. Menus and dropdowns: 150 to 250ms.',
@@ -372,7 +372,7 @@ export default defineTerm({
     'A duration inherited from a snippet or a library default. Pick it from the kind of element and how far it moves.',
     'One duration for every element. At 300ms a sheet is right and a tooltip drags.',
     'Exits as long as enters. The user has decided; let it go about 25% faster.',
-    'Actions used 100+ times a day, or triggered from the keyboard. Give them no animation at all, not a shorter one.',
+    'Actions used 100+ times a day, or changes driven by the keyboard inside a component (arrow-key highlight, shortcut toggles). Give them no animation at all, not a shorter one.',
   ],
   demo: {
     component: DurationDemo,
@@ -389,18 +389,20 @@ export default defineTerm({
       `Time this ${k.name}.`,
       '',
       '- Tokens: `--duration-1: 150ms; --duration-2: 200ms; --duration-3: 250ms; --duration-4: 300ms; --ease-out: cubic-bezier(0.23, 1, 0.32, 1)`.',
-      '- By kind, for reference across the UI: hover and color 100 to 150ms (`--duration-1`, `ease`); press `--duration-1` on `--ease-out`; tooltips 125 to 200ms; menus and dropdowns 150 to 250ms (`--duration-2`); dialogs and toasts `--duration-3`; drawers and sheets `--duration-4`. Only page-level transitions pass 300ms, 400ms at most.',
+      '- By kind, for reference: hover and color 100 to 150ms (`--duration-1`, `ease`); press `--duration-1` on `--ease-out`; tooltips 125 to 200ms; menus and dropdowns 150 to 250ms (`--duration-2`); dialogs and toasts `--duration-3`; drawers and sheets `--duration-4`. Only page-level transitions pass 300ms, 400ms at most.',
       v.exitRatio
         ? '- Exits of overlays (menus, tooltips, dialogs, sheets, toasts): enter × 0.75, `calc(var(--duration-N) * 0.75)`. Hover and press are symmetric.'
         : '- Exits of overlays (menus, tooltips, dialogs, sheets, toasts): same as the enter (the house default is enter × 0.75). Hover and press are symmetric.',
       '- Bigger elements and longer travel take the long end; never one duration for everything.',
-      '- Used 100+ times a day: no animation. Changes driven by the keyboard inside a component (arrow-key highlight, shortcut toggles): no animation.',
+      '- Used 100+ times a day, or driven by the keyboard inside a component (arrow-key highlight, shortcut toggles): no animation.',
       elementLine(v),
       ...(sheet ? ['- Backdrop, if any: `opacity` on the same open and close durations and curve.'] : []),
       `- CSS route: \`transition-property: ${sheet ? 'transform' : 'opacity, transform'}\`; the base rule holds the close duration, \`[data-open]\` the open; closed, it stays mounted with \`inert\`.`,
       `- Motion route: \`transition={{ duration: ${s(k.ms)}, ease: ${k.ease.motion} }}\`, \`exit={{ …, transition: { duration: ${exit}, ease: ${k.ease.motion} } }}\`, inside \`AnimatePresence\`; \`useReducedMotion()\` drops the ${sheet ? 'slide' : 'scale'}.`,
       ...(v.element === 'dropdown' ? ['- Arrow-key highlight inside the menu: instant.'] : []),
-      `- Reduced motion: no ${sheet ? 'slide' : 'scale'}, \`opacity\` only, same durations.`,
+      sheet
+        ? '- Reduced motion: no slide, `opacity` only (CSS: `transition-property: opacity`, closed `opacity: 0`, `transform: none`), same durations.'
+        : '- Reduced motion: no scale, `opacity` only, same durations.',
     ].join('\n')
   },
   acceptance: (v) => {
