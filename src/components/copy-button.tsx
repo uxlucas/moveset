@@ -39,7 +39,7 @@ export function CopyButton({ text, label, children, className = '' }: Props) {
               initial={{ scale: 0.3, opacity: 0, filter: 'blur(3px)' }}
               animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
               exit={{ scale: 0.3, opacity: 0, filter: 'blur(3px)' }}
-              transition={reduce ? { duration: 0 } : { type: 'spring', duration: 0.25, bounce: 0 }}
+              transition={reduce ? { duration: 0 } : { type: 'spring', duration: 0.35, bounce: 0 }}
             >
               {copied ? <Check size={14} aria-hidden data-icon="check" className="text-accent" /> : <Copy size={14} aria-hidden data-icon="copy" />}
             </motion.span>

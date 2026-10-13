@@ -30,6 +30,7 @@ The standard every demo, prompt and piece of site chrome is held to. Distilled f
 - Animate `transform`, `opacity`, and `clip-path`. Height only for expand/collapse, kept short.
 - Never `transition: all`. Name the properties.
 - Never enter from `scale(0)`. Start at `scale(0.95)`–`0.97` with `opacity: 0`.
+- Icon swaps start at `scale(0.3)`: a deep scale reads as a swap, 0.8–0.9 reads as a glitch (Icon Swap).
 - Popovers, menus and tooltips scale from their trigger (`transform-origin`). Dialogs stay centered.
 
 ## Interruptibility

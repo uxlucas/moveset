@@ -42,6 +42,10 @@ test('category headings show the written count and a one-line description', asyn
   const motion = main.getByRole('heading', { level: 2, name: 'Motion & Easing' })
   await expect(motion).toContainText('6 / 8')
   await expect(motion).toHaveAccessibleName(/6 of 8 written/)
+  // Transitions has Enter and Exit and Icon Swap in review (a build without review mode shows "0 / 7").
+  const transitions = main.getByRole('heading', { level: 2, name: 'Transitions' })
+  await expect(transitions).toContainText('2 / 7')
+  await expect(transitions).toHaveAccessibleName(/2 of 7 written/)
   await expect(main.getByText('Motion that scrolling drives or triggers.')).toBeVisible()
 })
 
