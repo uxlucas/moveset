@@ -199,6 +199,10 @@
     animation-name: g-stag-3;
     animation-delay: 0.24s;
   }
+  /* Across the span and back: the way back takes about 75% of the way out. */
+  .gl[data-glyph='duration'][data-active='true'] .m {
+    animation-name: g-dur;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .gl .m {
@@ -271,6 +275,12 @@
   0% { transform: translateY(1.5px); opacity: 0; }
   18%, 70% { transform: none; opacity: 1; }
   82%, 100% { transform: none; opacity: 0; }
+}
+
+@keyframes g-dur {
+  0%, 10% { transform: translateX(-2.6px); }
+  42%, 66% { transform: translateX(2.6px); }
+  90%, 100% { transform: translateX(-2.6px); }
 }
 
 /* Stagger demo (src/terms/stagger.tsx): the one-shot entrance each item runs. The exit is a transition on the list. */
