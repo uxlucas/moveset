@@ -416,7 +416,7 @@ export default defineTerm({
   name: 'Enter and Exit',
   category: 'transitions',
   order: 5,
-  status: 'review',
+  status: 'published',
   definition: 'The animations an element plays when it is added to the screen and when it is removed.',
   aliases: ['entrance and exit', 'mount and unmount animation', 'appear and disappear', 'fade in and out', 'exit animation', 'enter animation', 'AnimatePresence'],
   description:

@@ -1,6 +1,6 @@
 ---
 name: moveset
-description: "Design engineering vocabulary with copy-ready prompts: turns a vague description of motion or interaction into its exact term and a prompt with acceptance criteria. Use when someone describes an effect loosely (\"the header stays put while I scroll\", \"things fade in as they come into view\"), asks what an effect is called, or wants a precise prompt for building one. Terms: Scroll-triggered, Scroll-linked, Parallax, Sticky, Scroll Snap, Ease-out, Ease-in-out, Spring, Stagger, Duration, Overshoot."
+description: "Design engineering vocabulary with copy-ready prompts: turns a vague description of motion or interaction into its exact term and a prompt with acceptance criteria. Use when someone describes an effect loosely (\"the header stays put while I scroll\", \"things fade in as they come into view\"), asks what an effect is called, or wants a precise prompt for building one. Terms: Scroll-triggered, Scroll-linked, Parallax, Sticky, Scroll Snap, Ease-out, Ease-in-out, Spring, Stagger, Duration, Overshoot, Enter and Exit, Icon Swap."
 ---
 
 # moveset
@@ -33,6 +33,11 @@ A visual dictionary of design engineering terms. Each one shows the idea moving,
 - **Stagger**: Several items animate one after another with a small delay between each, creating a cascade. Also called: cascade, staggered entrance, one after another, sequential reveal, staggerChildren, waterfall. Read `terms/stagger.md`.
 - **Duration**: How long an animation takes, which decides whether it feels instant, smooth or slow. Also called: timing, how long it takes, animation length, feels slow, too fast, ms, animation speed. Read `terms/duration.md`.
 - **Overshoot**: Motion that travels slightly past its target before settling back, giving a small sense of energy. Also called: bounce-in, back easing, goes a bit past and comes back, elastic, pop in, easeOutBack. Read `terms/overshoot.md`.
+
+### Transitions
+
+- **Enter and Exit**: The animations an element plays when it is added to the screen and when it is removed. Also called: entrance and exit, mount and unmount animation, appear and disappear, fade in and out, exit animation, enter animation, AnimatePresence. Read `terms/enter-and-exit.md`.
+- **Icon Swap**: One icon turns into another in place with a quick scale, fade and blur, like copy becoming a check. Also called: icon transition, copy to check, play to pause, icon cross-fade, icon change animation. Read `terms/icon-swap.md`.
 
 ## House motion tokens
 

@@ -191,6 +191,7 @@ Every item is in the DOM from the start: the stagger only changes opacity, trans
 
 ## Related
 
+- [Enter and Exit](https://moveset.lucaslima.design/terms/enter-and-exit)
 - [Scroll-triggered](https://moveset.lucaslima.design/terms/scroll-triggered)
 - [Duration](https://moveset.lucaslima.design/terms/duration)
 - [Ease-out](https://moveset.lucaslima.design/terms/ease-out)
