@@ -308,8 +308,10 @@ function motionCode(v: V): string {
     '  const from = useReducedMotion() ? 1 : 0.95',
     '  return (',
     '    <motion.div',
-    '      // Placed absolutely below the trigger, as in the CSS tab.',
-    '      className="menu"',
+    "      // Its own class, not the CSS tab's .menu: that one carries a CSS transition",
+    '      // that would fight the transform Motion writes every frame. .menu-panel only',
+    '      // places it: absolutely, 4px below the trigger, left-aligned.',
+    '      className="menu-panel"',
     '      aria-hidden={present ? undefined : true}',
     '      // Grow out of the trigger. Motion drives the scale, so the origin goes here.',
     "      style={{ transformOrigin: 'top left', pointerEvents: present ? 'auto' : 'none' }}",
@@ -367,7 +369,7 @@ export default defineTerm({
       `- CSS route: \`data-open\` present = open. \`transition-property: opacity, transform\`; base rule \`transition-duration: ${exit}ms\` (close), \`[data-open]\` \`${enter}ms\` (open). Transitions, not keyframes: closing mid-open reverses from the current state.`,
       '- CSS route, closed: stays mounted, `inert`, `pointer-events: none`.',
       `- Motion route: \`AnimatePresence\`, unmounts after the exit; during the exit set \`pointer-events: none\` and \`aria-hidden\` (\`useIsPresent()\`). \`initial\`/\`exit\` \`{ opacity: 0, scale: 0.95 }\`, \`animate\` \`{ opacity: 1, scale: 1 }\`, \`ease: ${CURVES[v.curve].motion}\`, ${s(enter)}s in, ${s(exit)}s out; \`transformOrigin: 'top left'\` in \`style\`.`,
-      '- Focus: on close, return focus to the trigger; Escape and outside click close.',
+      '- Focus: Escape or choosing an item closes and returns focus to the trigger; an outside click closes without moving focus.',
       ...compareLine(v),
       '- Reduced motion: no scale, opacity only, same durations. CSS: `transform: none` on both states in `@media (prefers-reduced-motion: reduce)`. Motion: `useReducedMotion()`, keep `scale` at 1.',
     ].join('\n')
@@ -381,9 +383,8 @@ export default defineTerm({
       'Opening starts at 95% size and opacity 0, never from `scale(0)`.',
       'The menu grows out of the trigger: its top-left corner stays put while it scales.',
       'Closing while it is still opening reverses from its current size and opacity, without first jumping to fully open.',
-      "Closed 50ms into opening, the next frame's scale and opacity are within 0.02 of the frame before.",
       'Closed, the menu cannot be clicked, focused or reached by a screen reader; while the exit plays it takes no clicks.',
-      'Closing returns focus to the trigger; Escape and a click outside the menu close it.',
+      'Escape or choosing an item closes the menu and returns focus to the trigger; a click outside closes it without moving focus.',
       ...(v.compare === 'none'
         ? []
         : [`The comparison menu opens at the same instant, and its computed \`transition-timing-function\` is \`${COMPARE[v.compare].css}\` (comparison only).`]),
