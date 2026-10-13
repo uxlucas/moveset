@@ -167,6 +167,7 @@ Reorder the DOM, not only the picture, so Tab order and screen readers follow wh
 ## Related
 
 - [Ease-out](https://moveset.lucaslima.design/terms/ease-out)
+- [Duration](https://moveset.lucaslima.design/terms/duration)
 
 ## Often confused with
 

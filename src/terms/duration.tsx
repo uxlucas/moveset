@@ -536,7 +536,7 @@ export default defineTerm({
   name: 'Duration',
   category: 'motion',
   order: 5,
-  status: 'review',
+  status: 'published',
   definition: 'How long an animation takes, which decides whether it feels instant, smooth or slow.',
   aliases: ['timing', 'how long it takes', 'animation length', 'feels slow', 'too fast', 'ms', 'animation speed'],
   description:
