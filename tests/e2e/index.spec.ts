@@ -34,14 +34,14 @@ test('category headings show the written count and a one-line description', asyn
   await page.goto('/')
   const main = page.getByRole('main')
   // Relies on review mode (NEXT_PUBLIC_SHOW_REVIEW=1, set in .env.development): review terms count as written.
-  // Scroll has five published terms; Motion has Ease-out and Ease-in-out published and Spring and Stagger in review
-  // (a build without review mode shows "2 / 8").
+  // Scroll has five published terms; Motion has Ease-out, Ease-in-out, Spring and Stagger published and Duration and
+  // Overshoot in review (a build without review mode shows "4 / 8").
   const scroll = main.getByRole('heading', { level: 2, name: 'Scroll' })
   await expect(scroll).toContainText('5 / 8')
   await expect(scroll).toHaveAccessibleName(/5 of 8 written/)
   const motion = main.getByRole('heading', { level: 2, name: 'Motion & Easing' })
-  await expect(motion).toContainText('4 / 8')
-  await expect(motion).toHaveAccessibleName(/4 of 8 written/)
+  await expect(motion).toContainText('6 / 8')
+  await expect(motion).toHaveAccessibleName(/6 of 8 written/)
   await expect(main.getByText('Motion that scrolling drives or triggers.')).toBeVisible()
 })
 
