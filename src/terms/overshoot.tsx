@@ -13,7 +13,7 @@ const controls = [
     options: [
       { value: '0', label: '0' },
       { value: '3', label: '3%' },
-      { value: '8', label: '8%' },
+      { value: '8', label: '8% (strong)' },
       { value: '15', label: '15% (cartoon)' },
     ],
     default: '3',
@@ -177,7 +177,8 @@ function moveText(v: V): string {
     return `${spec}${overCap(v) ? ` (over the house ${BOUNCE_CAP} bounce cap)` : ''}: about ${a.springPeak}% of the travel past the target`
   }
   if (v.amount === '0') return '`var(--ease-out)` (`cubic-bezier(0.23, 1, 0.32, 1)`): it never passes the target'
-  return `\`${bezier(v.amount).css}\`: ${v.amount}% of the travel past the target${v.amount === '15' ? ' (cartoon; product UI stays at 2 to 5%)' : ''}`
+  const caveat = { '3': '', '8': ' (above the 2 to 5% product range)', '15': ' (cartoon; product UI stays at 2 to 5%)' }[v.amount]
+  return `\`${bezier(v.amount).css}\`: ${v.amount}% of the travel past the target${caveat}`
 }
 
 function cssCode(v: V): string {
@@ -281,9 +282,12 @@ function motionCode(v: V): string {
     '      className="overshoot-chip"',
     '      aria-pressed={placed}',
     '      onClick={toggle}',
+    '      // No animation on mount: it starts where it is.',
+    '      initial={false}',
     '      // x is transform only. Never animate opacity or a layout property on this curve.',
     `      animate={{ x: placed ? ${TRAVEL} : 0 }}`,
-    '      // Reduced motion: no overshoot and no travel.',
+    '      // Reduced motion or a keyboard click: no animated travel. Chosen in the same',
+    '      // render as x, so the move never runs on the previous transition.',
     '      transition={reduced || instant ? { duration: 0 } : placed ? arrive : leave}',
     '    />',
     '  )',
@@ -323,8 +327,8 @@ export default defineTerm({
   prompt: (v) => {
     const route =
       v.source === 'spring'
-        ? `- CSS route: \`[data-placed]\` (at the target) holds the arrival, \`${ENTER_MS}ms linear(…)\` with a point every 5ms or closer, sampled from that spring; the base rule holds the return. Motion route: \`animate={{ x }}\`, the spring as \`transition\` on the way in.`
-        : `- CSS route: \`[data-placed]\` (at the target) holds the arrival (${ENTER_MS}ms, the curve above); the base rule holds the return. Motion route: \`animate={{ x }}\`, \`{ duration: ${s(ENTER_MS)}, ease: ${bezier(v.amount).motion} }\` on the way in.`
+        ? `- CSS route: \`[data-placed]\` (at the target) holds the arrival, \`${ENTER_MS}ms linear(…)\` with a point every 5ms or closer, sampled from that spring; the base rule holds the return. Motion route: \`animate={{ x }}\`, \`initial={false}\`, the spring as \`transition\` on the way in.`
+        : `- CSS route: \`[data-placed]\` (at the target) holds the arrival (${ENTER_MS}ms, the curve above); the base rule holds the return. Motion route: \`animate={{ x }}\`, \`initial={false}\`, \`{ duration: ${s(ENTER_MS)}, ease: ${bezier(v.amount).motion} }\` on the way in.`
     const opener = {
       '0': 'Move this element into place, with no overshoot.',
       '3': 'Give this element a slight overshoot when it arrives.',
@@ -334,13 +338,13 @@ export default defineTerm({
     return [
       opener,
       '',
-      `- Setup: a \`<button type="button">\`; each click toggles it between its start and its target (\`translateX(${TRAVEL}px)\`, the travel) and sets \`aria-pressed\`.`,
-      `- Arrival: \`transform\` only, ${ENTER_MS}ms, ${moveText(v)}; settled on the target by ${ENTER_MS}ms.`,
+      `- Setup: a \`<button type="button">\`; each click toggles it between its start (\`translateX(0)\`) and its target (\`translateX(${TRAVEL}px)\`, the travel) and sets \`aria-pressed\`.`,
+      `- Arrival: \`transform\` only, ${ENTER_MS}ms, ${moveText(v)}; settled on the target by ${ENTER_MS}ms from the first animated frame.`,
       `- Return: ${RETURN_MS}ms \`cubic-bezier(0.23, 1, 0.32, 1)\` (ease-out), no overshoot.`,
       route,
       `- Only \`transform\` (translate or scale) takes the ${v.source === 'spring' ? 'spring' : 'curve'}: never \`opacity\` (it clamps at 1) or layout properties. Not on exits, dialogs, menus or text.`,
       ...(v.compare === 'plain' ? [`- Comparison only: a twin below on \`${EASE_OUT.css}\`, ${ENTER_MS}ms, same instants; it never passes the target.`] : []),
-      `- Keyboard click (\`event.detail === 0\`) or reduced motion: no overshoot, no travel; at the target next frame. CSS: \`transition-property: none\`; Motion: \`useReducedMotion()\`, \`duration: 0\`.`,
+      '- Keyboard click (`event.detail === 0`) or reduced motion: no animated travel; at the target next frame. CSS: set `data-instant` from `event.detail === 0`, `[data-instant] { transition-property: none }`, plus `@media (prefers-reduced-motion: reduce)`; Motion: `useReducedMotion()`, `duration: 0` chosen in the same render as `x`.',
     ].join('\n')
   },
   acceptance: (v) => {
@@ -350,8 +354,10 @@ export default defineTerm({
     return [
       v.amount === '0'
         ? `Sampled every frame on the way to the target, \`x\` never passes it: at most ${TRAVEL}.5px.`
-        : `Sampled every frame on the way to the target, \`x\` peaks once at ${TRAVEL} × ${(1 + peak / 100).toFixed(3)} = ${TRAVEL + px}px (±1% of the travel, ±${TRAVEL / 100}px), then settles.`,
-      `By ${ENTER_MS}ms (±1 frame) \`x\` is within 0.5px of ${TRAVEL}px and stays there.`,
+        : v.source === 'spring'
+          ? `Sampled every frame on the way to the target, \`x\`'s highest point is ${TRAVEL} × ${(1 + peak / 100).toFixed(3)} = ${TRAVEL + px}px (±1% of the travel, ±${TRAVEL / 100}px); any later swing stays under 1px past the target.`
+          : `Sampled every frame on the way to the target, \`x\` peaks once at ${TRAVEL} × ${(1 + peak / 100).toFixed(3)} = ${TRAVEL + px}px (±1% of the travel, ±${TRAVEL / 100}px), then settles.`,
+      `By ${ENTER_MS}ms from the first animated frame, \`x\` is within 0.5px of ${TRAVEL}px and stays there.`,
       `Returning, \`x\` never goes below -0.5px and is home by ${RETURN_MS}ms: no overshoot on the way back.`,
       'Only `transform` changes: `opacity` stays put and `offsetLeft` never changes.',
       ...(v.compare === 'plain'

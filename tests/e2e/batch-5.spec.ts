@@ -33,13 +33,18 @@ test.describe('Duration', () => {
 
   test('controls rewrite the prompt and the verdicts', async ({ page }) => {
     await page.goto('/terms/duration')
-    await expect(prompt(page)).toContainText('time this dropdown with them')
+    await expect(prompt(page)).toContainText('Time this dropdown.')
+    await expect(prompt(page)).toContainText('--duration-4: 300ms; --ease-out: cubic-bezier(0.23, 1, 0.32, 1)`.')
+    await expect(prompt(page)).toContainText('press `--duration-1` on `--ease-out`')
     await expect(prompt(page)).toContainText('This dropdown: open 200ms (`var(--duration-2)`), close 150ms (`calc(var(--duration-2) * 0.75)`)')
-    await expect(prompt(page)).toContainText('Exits: enter × 0.75, `calc(var(--duration-N) * 0.75)`.')
-    await expect(prompt(page)).toContainText('`transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}`, `exit` duration 0.15')
+    await expect(prompt(page)).toContainText('`transform-origin` at the trigger; `var(--ease-out)`.')
+    await expect(prompt(page)).toContainText('Exits of overlays (menus, tooltips, dialogs, sheets, toasts): enter × 0.75, `calc(var(--duration-N) * 0.75)`. Hover and press are symmetric.')
+    await expect(prompt(page)).toContainText('`transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}`, `exit={{ …, transition: { duration: 0.15, ease: [0.23, 1, 0.32, 1] } }}`')
+    await expect(prompt(page)).toContainText('Changes driven by the keyboard inside a component (arrow-key highlight, shortcut toggles): no animation.')
     await expect(prompt(page)).toContainText('Arrow-key highlight inside the menu: instant.')
     await expect(prompt(page)).not.toContainText('This tooltip')
     await expect(prompt(page)).not.toContainText('ease-drawer')
+    await expect(prompt(page)).not.toContainText('Backdrop')
     await expect(prompt(page)).not.toContainText('the house default is enter × 0.75')
     expect(await verdicts(page)).toEqual(['right', 'slow', 'too slow'])
 
@@ -53,18 +58,20 @@ test.describe('Duration', () => {
 
     await option(page, 'Element', 'Sheet').click()
     await expect(prompt(page)).toContainText('This sheet: open 300ms (`var(--duration-4)`), close 225ms (`calc(var(--duration-4) * 0.75)`)')
-    await expect(prompt(page)).toContainText('`var(--ease-drawer)` (`cubic-bezier(0.32, 0.72, 0, 1)`)')
+    await expect(prompt(page)).toContainText('from the bottom edge; `var(--ease-drawer)` (`cubic-bezier(0.32, 0.72, 0, 1)`).')
+    await expect(prompt(page)).toContainText('Backdrop, if any: `opacity` on the same open and close durations and curve.')
+    await expect(prompt(page)).toContainText('ease: [0.32, 0.72, 0, 1] }}`, `exit={{ …, transition: { duration: 0.225, ease: [0.32, 0.72, 0, 1] } }}`')
     await expect(prompt(page)).toContainText('Reduced motion: no slide')
     await expect(prompt(page)).not.toContainText('scale(0.9')
-    await expect(prompt(page)).not.toContainText('cubic-bezier(0.23, 1, 0.32, 1)')
+    await expect(prompt(page)).not.toContainText('`var(--ease-out)`.')
     // The same three numbers, judged against a bigger element: 150ms is now too quick for it.
     await expect.poll(() => verdicts(page)).toEqual(['abrupt', 'right', 'too slow'])
 
     await exitSwitch(page).click()
     await expect(exitSwitch(page)).toHaveAttribute('aria-checked', 'false')
-    await expect(prompt(page)).toContainText('Exits: the same duration as the enter (the house default is enter × 0.75).')
+    await expect(prompt(page)).toContainText('Exits of overlays (menus, tooltips, dialogs, sheets, toasts): same as the enter (the house default is enter × 0.75).')
     await expect(prompt(page)).toContainText('close 300ms (`var(--duration-4)`)')
-    await expect(prompt(page)).toContainText('`exit` duration 0.3,')
+    await expect(prompt(page)).toContainText('transition: { duration: 0.3, ease: [0.32, 0.72, 0, 1] } }}`')
     await expect(prompt(page)).not.toContainText('calc(var(--duration-N) * 0.75)')
     await expect(prompt(page)).not.toContainText('close 225ms')
     await exitSwitch(page).click()
@@ -133,11 +140,15 @@ test.describe('Overshoot', () => {
   test('controls rewrite the prompt', async ({ page }) => {
     await page.goto('/terms/overshoot')
     await expect(prompt(page)).toContainText('Give this element a slight overshoot when it arrives.')
-    await expect(prompt(page)).toContainText('`cubic-bezier(0.34, 1.3, 0.64, 1)`: 3% of the travel past the target; settled on the target by 300ms.')
+    await expect(prompt(page)).toContainText('between its start (`translateX(0)`) and its target (`translateX(240px)`, the travel)')
+    await expect(prompt(page)).toContainText('`cubic-bezier(0.34, 1.3, 0.64, 1)`: 3% of the travel past the target; settled on the target by 300ms from the first animated frame.')
     await expect(prompt(page)).toContainText('Return: 225ms `cubic-bezier(0.23, 1, 0.32, 1)` (ease-out), no overshoot.')
+    await expect(prompt(page)).toContainText('`animate={{ x }}`, `initial={false}`,')
     await expect(prompt(page)).toContainText('never `opacity` (it clamps at 1)')
+    await expect(prompt(page)).toContainText('CSS: set `data-instant` from `event.detail === 0`, `[data-instant] { transition-property: none }`, plus `@media (prefers-reduced-motion: reduce)`; Motion: `useReducedMotion()`, `duration: 0` chosen in the same render as `x`.')
     await expect(prompt(page)).not.toContainText('spring')
     await expect(prompt(page)).not.toContainText('cartoon')
+    await expect(prompt(page)).not.toContainText('product range')
     await expect(prompt(page)).not.toContainText('Comparison only')
 
     await option(page, 'Amount', '15% (cartoon)').click()
@@ -149,7 +160,8 @@ test.describe('Overshoot', () => {
     await expect(prompt(page)).toContainText('`var(--ease-out)` (`cubic-bezier(0.23, 1, 0.32, 1)`): it never passes the target')
     await expect(prompt(page)).not.toContainText('of the travel past the target')
 
-    await option(page, 'Amount', '8%').click()
+    await option(page, 'Amount', '8% (strong)').click()
+    await expect(prompt(page)).toContainText('`cubic-bezier(0.34, 1.5, 0.64, 1)`: 8% of the travel past the target (above the 2 to 5% product range)')
     await option(page, 'Source', 'Spring').click()
     await expect(prompt(page)).toContainText('`{ type: "spring", duration: 0.3, bounce: 0.37 }` (over the house 0.3 bounce cap): about 7.8% of the travel past the target')
     await expect(prompt(page)).toContainText('`300ms linear(…)` with a point every 5ms or closer, sampled from that spring')
@@ -171,7 +183,7 @@ test.describe('Overshoot', () => {
   for (const c of [
     { amount: '3%', source: 'Back curve', peak: 0.03 },
     { amount: '15% (cartoon)', source: 'Back curve', peak: 0.15 },
-    { amount: '8%', source: 'Spring', peak: 0.078 },
+    { amount: '8% (strong)', source: 'Spring', peak: 0.078 },
     { amount: '15% (cartoon)', source: 'Spring', peak: 0.148 },
     { amount: '0', source: 'Spring', peak: 0 },
   ]) {

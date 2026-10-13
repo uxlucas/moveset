@@ -133,7 +133,7 @@ function Column({ kind, ms, exit, timeScale, detail }: { kind: Kind; ms: number;
       <div style={vars} className={`relative overflow-hidden rounded-lg bg-demo ${detail ? 'h-40 sm:h-52' : 'h-[104px]'}`}>
         <Element kind={kind} ms={ms} detail={detail} />
       </div>
-      <p className={`font-mono ${text} ${word === 'right' ? 'text-ink' : 'text-ink-faint'}`}>{word}</p>
+      <p className={`font-mono ${text} ${word === 'right' ? 'text-ink' : 'text-ink-muted'}`}>{word}</p>
     </div>
   )
 }
@@ -170,7 +170,7 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
   const [lo, hi] = KINDS[kind].range
   const ease = { '--e': KINDS[kind].ease.css } as CSSProperties
   return (
-    <div ref={rootRef} style={ease} className={`group/stage flex h-full flex-col items-center justify-center ${detail ? 'gap-3 px-4' : 'px-1'}`}>
+    <div ref={rootRef} style={ease} className={`group/stage flex h-full flex-col items-center justify-center ${detail ? 'gap-3 px-4' : 'px-3'}`}>
       {detail && (
         <p className="w-full max-w-[560px] font-mono text-[11px] text-ink-muted">
           {KINDS[kind].name} range {lo}–{hi}ms
@@ -211,7 +211,8 @@ function elementLine(v: V): string {
     dropdown: '`opacity` 0 and `transform: scale(0.95)` to `none`, `transform-origin` at the trigger',
     sheet: '`transform: translateY(100%)` to `none`, from the bottom edge',
   }[v.element]
-  const ease = `\`${k.ease.token}\` (\`${k.ease.css}\`)`
+  // --ease-out is defined in the Tokens line; the drawer curve is defined here, the only place it is used.
+  const ease = k.ease === EASE_OUT ? `\`${k.ease.token}\`` : `\`${k.ease.token}\` (\`${k.ease.css}\`)`
   return `- This ${k.name}: open ${msText(k.ms)} (\`var(${k.token})\`), close ${msText(exit)} (\`${exitText(v)}\`); ${look}; ${ease}.`
 }
 
@@ -258,14 +259,16 @@ function cssCode(v: V): string {
     '  --duration-2: 200ms; /* menus, dropdowns, popovers */',
     '  --duration-3: 250ms; /* dialogs, toasts */',
     '  --duration-4: 300ms; /* drawers, sheets: the ceiling */',
-    `  ${k.ease === EASE_OUT ? '--ease-out: cubic-bezier(0.23, 1, 0.32, 1);' : '--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);'}`,
+    '  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);',
+    ...(k.ease === EASE_DRAWER ? ['  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);'] : []),
     '}',
     '',
-    '/* Hover and press: the short end, and only color and scale. */',
+    '/* Hover and press: the short end, and only color and scale. Color on ease,',
+    '   the press scale on --ease-out; both the same length each way. */',
     '.button {',
     '  transition-property: background-color, scale;',
     '  transition-duration: var(--duration-1);',
-    '  transition-timing-function: ease;',
+    '  transition-timing-function: ease, var(--ease-out);',
     '}',
     '@media (hover: hover) and (pointer: fine) {',
     '  .button:hover {',
@@ -357,7 +360,7 @@ export default defineTerm({
   definition: 'How long an animation takes, which decides whether it feels instant, smooth or slow.',
   aliases: ['timing', 'how long it takes', 'animation length', 'feels slow', 'too fast', 'ms', 'animation speed'],
   description:
-    'Duration is how long an animation runs from start to finish, and it shapes how an interface feels more than the curve does: a 180ms dropdown reads as a response, the same dropdown at 400ms reads as the interface thinking. Product UI stays under 300ms. Exits run about 25% faster than enters, because the user has already moved on. Size and distance pick the spot inside the range: a tooltip that moves a few pixels needs less time than a sheet crossing the screen, so one number is right for one element and wrong for the next.',
+    'Duration is how long an animation runs from start to finish, and it shapes how an interface feels: a 180ms dropdown reads as a response, the same dropdown at 400ms reads as the interface thinking. Product UI stays under 300ms. Exits run about 25% faster than enters, because the user has already moved on. Size and distance pick the spot inside the range: a tooltip that moves a few pixels needs less time than a sheet crossing the screen, so one number is right for one element and wrong for the next, and something used 100+ times a day gets none.',
   useWhen: [
     'Hover, press and color changes: 100 to 150ms.',
     'Tooltips and small popovers: 125 to 200ms. Menus and dropdowns: 150 to 250ms.',
@@ -380,41 +383,48 @@ export default defineTerm({
   },
   prompt: (v) => {
     const k = KINDS[v.element]
+    const sheet = v.element === 'sheet'
+    const exit = s(exitOf(k.ms, v))
     return [
-      `Set the animation durations in this UI, and time this ${k.name} with them.`,
+      `Time this ${k.name}.`,
       '',
-      '- Tokens: `--duration-1: 150ms; --duration-2: 200ms; --duration-3: 250ms; --duration-4: 300ms`.',
-      '- By kind: hover, press and color 100 to 150ms (`--duration-1`, `ease`); tooltips 125 to 200ms; menus and dropdowns 150 to 250ms (`--duration-2`); dialogs and toasts `--duration-3`; drawers and sheets `--duration-4`. Only page-level transitions go past 300ms, to 400ms at most.',
+      '- Tokens: `--duration-1: 150ms; --duration-2: 200ms; --duration-3: 250ms; --duration-4: 300ms; --ease-out: cubic-bezier(0.23, 1, 0.32, 1)`.',
+      '- By kind, for reference across the UI: hover and color 100 to 150ms (`--duration-1`, `ease`); press `--duration-1` on `--ease-out`; tooltips 125 to 200ms; menus and dropdowns 150 to 250ms (`--duration-2`); dialogs and toasts `--duration-3`; drawers and sheets `--duration-4`. Only page-level transitions pass 300ms, 400ms at most.',
       v.exitRatio
-        ? '- Exits: enter × 0.75, `calc(var(--duration-N) * 0.75)`.'
-        : '- Exits: the same duration as the enter (the house default is enter × 0.75).',
-      '- Bigger elements and longer travel take the long end of their range; never one duration for everything.',
-      '- Used 100+ times a day, or triggered from the keyboard (arrow keys, shortcuts): no animation.',
+        ? '- Exits of overlays (menus, tooltips, dialogs, sheets, toasts): enter × 0.75, `calc(var(--duration-N) * 0.75)`. Hover and press are symmetric.'
+        : '- Exits of overlays (menus, tooltips, dialogs, sheets, toasts): same as the enter (the house default is enter × 0.75). Hover and press are symmetric.',
+      '- Bigger elements and longer travel take the long end; never one duration for everything.',
+      '- Used 100+ times a day: no animation. Changes driven by the keyboard inside a component (arrow-key highlight, shortcut toggles): no animation.',
       elementLine(v),
-      `- CSS route: \`transition-property: ${v.element === 'sheet' ? 'transform' : 'opacity, transform'}\`; the base rule holds the close duration, \`[data-open]\` the open; closed, it stays mounted with \`inert\`.`,
-      `- Motion route: \`transition={{ duration: ${s(k.ms)}, ease: ${k.ease.motion} }}\`, \`exit\` duration ${s(exitOf(k.ms, v))}, inside \`AnimatePresence\`.`,
+      ...(sheet ? ['- Backdrop, if any: `opacity` on the same open and close durations and curve.'] : []),
+      `- CSS route: \`transition-property: ${sheet ? 'transform' : 'opacity, transform'}\`; the base rule holds the close duration, \`[data-open]\` the open; closed, it stays mounted with \`inert\`.`,
+      `- Motion route: \`transition={{ duration: ${s(k.ms)}, ease: ${k.ease.motion} }}\`, \`exit={{ …, transition: { duration: ${exit}, ease: ${k.ease.motion} } }}\`, inside \`AnimatePresence\`; \`useReducedMotion()\` drops the ${sheet ? 'slide' : 'scale'}.`,
       ...(v.element === 'dropdown' ? ['- Arrow-key highlight inside the menu: instant.'] : []),
-      `- Reduced motion: no ${v.element === 'sheet' ? 'slide' : 'scale'}, \`opacity\` only, same durations.`,
+      `- Reduced motion: no ${sheet ? 'slide' : 'scale'}, \`opacity\` only, same durations.`,
     ].join('\n')
   },
   acceptance: (v) => {
     const k = KINDS[v.element]
     const exit = exitOf(k.ms, v)
+    const sheet = v.element === 'sheet'
     return [
-      `Open, the ${k.name}'s computed \`transition-duration\` is \`${s(k.ms)}s\`; closed, \`${s(exit)}s\` (CSS route). Motion route: opening runs ${k.ms}ms and closing ${exit}ms, from the first to the last frame that changes (±1 frame).`,
+      `CSS route: the ${k.name}'s computed \`transition-duration\` is \`${s(k.ms)}s\` with \`[data-open]\` and \`${s(exit)}s\` without. Motion route: the \`transition\` durations are ${s(k.ms)} in and ${s(exit)} out.`,
       v.exitRatio
-        ? `Closing takes no more than 75% of opening: ${exit}ms against ${k.ms}ms.`
-        : `Closing takes as long as opening, ${k.ms}ms (the house ships 75%).`,
-      `Its computed \`transition-timing-function\` is \`${k.ease.css}\`.`,
+        ? `The close is configured at no more than 75% of the open: ${exit}ms against ${k.ms}ms.`
+        : `The close is configured as long as the open, ${k.ms}ms (the house ships 75%).`,
+      `Its computed \`transition-timing-function\` is \`${k.ease.css}\` (CSS route).`,
+      ...(sheet ? [`The backdrop, if there is one, fades on the same durations and curve as the sheet: ${k.ms}ms open, ${exit}ms close.`] : []),
       'No transition or animation in the UI is longer than 0.3s, except page-level transitions, which stay at or under 0.4s.',
       'Hover and press changes finish within 150ms.',
-      'Changes made from the keyboard, like moving a highlight with the arrow keys, show in the next frame with no transition.',
-      `With reduced motion on, the ${k.name} ${v.element === 'sheet' ? 'fades without sliding' : 'fades without changing size'}, over the same durations.`,
+      v.element === 'dropdown'
+        ? 'Moving the highlight with the arrow keys shows in the next frame with no transition.'
+        : 'Changes made from the keyboard inside the component show in the next frame with no transition.',
+      `With reduced motion on, the ${k.name} ${sheet ? 'fades without sliding' : 'fades without changing size'}, over the same durations.`,
     ]
   },
   code: (v) => ({ css: cssCode(v), motion: motionCode(v) }),
-  a11y: 'Duration has no accessibility cost of its own as long as nothing waits for it: make the element usable from the first frame of the enter, and move focus when it opens, not when the animation ends. Changes made from the keyboard should not animate. Under reduced motion, drop the movement and keep at most a fade over the same short durations.',
-  related: ['ease-out', 'ease-in-out', 'spring', 'stagger'],
+  a11y: 'Duration has no accessibility cost of its own as long as nothing waits for it: make the element usable from the first frame of the enter, and move focus when it opens, not when the animation ends. Changes made from the keyboard inside a component should not animate. Under reduced motion, drop the movement and keep at most a fade over the same short durations.',
+  related: ['ease-out', 'ease-in-out', 'enter-and-exit', 'spring', 'stagger'],
   sources: [
     { label: "Emil Kowalski: You Don't Need Animations", url: 'https://emilkowal.ski/ui/you-dont-need-animations' },
     { label: 'Emil Kowalski: 7 Practical Animation Tips', url: 'https://emilkowal.ski/ui/7-practical-animation-tips' },

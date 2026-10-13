@@ -19,7 +19,8 @@ The standard every demo, prompt and piece of site chrome is held to. Distilled f
 
 ## Duration
 - Press and hover 100–150ms. Tooltips and small popovers 125–200ms. Menus 150–250ms. Dialogs, drawers and toasts 200–300ms.
-- UI stays under 300ms. Exits run about 25% faster than enters.
+- Page-level transitions 300–400ms: the only place UI goes past 300ms.
+- Product UI stays at or under 300ms. Exits run about 25% faster than enters.
 
 ## Springs
 - Use a spring when motion follows a gesture or can be interrupted.
@@ -35,7 +36,7 @@ The standard every demo, prompt and piece of site chrome is held to. Distilled f
 - Anything the user can toggle uses transitions or springs, which retarget mid-flight. Keyframes are for one-shot sequences only.
 
 ## Enter and exit
-- Exits are quieter than enters: a few pixels of travel, faster, no full-height slides.
+- Exits are quieter than enters: a few pixels of travel, faster, no full-height slides. Exception: drawers and sheets slide fully off on `--ease-drawer`, matching their enter.
 - Don't play entrance animations for things already in place on first paint.
 
 ## Press and hover
