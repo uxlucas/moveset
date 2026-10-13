@@ -323,7 +323,7 @@ export default defineTerm({
   name: 'Ease-in-out',
   category: 'motion',
   order: 2,
-  status: 'review',
+  status: 'published',
   definition: 'Motion that speeds up and then slows down, for elements already on screen moving from one spot to another.',
   aliases: ['speeds up then slows down', 'smooth both ends', 'ease in out', 'acceleration and braking'],
   description:

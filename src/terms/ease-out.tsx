@@ -333,7 +333,7 @@ export default defineTerm({
   name: 'Ease-out',
   category: 'motion',
   order: 1,
-  status: 'review',
+  status: 'published',
   definition: 'Motion that starts fast and slows into place, the default for anything responding to the user.',
   aliases: ['starts fast and slows down', 'decelerate', 'snappy entrance', 'ease out', 'deceleration curve'],
   description:
