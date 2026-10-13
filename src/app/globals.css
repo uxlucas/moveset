@@ -182,6 +182,23 @@
     animation-name: g-eio;
     animation-timing-function: var(--ease-in-out);
   }
+  /* Shoots past the far end, swings back, settles, then fades back to the start. */
+  .gl[data-glyph='spring'][data-active='true'] .m {
+    animation-name: g-spring;
+  }
+  /* Three rows rise in one after another, hold, and fade out together. */
+  .gl[data-glyph='stagger'][data-active='true'] .m {
+    animation-name: g-stag;
+    animation-fill-mode: both;
+  }
+  .gl[data-glyph='stagger'][data-active='true'] .m.s1 {
+    animation-name: g-stag-2;
+    animation-delay: 0.12s;
+  }
+  .gl[data-glyph='stagger'][data-active='true'] .m.s2 {
+    animation-name: g-stag-3;
+    animation-delay: 0.24s;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .gl .m {
@@ -228,6 +245,37 @@
   0%, 10% { transform: translateX(-2.5px); }
   45%, 60% { transform: translateX(2.5px); }
   95%, 100% { transform: translateX(-2.5px); }
+}
+@keyframes g-spring {
+  0%, 8% { transform: translateX(-3px); opacity: 1; }
+  26% { transform: translateX(3.5px); }
+  38% { transform: translateX(2.85px); }
+  48% { transform: translateX(3.05px); }
+  56%, 80% { transform: translateX(3px); opacity: 1; }
+  90% { transform: translateX(3px); opacity: 0; }
+  91% { transform: translateX(-3px); opacity: 0; }
+  100% { transform: translateX(-3px); opacity: 1; }
+}
+/* Rows 2 and 3 start 5% and 10% of the loop later, so their fade sits 5% and 10% earlier: all three fade together. */
+@keyframes g-stag {
+  0% { transform: translateY(1.5px); opacity: 0; }
+  18%, 80% { transform: none; opacity: 1; }
+  92%, 100% { transform: none; opacity: 0; }
+}
+@keyframes g-stag-2 {
+  0% { transform: translateY(1.5px); opacity: 0; }
+  18%, 75% { transform: none; opacity: 1; }
+  87%, 100% { transform: none; opacity: 0; }
+}
+@keyframes g-stag-3 {
+  0% { transform: translateY(1.5px); opacity: 0; }
+  18%, 70% { transform: none; opacity: 1; }
+  82%, 100% { transform: none; opacity: 0; }
+}
+
+/* Stagger demo (src/terms/stagger.tsx): the one-shot entrance each item runs. The exit is a transition on the list. */
+@keyframes demo-stagger-in {
+  from { opacity: 0; transform: translateY(8px); filter: blur(2px); }
 }
 
 /* Site chrome goes still under reduced motion. Demos handle it themselves (play on request). */

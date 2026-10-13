@@ -24,6 +24,17 @@ test('ease-out shows ease-in in its code only when comparing against ease-in', (
   }
 })
 
+// Spring's comparison twin runs on the house ease-out curve; that curve belongs only in its comparison branch.
+test('spring names the ease-out curve only when comparing against it', () => {
+  const term = terms.find((t) => t.slug === 'spring')
+  if (!term || !isFull(term)) throw new Error('spring is not a full term')
+  const easeOut = /0\.23, 1, 0\.32, 1|ease-out/
+  for (const v of controlCombinations(term.demo.controls)) {
+    const text = [...Object.values(term.code(v)), term.prompt(v), ...term.acceptance(v)].join('\n')
+    expect(easeOut.test(text), JSON.stringify(v)).toBe(v.compare === 'ease-out')
+  }
+})
+
 test('the 47 terms are spread across the seven categories in order', () => {
   const counts = Object.fromEntries(groupByCategory(terms).map((g) => [g.category.slug, g.terms.length]))
   expect(counts).toEqual({ scroll: 8, motion: 8, transitions: 7, gestures: 6, layout: 5, states: 7, visual: 6 })
