@@ -156,8 +156,15 @@ test.describe('Duration', () => {
   })
 
   const frame = (page: Page, ms: number, kind = 'dropdown') => demo(page, 'duration').getByRole('button', { name: `${ms}ms ${kind}`, exact: true })
-  const hint = (page: Page) => demo(page, 'duration').locator('p[aria-hidden]')
+  const trigger = (page: Page, ms: number) => demo(page, 'duration').locator(`[data-duration-column][data-ms="${ms}"] [data-duration-trigger]`)
+  // The hint keeps one span per line and shows one at a time, so what it reads is its innerText.
+  const expectHint = (page: Page, text: string) => expect(demo(page, 'duration').locator('p[aria-hidden]')).toHaveText(text, { useInnerText: true })
   const stage = (page: Page) => demo(page, 'duration').locator('[data-taken-over]')
+  /** Moves the mouse onto a locator's centre in one step, so only the landing element sees a pointerover. */
+  const mouseTo = async (page: Page, target: Locator, dx = 0, dy = 0) => {
+    const box = (await target.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy)
+  }
   /** data-open of the three items, by column. */
   const opens = (page: Page) =>
     demo(page, 'duration').locator('[data-duration-item]').evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.open))
@@ -168,14 +175,17 @@ test.describe('Duration', () => {
       .evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration) * 1000)
 
   type Opened = { t: number; o: number }[]
-  /** From the next pointerdown or click on, records the item's opacity every frame until it is fully opaque. */
+  /** From the next pointerdown, keydown or hover onto a trigger on, records the item's opacity every frame until it is fully opaque. */
   const recordOpen = (page: Page, ms: number) =>
     demo(page, 'duration')
       .locator(`[data-duration-item][data-ms="${ms}"]`)
       .evaluate((el) => {
         const rec: Opened = []
         ;(window as unknown as { rec: Opened }).rec = rec
+        let started = false
         const start = () => {
+          if (started) return
+          started = true
           const t0 = performance.now()
           const tick = () => {
             const o = Number(getComputedStyle(el).opacity)
@@ -186,19 +196,20 @@ test.describe('Duration', () => {
         }
         window.addEventListener('pointerdown', start, { once: true, capture: true })
         window.addEventListener('keydown', start, { once: true, capture: true })
+        window.addEventListener('pointerover', (e) => (e.target as Element).closest('[data-duration-trigger]') && start(), { capture: true })
       })
   const recorded = (page: Page) => page.evaluate(() => (window as unknown as { rec: Opened }).rec)
 
   test('held, a frame opens its own element at its duration and the other two stay closed; let go, it closes at its exit duration', async ({ page, isMobile }) => {
     await page.goto('/terms/duration')
     await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
-    await expect(hint(page)).toHaveText('Hold a frame to play it')
+    await expectHint(page, 'Hold a frame to play it')
     await expect(frame(page, 150)).toBeVisible()
     await expect(frame(page, 500)).toBeVisible()
     await recordOpen(page, 300)
     const pointer = await pointerOn(page, frame(page, 300), isMobile)
     await pointer.down()
-    await expect(hint(page)).toHaveText('Let go to close it')
+    await expectHint(page, 'Let go to close it')
     await expect(frame(page, 300)).toHaveAttribute('aria-pressed', 'true')
     await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
     expect(await opens(page)).toEqual(['false', 'true', 'false'])
@@ -215,7 +226,7 @@ test.describe('Duration', () => {
     expect(await opens(page)).toEqual(['false', 'true', 'false'])
     await pointer.up()
     await expect(frame(page, 300)).toHaveAttribute('aria-pressed', 'false')
-    await expect(hint(page)).toHaveText('Hold a frame to play it')
+    await expectHint(page, 'Hold a frame to play it')
     expect(await opens(page)).toEqual(['false', 'false', 'false'])
     expect(await durationOf(page, 300)).toBeCloseTo(225, 1)
     // The stage rests as the visitor left it.
@@ -287,6 +298,134 @@ test.describe('Duration', () => {
     await expect(frame(page, 500, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
   })
 
+  test('the tooltip hint names the gesture for the pointer; on touch, holding its frame still plays it', async ({ page, isMobile }) => {
+    await page.goto('/terms/duration')
+    await option(page, 'Element', 'Tooltip').click()
+    await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
+    await expect(frame(page, 300, 'tooltip')).toBeVisible()
+    await expectHint(page, isMobile ? 'Hold a frame to play it' : 'Hover a trigger to play it')
+    // Dropdown and sheet are held whatever the pointer.
+    await option(page, 'Element', 'Sheet').click()
+    await expectHint(page, 'Hold a frame to play it')
+    await option(page, 'Element', 'Tooltip').click()
+    test.skip(!isMobile, 'touch')
+    const pointer = await pointerOn(page, frame(page, 300, 'tooltip'), isMobile)
+    await pointer.down()
+    await expectHint(page, 'Let go to close it')
+    await expect(frame(page, 300, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+    expect(await opens(page)).toEqual(['false', 'true', 'false'])
+    await pointer.up()
+    await expect(frame(page, 300, 'tooltip')).toHaveAttribute('aria-pressed', 'false')
+    await expectHint(page, 'Hold a frame to play it')
+    expect(await opens(page)).toEqual(['false', 'false', 'false'])
+  })
+
+  test('with a mouse, hovering a tooltip trigger opens it at its duration and the other two stay closed; moving away closes it at its exit duration', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'mouse')
+    await page.goto('/terms/duration')
+    await option(page, 'Element', 'Tooltip').click()
+    await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
+    await expect(trigger(page, 500)).toBeVisible()
+    await recordOpen(page, 500)
+    await mouseTo(page, trigger(page, 500))
+    await expectHint(page, 'Move away to close it')
+    await expect(frame(page, 500, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+    expect(await opens(page)).toEqual(['false', 'false', 'true'])
+    expect(await durationOf(page, 500)).toBeCloseTo(500, 1)
+    await page.waitForTimeout(800)
+    const rec = await recorded(page)
+    // It faded in over its own duration: in-between frames, never a jump, fully there between 300ms and 500ms (+slack).
+    expect(rec.some((f) => f.o > 0.05 && f.o < 0.95)).toBe(true)
+    for (let i = 1; i < rec.length; i++) expect(rec[i].o).toBeGreaterThanOrEqual(rec[i - 1].o - 0.001)
+    const landed = rec.find((f) => f.o >= 0.999)!
+    expect(landed.t).toBeGreaterThan(300)
+    expect(landed.t).toBeLessThan(650)
+    // Still hovering: the other two have not been opened by the cycle.
+    expect(await opens(page)).toEqual(['false', 'false', 'true'])
+    // Off the trigger, onto the frame above it (the hit zone ends where the tooltip begins).
+    await mouseTo(page, frame(page, 500, 'tooltip'), 0, -60)
+    await expect(frame(page, 500, 'tooltip')).toHaveAttribute('aria-pressed', 'false')
+    await expectHint(page, 'Hover a trigger to play it')
+    expect(await opens(page)).toEqual(['false', 'false', 'false'])
+    expect(await durationOf(page, 500)).toBeCloseTo(375, 1)
+    // The stage rests as the visitor left it.
+    await page.waitForTimeout(300)
+    expect(await opens(page)).toEqual(['false', 'false', 'false'])
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+  })
+
+  test('with a mouse, the hover zone reaches 44px tall around the trigger', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'mouse')
+    await page.goto('/terms/duration')
+    await option(page, 'Element', 'Tooltip').click()
+    await expect(trigger(page, 300)).toBeVisible()
+    const box = (await trigger(page, 300).boundingBox())!
+    expect(box.height).toBeLessThan(44)
+    // 6px below the visible trigger, inside the 44px zone.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height + 6)
+    await expect(frame(page, 300, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
+    expect(await opens(page)).toEqual(['false', 'true', 'false'])
+    // Well below it, out of the zone.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height + 30)
+    await expect(frame(page, 300, 'tooltip')).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('hovering 150 then 500 back to back leaves nothing stuck; Replay hands the stage back', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'mouse')
+    await page.goto('/terms/duration')
+    await option(page, 'Element', 'Tooltip').click()
+    await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
+    await expect(trigger(page, 500)).toBeVisible()
+    await mouseTo(page, trigger(page, 150))
+    await expect(frame(page, 150, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
+    expect(await opens(page)).toEqual(['true', 'false', 'false'])
+    await mouseTo(page, trigger(page, 500))
+    await expect(frame(page, 500, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
+    await expect(frame(page, 150, 'tooltip')).toHaveAttribute('aria-pressed', 'false')
+    expect(await opens(page)).toEqual(['false', 'false', 'true'])
+    await expectHint(page, 'Move away to close it')
+    await mouseTo(page, frame(page, 500, 'tooltip'), 0, -60)
+    await expect.poll(() => opens(page)).toEqual(['false', 'false', 'false'])
+    await expectHint(page, 'Hover a trigger to play it')
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+    // Replay: a new cycle, all three open together again, and the buttons report it.
+    await page.getByRole('button', { name: 'Replay' }).click()
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'false')
+    await expect.poll(() => opens(page), { timeout: 3000 }).toEqual(['true', 'true', 'true'])
+    await expect(frame(page, 500, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('with the tooltip, a mouse press on the frame does nothing (hover owns it); Enter still toggles', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'mouse')
+    await page.goto('/terms/duration')
+    await option(page, 'Element', 'Tooltip').click()
+    await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
+    await expect(frame(page, 300, 'tooltip')).toBeVisible()
+    // A corner of the frame, well away from the trigger's zone.
+    const box = (await frame(page, 300, 'tooltip').boundingBox())!
+    await page.mouse.move(box.x + 12, box.y + 12)
+    await page.mouse.down()
+    await page.waitForTimeout(250)
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'false')
+    await expectHint(page, 'Hover a trigger to play it')
+    await page.mouse.up()
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'false')
+    // Tooltips do not change the cursor; the other frames do.
+    expect(await frame(page, 300, 'tooltip').evaluate((el) => getComputedStyle(el).cursor)).not.toBe('pointer')
+    await frame(page, 300, 'tooltip').focus()
+    await page.keyboard.press('Enter')
+    await expect(frame(page, 300, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
+    expect(await opens(page)).toEqual(['false', 'true', 'false'])
+    await page.keyboard.press('Space')
+    await expect(frame(page, 300, 'tooltip')).toHaveAttribute('aria-pressed', 'false')
+    await option(page, 'Element', 'Dropdown').click()
+    await expect(frame(page, 300)).toBeVisible()
+    expect(await frame(page, 300).evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer')
+  })
+
   /** The computed transform of one item. */
   const transformOf = (page: Page, ms: number) =>
     demo(page, 'duration').locator(`[data-duration-item][data-ms="${ms}"]`).evaluate((el) => getComputedStyle(el).transform)
@@ -316,6 +455,9 @@ test.describe('Duration', () => {
     // The sheet: no slide under reduced motion, a fade in place over the same durations.
     await option(page, 'Element', 'Sheet').click()
     await expect(frame(page, 500, 'sheet')).toBeVisible()
+    // The control change hands the stage back: all three open and reported as pressed, not taken over any more.
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'false')
+    for (const ms of [150, 300, 500]) await expect(frame(page, ms, 'sheet')).toHaveAttribute('aria-pressed', 'true')
     await recordOpen(page, 500)
     const sheet = await pointerOn(page, frame(page, 500, 'sheet'), isMobile)
     await sheet.down()
