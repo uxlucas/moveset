@@ -1,6 +1,8 @@
 import { animate, motionValue, spring, type AnimationPlaybackControls, type MotionValue } from 'motion/react'
-import { useEffect, useRef, type MouseEvent } from 'react'
+import { useEffect, useRef, type MouseEvent, type PointerEvent } from 'react'
+import { scaled } from '@/components/demo/playback'
 import { useCycle } from '@/components/demo/use-cycle'
+import { usePrefersReducedMotion } from '@/components/demo/use-reduced-motion'
 import { GlyphSvg } from '@/components/site/glyph'
 import { defineTerm, type Control, type ControlValues, type DemoProps, type GlyphProps } from '@/lib/term-types'
 
@@ -78,6 +80,11 @@ const REST_MS = 400
 const HOLD_MS = 600
 // The demo sends the card back at 40% of the way, but never before this, so the short springs show an outbound leg.
 const MIN_BACK_MS = 90
+// A press let go this soon and this still is a click: the card goes out and is sent back on the timeline's beat.
+const CLICK_MS = 150
+const CLICK_PX = 4
+const HINT = 'Hold the card, let go early'
+const HINT_HELD = 'Release to send it back'
 
 /** ms until the spring has covered `fraction` of the distance, from Motion's own generator. */
 function timeTo(p: Physics, fraction: number): number {
@@ -87,6 +94,7 @@ function timeTo(p: Physics, fraction: number): number {
 }
 
 type Side = 'a' | 'b'
+type Press = { pointerId: number; x: number; y: number; at: number }
 
 /** The spring sampled into a CSS linear() easing over its duration, by Motion's own spring generator. */
 function linearPoints(v: V): string[] {
@@ -123,8 +131,9 @@ function Track({ size, label, twin }: { size: DemoProps['size']; label?: string;
             data-spring-card=""
             data-side="a"
             aria-pressed="false"
-            aria-label="Send the card to the other end"
-            className={`${card} cursor-pointer touch-manipulation`}
+            aria-label="Spring card: press and hold to send it to the other end, release to send it back"
+            // A hold must not scroll the page, select text or open the long-press menu.
+            className={`${card} cursor-pointer touch-none select-none [-webkit-touch-callout:none]`}
           >
             {face}
           </button>
@@ -151,18 +160,37 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
   // One motion value per card node, written straight to its transform: nothing renders per frame.
   const positions = useRef(new WeakMap<HTMLElement, MotionValue<number>>())
   const running = useRef<AnimationPlaybackControls[]>([])
-  // Set when the visitor clicks the card; the timeline then leaves it alone until a replay or a control change.
+  // Set when the visitor presses the card; the timeline then leaves it alone until a replay or a control change.
   // Pausing (off screen, hidden tab) and resuming keeps the visitor in charge.
   const taken = useRef(false)
   const takenIn = useRef('')
+  // Where the card rests between gestures: a hold sends it to the other side, the release brings it back here.
+  // Enter and Space move it.
+  const home = useRef<Side>('a')
+  const press = useRef<Press | null>(null)
+  const backTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const hintRef = useRef<HTMLParagraphElement>(null)
+  const reduced = usePrefersReducedMotion()
   const cycleKey = `${replayKey}|${values.bounce}|${values.duration}|${values.compare}`
   const physics = PHYSICS[values.duration][values.bounce]
   const seconds = Number(values.duration)
+  // When the timeline (and a plain click) sends the card back: at 40% of the way, never before 90ms, so the short
+  // springs show an outbound leg, but always before 75% of the way, so the card is still mid-flight.
+  const backMs = Math.min(Math.max(physics.at40, MIN_BACK_MS), timeTo(physics, 0.75))
+
+  const setHeld = (pressed: Press | null) => {
+    press.current = pressed
+    if (hintRef.current) hintRef.current.textContent = pressed ? HINT_HELD : HINT
+  }
 
   const setTaken = (on: boolean) => {
     taken.current = on
     takenIn.current = on ? cycleKey : ''
     if (rootRef.current) rootRef.current.dataset.takenOver = String(on)
+    if (on) return
+    clearTimeout(backTimer.current)
+    setHeld(null)
+    home.current = 'a'
   }
 
   const xOf = (card: HTMLElement) => {
@@ -201,15 +229,14 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
     }
   }
 
-  // One cycle: home (a no-op unless a replay lands mid-move), a beat, off toward the far end, and at 40% of the way
-  // sent back home: never before 90ms, so the short springs show an outbound leg, but always before 75% of the way, so
-  // the card is still mid-flight. Both cards get each command at the same instant. The still frame is home.
+  // One cycle: home (a no-op unless a replay lands mid-move), a beat, off toward the far end, and sent back home
+  // mid-flight. Both cards get each command at the same instant. The still frame is home.
   useCycle(
     () => {
       const go = (side: Side) => () => {
         if (!taken.current) send(side)
       }
-      const backAt = REST_MS + Math.min(Math.max(physics.at40, MIN_BACK_MS), timeTo(physics, 0.75))
+      const backAt = REST_MS + backMs
       return {
         steps: [
           [
@@ -249,15 +276,45 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
     return () => {
       observer.disconnect()
       running.current.forEach((a) => a.stop())
+      clearTimeout(backTimer.current)
     }
   }, [])
 
+  // Press and hold sends the card across on the spring; letting go at any moment sends it home from wherever it is,
+  // carrying its speed. The visitor picks the moment by releasing, not by reacting to a fast move. The capture keeps
+  // the release on the card after it has moved out from under the pointer. Reduced motion: it jumps both times.
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>('[data-spring-card]')
+    if (size !== 'detail' || !card || !e.isPrimary || e.button !== 0 || press.current) return
+    card.setPointerCapture(e.pointerId)
+    clearTimeout(backTimer.current)
+    setTaken(true)
+    setHeld({ pointerId: e.pointerId, x: e.clientX, y: e.clientY, at: performance.now() })
+    send(home.current === 'a' ? 'b' : 'a', reduced)
+  }
+
+  // pointerup, pointercancel, or the capture lost: whichever comes first ends the hold.
+  const onRelease = (e: PointerEvent<HTMLDivElement>) => {
+    const pressed = press.current
+    if (!pressed || e.pointerId !== pressed.pointerId) return
+    setHeld(null)
+    const heldMs = performance.now() - pressed.at
+    const click = e.type === 'pointerup' && heldMs < CLICK_MS && Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) < CLICK_PX
+    // A plain click plays the lesson by itself: the card is sent back on the timeline's beat, counted from the press.
+    const wait = click && !reduced ? scaled(backMs, timeScale) - heldMs : 0
+    if (wait > 0) backTimer.current = setTimeout(() => send(home.current), wait)
+    else send(home.current, reduced)
+  }
+
+  // Pointer clicks are handled as presses above. A click from the keyboard (Enter or Space reports detail 0) moves
+  // the card to the other end without animating, as the house rule says.
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     const card = (e.target as HTMLElement).closest<HTMLElement>('[data-spring-card]')
-    if (size !== 'detail' || !card) return
+    if (size !== 'detail' || !card || e.detail !== 0 || press.current) return
+    clearTimeout(backTimer.current)
     setTaken(true)
-    // A click from the keyboard (Enter or Space reports detail 0) moves without animating, as the house rule says.
-    send(card.dataset.side === 'b' ? 'a' : 'b', e.detail === 0)
+    home.current = home.current === 'a' ? 'b' : 'a'
+    send(home.current, true)
   }
 
   const compare = values.compare === 'ease-out'
@@ -267,11 +324,22 @@ function SpringDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
       ref={rootRef}
       data-taken-over="false"
       onClick={onClick}
+      onPointerDown={onPointerDown}
+      onPointerUp={onRelease}
+      onPointerCancel={onRelease}
+      onLostPointerCapture={onRelease}
+      onContextMenu={(e) => {
+        if (press.current) e.preventDefault()
+      }}
       className={`flex h-full flex-col items-center justify-center px-4 ${detail ? 'gap-6' : 'gap-4'}`}
     >
       <Track size={size} label={compare ? 'spring' : undefined} />
       {compare && <Track size={size} label="ease-out" twin />}
-      {detail && <p className="font-mono text-[11px] text-ink-muted">Click the card, then again mid-move</p>}
+      {detail && (
+        <p ref={hintRef} aria-hidden className="font-mono text-[11px] text-ink-muted">
+          {HINT}
+        </p>
+      )}
     </div>
   )
 }
@@ -470,7 +538,7 @@ export default defineTerm({
   demo: {
     component: SpringDemo,
     label:
-      'A card sits at the left end of a track. It springs toward the right end and, partway there, is sent back: it keeps its speed for a moment, slows, turns and settles at the start without stopping dead. On the entry page, clicking the card sends it to the other end at any moment. With a comparison picked, a twin card below makes the same moves on a fixed ease-out curve and reverses at full speed.',
+      'A card sits at the left end of a track. It springs toward the right end and, partway there, is sent back: it keeps its speed for a moment, slows, turns and settles at the start without stopping dead. On the entry page, holding the card sends it toward the other end, and letting go at any moment sends it back from wherever it is. With a comparison picked, a twin card below makes the same moves on a fixed ease-out curve and reverses at full speed.',
     controls,
     glyph: SpringGlyph,
   },

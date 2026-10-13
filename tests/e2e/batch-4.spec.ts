@@ -26,6 +26,104 @@ for (const { slug, name, subject } of [
   })
 }
 
+const springCard = (page: Page) => demo(page, 'spring').locator('[data-spring-card]')
+const springHint = (page: Page) => demo(page, 'spring').locator('p[aria-hidden]')
+
+type Recording = { f: { t: number; s: number; tw: number; event: boolean }[]; down: number; up: number; on: boolean }
+
+/**
+ * Takes over the card and jumps it home with keyboard-style clicks (element.click() reports detail 0, like Enter),
+ * waits for it to rest, then records the position of the card (and the twin, if any) in every frame Motion moves
+ * it, with the moments of the press and the release. Returns home and the travel, in px from the track's left edge.
+ */
+async function homeAndRecord(page: Page) {
+  return springCard(page).evaluate(async (el: HTMLElement) => {
+    const frame = () => new Promise((r) => requestAnimationFrame(r))
+    const track = el.parentElement!
+    const x = (node: Element) => node.getBoundingClientRect().left - track.getBoundingClientRect().left
+    el.click()
+    if (el.dataset.side === 'b') el.click()
+    const home = x(track.children[0])
+    const travel = x(track.children[1]) - home
+    for (let still = 0; still < 3; ) {
+      await frame()
+      still = Math.abs(x(el) - home) < 0.5 ? still + 1 : 0
+    }
+    const twin = el.closest('[data-taken-over]')!.querySelector('[data-twin-card]')
+    const rec: Recording = { f: [], down: NaN, up: NaN, on: true }
+    ;(window as unknown as { rec: Recording }).rec = rec
+    // Read the rects right after each write Motion makes, stamped with performance.now(), the clock Motion samples
+    // its animations on. Reading from our own rAF or a timer instead depends on callback order and main-thread load,
+    // and can pair one frame's time with another frame's position. Writes made inside the press or release handler
+    // (a jump, or the old animation brought up to Motion's cached time before it stops) are marked `event`: they
+    // are never painted as such and carry no reliable time.
+    let inEvent = false
+    const observer = new MutationObserver(() => {
+      if (!rec.on) return observer.disconnect()
+      rec.f.push({ t: performance.now(), s: x(el), tw: twin ? x(twin) : 0, event: inEvent })
+    })
+    for (const card of twin ? [el, twin] : [el]) observer.observe(card, { attributes: true, attributeFilter: ['style'] })
+    for (const type of ['pointerdown', 'pointerup'] as const) {
+      // Capture on window runs before React's handler, bubble on window after it.
+      window.addEventListener(type, () => {
+        inEvent = true
+        rec[type === 'pointerdown' ? 'down' : 'up'] = performance.now()
+      }, true)
+      window.addEventListener(type, () => (inEvent = false))
+    }
+    return { home, travel }
+  })
+}
+
+/** Speeds in px per 60Hz frame (so uneven or skipped frames never read as jumps); speeds[k] is the move into sample k. */
+async function stopRecording(page: Page) {
+  const rec = await page.evaluate(() => {
+    const r = (window as unknown as { rec: Recording }).rec
+    r.on = false
+    return r
+  })
+  // Frames: what Motion wrote on its own clock.
+  const f = rec.f.filter((p) => !p.event)
+  const speed = (k: number, key: 's' | 'tw') => (k === 0 ? 0 : ((f[k][key] - f[k - 1][key]) / (f[k].t - f[k - 1].t)) * (1000 / 60))
+  return {
+    // Every position the card was given, frames and handler writes alike.
+    all: rec.f.map((p) => p.s),
+    xs: f.map((p) => p.s),
+    times: f.map((p) => p.t),
+    speeds: f.map((_, k) => ({ s: speed(k, 's'), t: speed(k, 'tw') })),
+    // The last frame painted before the release.
+    beforeAt: f.findLastIndex((p) => p.t <= rec.up),
+    // The first frame mostly after the release: at least 12ms on. A frame painted just after it is still mostly the
+    // old move, and is skipped.
+    upAt: f.findIndex((p) => p.t > rec.up + 12),
+    downMs: rec.down,
+    upMs: rec.up,
+  }
+}
+
+/** A mouse on desktop; a real touch (through CDP) on mobile, so `touch-action` and touch pointer events are in play. */
+async function pointerOn(page: Page, isMobile: boolean) {
+  const box = (await springCard(page).boundingBox())!
+  const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  const cdp = isMobile ? await page.context().newCDPSession(page) : null
+  let downAt = 0
+  return {
+    down: async () => {
+      if (cdp) await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] })
+      else {
+        await page.mouse.move(at.x, at.y)
+        await page.mouse.down()
+      }
+      downAt = Date.now()
+    },
+    up: async () => {
+      if (cdp) await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      else await page.mouse.up()
+    },
+    sinceDown: () => Date.now() - downAt,
+  }
+}
+
 test.describe('Spring', () => {
   test('controls rewrite the prompt', async ({ page }) => {
     await page.goto('/terms/spring')
@@ -65,69 +163,92 @@ test.describe('Spring', () => {
     await expect(demo(page, 'spring').locator('[data-twin-card]')).toHaveCount(0)
   })
 
-  test('clicked mid-move, the card carries its speed into the turn; the ease-out twin reverses at once', async ({ page }) => {
+  test('held and let go mid-move, the card carries its speed into the turn; the ease-out twin reverses at once', async ({ page, isMobile }) => {
     await page.goto('/terms/spring')
     await option(page, 'Compare', 'Ease-out').click()
+    // Duration 0.8: let go anywhere from about 100ms to 250ms in, the card is still moving fast enough to carry on
+    // for a frame, so the check does not hang on how long the hold really took on a loaded machine.
+    await option(page, 'Duration', '0.8s').click()
     await expect(demo(page, 'spring')).toHaveAttribute('data-playing', 'true')
-    const result = await demo(page, 'spring').evaluate(async (root) => {
-      const frame = () => new Promise((r) => requestAnimationFrame(r))
-      const springCard = root.querySelector<HTMLElement>('[data-spring-card]')!
-      const twin = root.querySelector<HTMLElement>('[data-twin-card]')!
-      const x = (el: HTMLElement) => el.getBoundingClientRect().left - el.parentElement!.getBoundingClientRect().left
-      const travel = springCard.parentElement!.clientWidth - springCard.offsetWidth
-      // A pointer click (detail 1); element.click() reports detail 0, like Enter or Space, and jumps.
-      const tap = () => springCard.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
-      // Take over (the timeline then leaves the card alone) and jump it home with keyboard-style clicks, so the
-      // move under test starts from rest at A: the first child of the track is the slot at A.
-      springCard.click()
-      if (springCard.dataset.side === 'b') springCard.click()
-      const home = x(springCard.parentElement!.firstElementChild as HTMLElement)
-      for (let still = 0; still < 3; ) {
-        await frame()
-        still = Math.abs(x(springCard) - home) < 0.5 ? still + 1 : 0
-      }
-      // Off toward B. Catch it well out, still moving fast, then click it back (on the frame clock, not wall time).
-      tap()
-      let prev = { s: x(springCard), t: x(twin) }
-      let step = { s: 0, t: 0 }
-      for (;;) {
-        await frame()
-        const now = { s: x(springCard), t: x(twin) }
-        step = { s: now.s - prev.s, t: now.t - prev.t }
-        prev = now
-        if (now.s > travel * 0.35) break
-      }
-      tap()
-      const pressed = springCard.getAttribute('aria-pressed')
-      const after: { s: number; t: number }[] = []
-      for (let i = 0; i < 6; i++) {
-        await frame()
-        const now = { s: x(springCard), t: x(twin) }
-        after.push({ s: now.s - prev.s, t: now.t - prev.t })
-        prev = now
-      }
-      return { before: step, after, pressed, side: springCard.dataset.side, taken: root.querySelector<HTMLElement>('[data-taken-over]')!.dataset.takenOver }
-    })
-    expect(result.side).toBe('a')
-    expect(result.pressed).toBe('false')
-    expect(result.taken).toBe('true')
+    await homeAndRecord(page)
+    const pointer = await pointerOn(page, isMobile)
+    await pointer.down()
+    await expect(springHint(page)).toHaveText('Release to send it back')
+    await expect(springCard(page)).toHaveAttribute('aria-pressed', 'true')
+    await page.waitForTimeout(Math.max(0, 120 - pointer.sinceDown()))
+    await pointer.up()
+    await page.waitForTimeout(500)
+    const rec = await stopRecording(page)
+    const after = rec.speeds.slice(rec.upAt, rec.upAt + 4)
+    const before = rec.speeds[rec.beforeAt]
+    await expect(springCard(page)).toHaveAttribute('data-side', 'a')
+    await expect(springCard(page)).toHaveAttribute('aria-pressed', 'false')
+    await expect(demo(page, 'spring').locator('[data-taken-over]')).toHaveAttribute('data-taken-over', 'true')
+    await expect(springHint(page)).toHaveText('Hold the card, let go early')
     // It was heading for B at speed.
-    expect(result.before.s).toBeGreaterThan(2)
-    const steps = result.after.map((a) => a.s)
-    // Momentum: the first frame after the click still moves toward B, by less than the frame before.
-    expect(steps[0]).toBeGreaterThan(0)
-    expect(steps[0]).toBeLessThan(result.before.s)
-    // Then a monotonic approach to A over the next 4 frames: the velocity toward A rises every frame (it slows,
-    // turns, speeds up).
-    for (let i = 1; i < 4; i++) expect(-steps[i]).toBeGreaterThan(-steps[i - 1])
-    // It turns once, and never reverses within a single frame: the first step back toward A is slow, then it builds.
-    const turn = steps.findIndex((s) => s < 0)
+    expect(before.s).toBeGreaterThan(2)
+    const s = after.map((a) => a.s)
+    // Momentum: the first frame after the release still moves toward B, by less than the frame before.
+    expect(s[0]).toBeGreaterThan(0)
+    expect(s[0]).toBeLessThan(before.s)
+    // Then it turns once within these 4 frames: it keeps slowing until the first frame back, which is slower than it
+    // was going out (it never reverses within a single frame), and every frame after that heads for A.
+    const turn = s.findIndex((v) => v < 0)
     expect(turn).toBeGreaterThan(0)
-    expect(steps.slice(turn).every((s) => s < 0)).toBe(true)
-    expect(Math.abs(steps[turn])).toBeLessThan(result.before.s / 2)
-    // The ease-out twin, sent back at the same instant, reverses on the very next frame.
-    expect(result.before.t).toBeGreaterThan(0)
-    expect(result.after[0].t).toBeLessThan(0)
+    for (let i = 1; i <= turn; i++) expect(s[i]).toBeLessThan(s[i - 1])
+    expect(Math.abs(s[turn])).toBeLessThan(before.s)
+    expect(s.slice(turn).every((v) => v < 0)).toBe(true)
+    // No jump: from the release on, no frame moves faster than the fastest frame on the way out, with some margin.
+    const outPeak = Math.max(...rec.speeds.slice(0, rec.upAt).map((v) => v.s))
+    expect(Math.max(...rec.speeds.slice(rec.upAt).map((v) => Math.abs(v.s)))).toBeLessThan(outPeak * 1.25)
+    // The ease-out twin, sent back at the same instant, snaps into reverse: it heads back from the first frame on,
+    // and by the second it is going back faster than the spring card is moving at all.
+    expect(before.t).toBeGreaterThan(0)
+    expect(after.every((a) => a.t < 0)).toBe(true)
+    expect(-after[1].t).toBeGreaterThan(Math.abs(after[1].s))
+  })
+
+  test('a quick click still sends the card out and back on its own', async ({ page, isMobile }) => {
+    await page.goto('/terms/spring')
+    await expect(demo(page, 'spring')).toHaveAttribute('data-playing', 'true')
+    const { home, travel } = await homeAndRecord(page)
+    const pointer = await pointerOn(page, isMobile)
+    await pointer.down()
+    await pointer.up()
+    await page.waitForTimeout(900)
+    const rec = await stopRecording(page)
+    expect(rec.upMs - rec.downMs).toBeLessThan(150)
+    const s = rec.speeds.map((v) => v.s)
+    // The release does not send it back: it keeps going toward B, past 40% of the way.
+    const early = s.slice(1).filter((_, k) => rec.times[k + 1] - rec.downMs < 90)
+    expect(early.length).toBeGreaterThan(2)
+    expect(early.every((v) => v > 0)).toBe(true)
+    expect(Math.max(...rec.xs) - home).toBeGreaterThan(travel * 0.4)
+    // The automatic redirect does, on the timeline's beat (90ms after the press at duration 0.5): the card turns
+    // once, after that, and settles home.
+    const turn = s.findIndex((v) => v < -0.5)
+    expect(rec.times[turn] - rec.downMs).toBeGreaterThan(90)
+    expect(s.slice(turn).every((v) => v < 0.5)).toBe(true)
+    expect(rec.xs[rec.xs.length - 1]).toBeCloseTo(home, 0)
+    await expect(springCard(page)).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('with reduced motion, a hold jumps the card across and the release jumps it back', async ({ page, isMobile }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/terms/spring')
+    await expect(demo(page, 'spring')).toHaveAttribute('data-playing', 'false')
+    const { home, travel } = await homeAndRecord(page)
+    const pointer = await pointerOn(page, isMobile)
+    await pointer.down()
+    await page.waitForTimeout(300)
+    await expect(springCard(page)).toHaveAttribute('aria-pressed', 'true')
+    await pointer.up()
+    await page.waitForTimeout(200)
+    const rec = await stopRecording(page)
+    // The card is only ever at one end or the other: no in-between positions.
+    expect(rec.all.every((x) => Math.abs(x - home) < 0.5 || Math.abs(x - home - travel) < 0.5)).toBe(true)
+    expect(rec.all.some((x) => Math.abs(x - home - travel) < 0.5)).toBe(true)
+    expect(rec.all.at(-1)).toBeCloseTo(home, 1)
   })
 
   test('activated from the keyboard, the card jumps with no in-between frames', async ({ page, isMobile }) => {
