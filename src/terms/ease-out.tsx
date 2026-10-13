@@ -392,7 +392,7 @@ export default defineTerm({
     ]
   },
   code: (v) => ({ css: cssCode(v), motion: motionCode(v) }),
-  a11y: 'Keep the closed menu out of the tab order and the accessibility tree: inert while it stays mounted, or unmounted once the exit ends and click-through while the exit plays. When it opens from the keyboard, move focus into it, and return focus to the trigger when it closes. Under reduced motion, drop the scale and keep a short fade, so the menu still appears without moving.',
+  a11y: 'Keep the closed menu out of the tab order and the accessibility tree: inert while it stays mounted, or unmounted once the exit ends and click-through while the exit plays. When it opens from the keyboard, move focus into it; Escape or choosing an item returns focus to the trigger, an outside click leaves focus where it is. Under reduced motion, drop the scale and keep a short fade, so the menu still appears without moving.',
   related: ['ease-in-out', 'duration', 'origin-aware', 'interruptibility', 'enter-and-exit', 'spring'],
   confusedWith: [
     {
