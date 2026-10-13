@@ -13,8 +13,8 @@ test('/llms.txt lists published terms and nothing else', async ({ request }) => 
   const body = await res.text()
   expect(body).toContain('# moveset')
   expect(body).toContain('[Sticky](https://moveset.lucaslima.design/terms/sticky.md)')
-  // Ease-out is in review: visible on the site with NEXT_PUBLIC_SHOW_REVIEW=1, never in agent outputs.
-  expect(body).not.toContain('[Ease-out]')
+  // Spring is in review: visible on the site with NEXT_PUBLIC_SHOW_REVIEW=1, never in agent outputs.
+  expect(body).not.toContain('[Spring]')
   expect(body).toContain('https://moveset.lucaslima.design/api/terms.json')
 })
 
@@ -26,7 +26,7 @@ test('/terms/sticky.md serves the entry as markdown', async ({ request }) => {
 })
 
 test('no unpublished term has a .md', async ({ request }) => {
-  expect(unpublished).toContain('ease-out')
+  expect(unpublished).toContain('spring')
   for (const slug of unpublished) {
     expect((await request.get(`/terms/${slug}.md`)).status(), slug).toBe(404)
   }
