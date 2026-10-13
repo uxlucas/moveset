@@ -153,7 +153,7 @@ function Entry({ term }: { term: FullTerm }) {
               <li key={other.slug}>
                 <span className="flex items-center gap-2">
                   {href ? (
-                    <Link href={href} className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
+                    <Link href={href} className="link text-ink">
                       {term.name} vs {other.name}
                     </Link>
                   ) : (

@@ -30,7 +30,7 @@ export default function About() {
       <ul className="space-y-1.5 text-sm">
         {[...REFERENCES, ...sources].map((s) => (
           <li key={s.url}>
-            <a href={s.url} className="text-ink-muted underline decoration-line-strong underline-offset-4 hover:text-ink">
+            <a href={s.url} className="link text-ink-muted">
               {s.label}
             </a>
           </li>

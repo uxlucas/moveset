@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { REPO_URL } from '@/lib/site'
 
-const LINK = 'inline-flex min-h-11 items-center transition-colors duration-150 ease-[ease] hover:text-ink pointer-fine:min-h-0'
+const LINK = 'inline-flex min-h-11 items-center transition-colors duration-150 ease-[ease] hover:text-accent-ink pointer-fine:min-h-0'
 
 export function Footer() {
   return (
