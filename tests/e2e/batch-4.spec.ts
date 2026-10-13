@@ -168,10 +168,15 @@ test.describe('Stagger', () => {
     await expect(prompt(page)).toContainText('animation-delay: calc(min(var(--n), 6) * 60ms)')
     await expect(prompt(page)).toContainText('delayChildren: (i) => Math.min(i, 6) * 0.06')
     await expect(prompt(page)).toContainText('no item waits more than 360ms')
+    await expect(prompt(page)).toContainText('`stagger(0.06)`, uncapped; it replaces `staggerChildren`')
+    await expect(prompt(page)).toContainText('Exit: the whole list as one, 150ms ease-out')
+    await expect(prompt(page)).toContainText('never per item')
+    await expect(prompt(page)).toContainText('`translate: none` on `[data-leaving]`')
+    await expect(prompt(page)).not.toContainText('staggerChildren: 0.06')
     await expect(prompt(page)).not.toContainText('too slow')
     await expect(prompt(page)).not.toContainText('Comparison only')
 
-    await option(page, 'Delay', '100ms').click()
+    await option(page, 'Delay', '100ms (slow)').click()
     await expect(prompt(page)).toContainText('100ms per step (too slow; ship 30 to 80ms)')
     await expect(prompt(page)).toContainText('* 100ms)')
     await expect(prompt(page)).toContainText('Math.min(i, 6) * 0.1')
@@ -182,15 +187,15 @@ test.describe('Stagger', () => {
     await option(page, 'Order', 'Reverse').click()
     await expect(prompt(page)).toContainText('last item first (`--n` = count - 1 - index)')
     await expect(prompt(page)).toContainText('Math.min(total - 1 - i, 6) * 0.03')
-    await expect(prompt(page)).toContainText('staggerDirection: -1')
+    await expect(prompt(page)).toContainText('`stagger(0.03, { from: "last" })`, uncapped')
     await expect(prompt(page)).not.toContainText('first item first')
     await option(page, 'Order', 'Center out').click()
-    await expect(prompt(page)).toContainText('middle out')
-    await expect(prompt(page)).toContainText('stagger(0.03, { from: "center" })')
-    await expect(prompt(page)).not.toContainText('staggerDirection')
+    await expect(prompt(page)).toContainText('middle out (`--n` for 6 items: 2, 1, 0, 0, 1, 2)')
+    await expect(prompt(page)).toContainText('Math.min(Math.floor(Math.abs(i - (total - 1) / 2)), 6) * 0.03')
+    await expect(prompt(page)).not.toContainText('from: "last"')
 
     await option(page, 'Compare', 'All at once').click()
-    await expect(prompt(page)).toContainText('Comparison only: a twin list beside it, every item at delay 0')
+    await expect(prompt(page)).toContainText('Comparison only: a twin list, every delay 0, started together.')
     await option(page, 'Compare', 'None').click()
     await expect(prompt(page)).not.toContainText('Comparison only')
   })
@@ -206,7 +211,7 @@ test.describe('Stagger', () => {
       )
     const expected = { Forward: [0, 1, 2, 3, 4, 5], Reverse: [5, 4, 3, 2, 1, 0], 'Center out': [2, 1, 0, 0, 1, 2] }
     for (const ms of [60, 30, 100]) {
-      await option(page, 'Delay', `${ms}ms`).click()
+      await option(page, 'Delay', ms === 100 ? '100ms (slow)' : `${ms}ms`).click()
       for (const [order, steps] of Object.entries(expected)) {
         await option(page, 'Order', order).click()
         await expect.poll(async () => (await delays('stagger')).map((d) => d.n)).toEqual(steps)
@@ -237,11 +242,55 @@ test.describe('Stagger', () => {
     await page.goto('/terms/stagger')
     await expect(demo(page, 'stagger')).toHaveAttribute('data-playing', 'true')
     const stage = demo(page, 'stagger').locator('[data-phase]')
-    // A replay starts a cycle at once: out first, then in.
+    // A replay starts a cycle at once: the list leaves (from a finished cascade: `leave`), then the cascade runs.
     await page.getByRole('button', { name: 'Replay' }).click()
-    await expect(stage).toHaveAttribute('data-phase', 'out')
+    await expect(stage).toHaveAttribute('data-phase', /^(out|leave)$/)
     await expect(stage).toHaveAttribute('data-phase', 'in')
     const names = await stage.locator('[data-stagger-item]').evaluateAll((els) => els.map((el) => getComputedStyle(el).animationName))
     expect(names).toEqual(Array.from({ length: 6 }, () => 'demo-stagger-in'))
+  })
+
+  test('a replay mid-cascade never flashes the items still waiting; the list leaves as one', async ({ page }) => {
+    await page.goto('/terms/stagger')
+    await expect(demo(page, 'stagger')).toHaveAttribute('data-playing', 'true')
+    // A control change starts a new cycle with the 100ms step; wait for its cascade on the frame clock.
+    await option(page, 'Delay', '100ms (slow)').click()
+    const stage = demo(page, 'stagger').locator('[data-phase]')
+    await expect(stage).toHaveAttribute('data-phase', /^(out|leave)$/)
+    const result = await stage.evaluate(async (root: HTMLElement) => {
+      const frame = () => new Promise((r) => requestAnimationFrame(r))
+      const items = [...root.querySelectorAll<HTMLElement>('[data-list="stagger"] [data-stagger-item]')]
+      const list = root.querySelector<HTMLElement>('[data-list="stagger"] [data-stagger-list]')!
+      const opacities = () => items.map((el) => Number(getComputedStyle(el).opacity))
+      // 250ms into the cascade, timed from the frame it starts.
+      while (root.dataset.phase !== 'in') await frame()
+      const start = performance.now()
+      while (performance.now() - start < 250) await frame()
+      const before = opacities()
+      document.querySelector<HTMLButtonElement>('button[aria-label="Replay"]')!.click()
+      // Frames until the replay lands (React runs the new cycle after the click), keeping the last cascade frame.
+      let last = before
+      while (root.dataset.phase === 'in') {
+        last = opacities()
+        await frame()
+      }
+      const atSwitch = opacities()
+      await frame()
+      const next = opacities()
+      await frame()
+      const listOpacity = Number(getComputedStyle(list).opacity)
+      return { phase: String(root.getAttribute('data-phase')), before, last, atSwitch, next, listOpacity }
+    })
+    expect(result.phase).toBe('leave')
+    // Mid-cascade: some items in, some still waiting.
+    expect(result.before.some((o) => o > 0.9)).toBe(true)
+    expect(result.before.some((o) => o === 0)).toBe(true)
+    // No item's opacity rises once the list is leaving, and the waiting ones stay at 0.
+    result.atSwitch.forEach((o, i) => {
+      expect(result.next[i]).toBeLessThanOrEqual(o + 0.001)
+      if (result.last[i] === 0) expect(o).toBe(0)
+    })
+    // The list itself is fading.
+    expect(result.listOpacity).toBeLessThan(1)
   })
 })
