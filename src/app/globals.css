@@ -182,6 +182,10 @@
     animation-name: g-eio;
     animation-timing-function: var(--ease-in-out);
   }
+  /* Shoots past the far end, swings back, settles, then fades back to the start. */
+  .gl[data-glyph='spring'][data-active='true'] .m {
+    animation-name: g-spring;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .gl .m {
@@ -228,6 +232,16 @@
   0%, 10% { transform: translateX(-2.5px); }
   45%, 60% { transform: translateX(2.5px); }
   95%, 100% { transform: translateX(-2.5px); }
+}
+@keyframes g-spring {
+  0%, 8% { transform: translateX(-3px); opacity: 1; }
+  26% { transform: translateX(3.8px); }
+  38% { transform: translateX(2.6px); }
+  48% { transform: translateX(3.2px); }
+  56%, 80% { transform: translateX(3px); opacity: 1; }
+  90% { transform: translateX(3px); opacity: 0; }
+  91% { transform: translateX(-3px); opacity: 0; }
+  100% { transform: translateX(-3px); opacity: 1; }
 }
 
 /* Site chrome goes still under reduced motion. Demos handle it themselves (play on request). */
