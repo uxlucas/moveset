@@ -62,7 +62,7 @@ function ControlField({ control, value, onChange }: { control: Control; value: C
           aria-checked={Boolean(value)}
           aria-labelledby={`${id}-label`}
           onClick={() => onChange(!value)}
-          className={`press hit relative h-5 w-9 rounded-full transition-colors duration-150 ease-[ease] ${value ? 'bg-ink/70' : 'bg-demo-2'}`}
+          className={`press hit relative h-5 w-9 rounded-full transition-colors duration-150 ease-[ease] ${value ? 'bg-accent' : 'bg-demo-2'}`}
         >
           <span
             aria-hidden
@@ -83,7 +83,7 @@ function ControlField({ control, value, onChange }: { control: Control; value: C
             type="button"
             aria-pressed={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`press hit rounded-full px-2.5 py-1 transition-colors duration-150 ease-[ease] ${value === o.value ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line),0_1px_2px_var(--shadow-color)]' : 'text-ink-muted hover:text-ink'}`}
+            className={`press hit rounded-full px-2.5 py-1 transition-colors duration-150 ease-[ease] ${value === o.value ? 'bg-surface text-accent-ink shadow-[0_0_0_1px_var(--line),0_1px_2px_var(--shadow-color)]' : 'text-ink-muted hover:text-ink'}`}
           >
             {o.label}
           </button>

@@ -59,6 +59,12 @@ The standard every demo, prompt and piece of site chrome is held to. Distilled f
 - Numbers that change use tabular figures. Headings use balanced wrapping.
 - Icon-only buttons have an `aria-label`. Feedback appears next to what triggered it.
 
+## Color
+- The site is grayscale plus one accent. `--accent` (`oklch(0.62 0.2 292)` light, `0.72 0.15 292` dark) for marks and lines, `--accent-ink` (`0.53 0.2 292` light, same as accent in dark) for accent text, `--accent-soft` for `::selection`. Tailwind: `accent`, `accent-ink`, `accent-soft`.
+- The accent marks where you are or what is on: the current rail item, focus rings, the toggle's on track, the selected segment or pill (text only), the copied check, link underlines (`link` utility; hover turns the words accent, as it does for footer links).
+- Not for rail hover, cards, buttons, backgrounds, gradients or demos. Demos stay grayscale with the `--demo-*` tokens.
+- Accent text uses `accent-ink` (5.5:1 or more on light surfaces); plain `accent` is for non-text only (3.8:1).
+
 ## Copy
 - Plain, specific and calm. Say what it does, not how good it is.
 - Definitions are one sentence, under 140 characters.

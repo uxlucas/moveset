@@ -30,7 +30,7 @@ export function FilterPills({ value, onChange }: { value: Filter; onChange: (f: 
             type="button"
             aria-pressed={pressed}
             onClick={() => onChange(o.value)}
-            className={`press hit shrink-0 rounded-full px-3 py-1.5 text-sm ${pressed ? 'bg-surface text-ink shadow-card-hover' : 'bg-surface text-ink-muted shadow-card hover:text-ink'}`}
+            className={`press hit shrink-0 rounded-full px-3 py-1.5 text-sm ${pressed ? 'bg-surface text-accent-ink shadow-card-hover' : 'bg-surface text-ink-muted shadow-card hover:text-ink'}`}
           >
             {o.label}
           </button>
