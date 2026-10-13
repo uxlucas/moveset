@@ -557,7 +557,7 @@ export default defineTerm({
   demo: {
     component: DurationDemo,
     label:
-      'Three identical frames side by side, labelled 150ms, 300ms and 500ms. In each, the same dropdown opens at the same instant on the same curve, so the 150ms one lands first and the 500ms one last; under each, a verdict says whether that duration suits the element. They hold, then close about 25% faster. On the entry page, holding a frame opens that one element at its duration, and letting go closes it at its exit duration; the tooltip plays on hover with a mouse (onto its trigger to open, away to close) and on hold on touch. Switching to a tooltip or a full-height sheet changes the element and the verdicts: 150ms is right for a tooltip and abrupt for a sheet.',
+      'Three identical frames side by side, labelled 150ms, 300ms and 500ms. In each, the same dropdown opens at the same instant on the same curve, so the 150ms one lands first and the 500ms one last; under each, a verdict says whether that duration suits the element. They hold, then close about 25% faster. On the entry page, holding a frame opens that one element at its duration, and letting go closes it at its exit duration. With a mouse, the tooltip opens when the pointer moves onto its trigger and closes when it moves away; on touch it is held like the others. Switching to a tooltip or a full-height sheet changes the element and the verdicts: 150ms is right for a tooltip and abrupt for a sheet.',
     controls,
     glyph: DurationGlyph,
   },
