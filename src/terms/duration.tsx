@@ -51,77 +51,82 @@ function verdict(ms: number, kind: Kind): string {
 // Closed time between the slowest exit and the next open, and the open hold before the cycle ends.
 const CLOSED_MS = 400
 const HOLD_MS = 1000
-const HINT = 'Hold a frame to open it'
+const HINT = 'Hold a frame to play it'
 const HINT_HELD = 'Let go to close it'
 
 type Hold = { pointerId: number; item: HTMLElement }
 
 // Each element's closed and open look. The duration of the state it heads to times the move: --x closing, --d opening.
+// Under reduced motion a held element does not move; it fades over the same durations. Play keeps its full cycle.
 const ITEM =
-  'transition-[opacity,transform] duration-(--x) ease-(--e) data-[open=true]:duration-(--d) group-data-[snap=true]/stage:transition-none'
+  'transition-[opacity,transform] duration-(--x) ease-(--e) data-[open=true]:duration-(--d) group-data-[snap=true]/stage:transition-none motion-reduce:group-data-[taken-over=true]/stage:[transform:none]'
+const SHEET_REDUCED =
+  'motion-reduce:group-data-[taken-over=true]/stage:opacity-0 motion-reduce:group-data-[taken-over=true]/stage:data-[open=true]:opacity-100'
 
+// Spans throughout: on the entry page the frame is a <button>, which holds phrasing content only.
 function Element({ kind, ms, detail }: { kind: Kind; ms: number; detail: boolean }) {
   if (kind === 'tooltip') {
     return (
       <>
-        <div className={`absolute inset-x-0 flex justify-center ${detail ? 'bottom-[calc(42%+8px)]' : 'bottom-[calc(42%+5px)]'}`}>
-          <div
+        <span className={`absolute inset-x-0 flex justify-center ${detail ? 'bottom-[calc(42%+8px)]' : 'bottom-[calc(42%+5px)]'}`}>
+          {/* Inverted, as tooltips are, so the whole body carries the fade against the frame. */}
+          <span
             data-duration-item=""
             data-ms={ms}
             data-open="true"
-            className={`${ITEM} flex origin-bottom items-center rounded-md bg-surface opacity-0 shadow-card [transform:scale(0.97)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'h-7 px-2.5' : 'h-5 px-1.5'}`}
+            className={`${ITEM} flex origin-bottom items-center rounded-md bg-demo-subject opacity-0 shadow-card [transform:scale(0.97)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'h-8 px-3' : 'h-5 px-1.5'}`}
           >
-            <span className={`h-1.5 rounded-full bg-demo-subject ${detail ? 'w-12' : 'w-7'}`} />
-          </div>
-        </div>
-        <div className={`absolute inset-x-0 top-[58%] flex justify-center`}>
+            <span className={`h-1.5 rounded-full bg-surface ${detail ? 'w-12' : 'w-7'}`} />
+          </span>
+        </span>
+        <span className={`absolute inset-x-0 top-[58%] flex justify-center`}>
           <span className={`rounded-md bg-surface shadow-card ${detail ? 'h-7 w-14' : 'h-5 w-9'}`} />
-        </div>
+        </span>
       </>
     )
   }
   if (kind === 'dropdown') {
     return (
       <>
-        <div className={`absolute flex items-center justify-between rounded-md bg-surface shadow-card ${detail ? 'left-3 top-3 h-7 w-[min(80px,calc(100%-24px))] px-2' : 'left-2 top-2 h-5 w-12 px-1.5'}`}>
+        <span className={`absolute flex items-center justify-between rounded-md bg-surface shadow-card ${detail ? 'left-3 top-3 h-7 w-[min(80px,calc(100%-24px))] px-2' : 'left-2 top-2 h-5 w-12 px-1.5'}`}>
           <span className={`h-1.5 rounded-full bg-demo-2 ${detail ? 'w-9' : 'w-5'}`} />
           <span className="size-1.5 rotate-45 border-b border-r border-ink-faint" />
-        </div>
-        <div
+        </span>
+        <span
           data-duration-item=""
           data-ms={ms}
           data-open="true"
-          className={`${ITEM} absolute origin-top-left rounded-lg bg-surface p-1 opacity-0 shadow-card [transform:scale(0.95)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'inset-x-3 top-12' : 'inset-x-2 top-8'}`}
+          className={`${ITEM} absolute block origin-top-left rounded-lg bg-surface p-1 opacity-0 shadow-card [transform:scale(0.95)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'inset-x-3 top-12' : 'inset-x-2 top-8'}`}
         >
           {[0, 1, 2].map((i) => (
-            <div key={i} className={`flex items-center rounded-md ${detail ? 'h-7 gap-2 px-2' : 'h-[18px] gap-1.5 px-1'} ${i === 0 ? 'bg-demo' : ''}`}>
+            <span key={i} className={`flex items-center rounded-md ${detail ? 'h-7 gap-2 px-2' : 'h-[18px] gap-1.5 px-1'} ${i === 0 ? 'bg-demo' : ''}`}>
               <span className={`shrink-0 rounded-sm ${i === 0 ? 'bg-demo-subject' : 'bg-demo-2'} ${detail ? 'size-2.5' : 'size-2'}`} />
               <span className={`h-1.5 rounded-full bg-demo-2 ${['w-3/5', 'w-1/2', 'w-2/3'][i]}`} />
-            </div>
+            </span>
           ))}
-        </div>
+        </span>
       </>
     )
   }
   return (
     <>
       {/* The page behind the sheet. */}
-      <div className={`absolute inset-x-0 top-0 flex flex-col ${detail ? 'gap-2 p-3' : 'gap-1.5 p-2'}`}>
+      <span className={`absolute inset-x-0 top-0 flex flex-col ${detail ? 'gap-2 p-3' : 'gap-1.5 p-2'}`}>
         <span className="h-1.5 w-1/2 rounded-full bg-demo-2" />
         <span className="h-1.5 w-2/3 rounded-full bg-demo-2" />
-      </div>
+      </span>
       {/* Closed it sits 4px below the frame, so its hairline ring never shows along the bottom edge. */}
-      <div
+      <span
         data-duration-item=""
         data-ms={ms}
         data-open="true"
-        className={`${ITEM} absolute inset-x-1 bottom-0 top-[22%] flex flex-col items-center rounded-t-xl bg-surface shadow-card [transform:translateY(calc(100%_+_4px))] data-[open=true]:[transform:none] ${detail ? 'gap-2.5 px-3 pt-2' : 'gap-1.5 px-2 pt-1.5'}`}
+        className={`${ITEM} ${SHEET_REDUCED} absolute inset-x-1 bottom-0 top-[22%] flex flex-col items-center rounded-t-xl bg-surface shadow-card [transform:translateY(calc(100%_+_4px))] data-[open=true]:[transform:none] ${detail ? 'gap-2.5 px-3 pt-2' : 'gap-1.5 px-2 pt-1.5'}`}
       >
         <span className={`h-1 rounded-full bg-demo-2 ${detail ? 'w-8' : 'w-5'}`} />
         <span className={`h-1.5 self-start rounded-full bg-demo-subject ${detail ? 'w-2/3' : 'w-3/4'}`} />
         <span className="h-1.5 w-full rounded-full bg-demo-2" />
         <span className="h-1.5 w-4/5 self-start rounded-full bg-demo-2" />
-      </div>
+      </span>
     </>
   )
 }
@@ -137,14 +142,15 @@ function Column({ kind, ms, exit, timeScale, detail }: { kind: Kind; ms: number;
       <p className={`font-mono tabular-nums ${text} ${word === 'right' ? 'text-ink' : 'text-ink-muted'}`}>{ms}ms</p>
       {detail ? (
         // On the entry page the frame is held to open its element. The items start open, so the button starts pressed.
-        // A hold must not scroll the page, select text or open the long-press menu.
+        // A still hold must not select text or open the long-press menu; a vertical swipe still scrolls the page
+        // (the browser then cancels the pointer, which closes the element).
         <button
           type="button"
           data-duration-frame=""
           aria-pressed="true"
-          aria-label={`Open the ${ms}ms ${KINDS[kind].name}`}
+          aria-label={`${ms}ms ${KINDS[kind].name}`}
           style={vars}
-          className={`${frame} cursor-pointer touch-none select-none [-webkit-touch-callout:none]`}
+          className={`${frame} cursor-pointer touch-pan-y select-none [-webkit-touch-callout:none]`}
         >
           <Element kind={kind} ms={ms} detail={detail} />
         </button>
@@ -240,7 +246,7 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
 
   // Press and hold opens that frame's element at its duration; letting go closes it at its exit duration, as hover in
   // and hover out would for a tooltip. The capture keeps the release on the frame wherever the pointer has gone.
-  // Under reduced motion the transition still runs: the term keeps a fade over the same durations.
+  // Under reduced motion the transition still runs, with no scale or slide: a fade over the same durations (ITEM).
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     const frame = frameOf(e.target)
     const item = frame && itemOf(frame)
@@ -298,7 +304,7 @@ function DurationDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
         ))}
       </div>
       {detail && (
-        <p ref={hintRef} aria-hidden className="font-mono text-[11px] text-ink-muted">
+        <p ref={hintRef} aria-hidden className="mt-3 font-mono text-[11px] text-ink-muted">
           {HINT}
         </p>
       )}

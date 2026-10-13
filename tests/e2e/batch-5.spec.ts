@@ -155,7 +155,7 @@ test.describe('Duration', () => {
     expect(c).toBeLessThan(600)
   })
 
-  const frame = (page: Page, ms: number, kind = 'dropdown') => demo(page, 'duration').getByRole('button', { name: `Open the ${ms}ms ${kind}` })
+  const frame = (page: Page, ms: number, kind = 'dropdown') => demo(page, 'duration').getByRole('button', { name: `${ms}ms ${kind}`, exact: true })
   const hint = (page: Page) => demo(page, 'duration').locator('p[aria-hidden]')
   const stage = (page: Page) => demo(page, 'duration').locator('[data-taken-over]')
   /** data-open of the three items, by column. */
@@ -192,7 +192,7 @@ test.describe('Duration', () => {
   test('held, a frame opens its own element at its duration and the other two stay closed; let go, it closes at its exit duration', async ({ page, isMobile }) => {
     await page.goto('/terms/duration')
     await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
-    await expect(hint(page)).toHaveText('Hold a frame to open it')
+    await expect(hint(page)).toHaveText('Hold a frame to play it')
     await expect(frame(page, 150)).toBeVisible()
     await expect(frame(page, 500)).toBeVisible()
     await recordOpen(page, 300)
@@ -215,7 +215,7 @@ test.describe('Duration', () => {
     expect(await opens(page)).toEqual(['false', 'true', 'false'])
     await pointer.up()
     await expect(frame(page, 300)).toHaveAttribute('aria-pressed', 'false')
-    await expect(hint(page)).toHaveText('Hold a frame to open it')
+    await expect(hint(page)).toHaveText('Hold a frame to play it')
     expect(await opens(page)).toEqual(['false', 'false', 'false'])
     expect(await durationOf(page, 300)).toBeCloseTo(225, 1)
     // The stage rests as the visitor left it.
@@ -287,7 +287,11 @@ test.describe('Duration', () => {
     await expect(frame(page, 500, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
   })
 
-  test('with reduced motion, the still frame stays and a hold fades the element over its duration', async ({ page, isMobile }) => {
+  /** The computed transform of one item. */
+  const transformOf = (page: Page, ms: number) =>
+    demo(page, 'duration').locator(`[data-duration-item][data-ms="${ms}"]`).evaluate((el) => getComputedStyle(el).transform)
+
+  test('with reduced motion, the still frame stays and a hold fades the element over its duration without moving it', async ({ page, isMobile }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/terms/duration')
     await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'false')
@@ -297,6 +301,8 @@ test.describe('Duration', () => {
     await pointer.down()
     await expect(frame(page, 500)).toHaveAttribute('aria-pressed', 'true')
     expect(await opens(page)).toEqual(['false', 'false', 'true'])
+    // No scale while it fades in.
+    expect(await transformOf(page, 500)).toBe('none')
     await page.waitForTimeout(700)
     const rec = await recorded(page)
     expect(rec.some((f) => f.o > 0.05 && f.o < 0.95)).toBe(true)
@@ -304,6 +310,47 @@ test.describe('Duration', () => {
     await pointer.up()
     await expect(frame(page, 500)).toHaveAttribute('aria-pressed', 'false')
     expect(await opens(page)).toEqual(['false', 'false', 'false'])
+    // Closed and held, it does not slide off either.
+    expect(await transformOf(page, 500)).toBe('none')
+
+    // The sheet: no slide under reduced motion, a fade in place over the same durations.
+    await option(page, 'Element', 'Sheet').click()
+    await expect(frame(page, 500, 'sheet')).toBeVisible()
+    await recordOpen(page, 500)
+    const sheet = await pointerOn(page, frame(page, 500, 'sheet'), isMobile)
+    await sheet.down()
+    await expect(frame(page, 500, 'sheet')).toHaveAttribute('aria-pressed', 'true')
+    expect(await transformOf(page, 500)).toBe('none')
+    await page.waitForTimeout(700)
+    const sheetRec = await recorded(page)
+    expect(sheetRec.some((f) => f.o > 0.05 && f.o < 0.95)).toBe(true)
+    expect(sheetRec.find((f) => f.o >= 0.999)!.t).toBeGreaterThan(300)
+    await sheet.up()
+    await expect(frame(page, 500, 'sheet')).toHaveAttribute('aria-pressed', 'false')
+    expect(await transformOf(page, 500)).toBe('none')
+    await expect.poll(() => demo(page, 'duration').locator('[data-duration-item][data-ms="500"]').evaluate((el) => getComputedStyle(el).opacity)).toBe('0')
+  })
+
+  test('on touch, a vertical swipe that starts on a frame scrolls the page and ends the hold', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'touch')
+    await page.goto('/terms/duration')
+    await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'true')
+    await expect(frame(page, 300)).toBeVisible()
+    const box = (await frame(page, 300).boundingBox())!
+    const before = await page.evaluate(() => window.scrollY)
+    const cdp = await page.context().newCDPSession(page)
+    const x = box.x + box.width / 2
+    const y = box.y + box.height / 2
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
+    for (let i = 1; i <= 12; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - i * 20 }] })
+      await page.waitForTimeout(16)
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before + 100)
+    // The touch opened the element, then the browser took the gesture as a scroll and cancelled the pointer: closed.
+    await expect(frame(page, 300)).toHaveAttribute('aria-pressed', 'false')
+    await expect(stage(page)).toHaveAttribute('data-taken-over', 'true')
   })
 
   test('the card on the index has no buttons in its frames', async ({ page }) => {
