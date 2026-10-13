@@ -83,7 +83,7 @@ const MIN_BACK_MS = 90
 // A press let go this soon and this still is a click: the card goes out and is sent back on the timeline's beat.
 const CLICK_MS = 150
 const CLICK_PX = 4
-const HINT = 'Hold the card, release mid-move'
+const HINT = 'Hold the card, let go early'
 const HINT_HELD = 'Release to send it back'
 
 /** ms until the spring has covered `fraction` of the distance, from Motion's own generator. */

@@ -184,7 +184,7 @@ test.describe('Spring', () => {
     await expect(springCard(page)).toHaveAttribute('data-side', 'a')
     await expect(springCard(page)).toHaveAttribute('aria-pressed', 'false')
     await expect(demo(page, 'spring').locator('[data-taken-over]')).toHaveAttribute('data-taken-over', 'true')
-    await expect(springHint(page)).toHaveText('Hold the card, release mid-move')
+    await expect(springHint(page)).toHaveText('Hold the card, let go early')
     // It was heading for B at speed.
     expect(before.s).toBeGreaterThan(2)
     const s = after.map((a) => a.s)
