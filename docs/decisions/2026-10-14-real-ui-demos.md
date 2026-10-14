@@ -8,7 +8,7 @@ Reviewing Press Scale, the owner asked what the row of four small squares was. I
 
 ## Decision
 
-Every demo stage shows a real component with real content.
+Every entry-page stage shows a real component with real content. Index cards keep the wireframe: at 308px a real menu or toolbar is too cramped to read, and the card's job is to show the motion, not the component (owner's call after the checkpoint).
 
 - **Real labels and icons.** Text is text (13px on cards, 14px on the entry page, `text-ink` / `text-ink-muted`), icons are lucide at 14–16px. No grey bars where a label would be. Placeholder bars are allowed only for body copy that is genuinely not the point (a paragraph behind a sticky header), and never for the subject of the motion.
 - **A recognisable component.** Pick the component the term is most often applied to: a tooltip on a formatting toolbar, a user menu under an "Options" button, a toast that says "Message sent" with an Undo, a sidebar list, a bottom sheet with a title and actions. The content should make the motion's purpose obvious without a caption.
@@ -16,7 +16,9 @@ Every demo stage shows a real component with real content.
 - **Verdicts stay in ink.** Comparison stages label their frames with words ("300ms fade in" / "Instant"; "right" / "too slow") and may add a lucide `Check` or `X` in `text-ink-muted` beside the label. Not red and green: the site has one accent and it marks where you are, not what is right.
 - **Captions carry the numbers**, as they do now (`scale 0.97 · 150ms ease-out`). Anything else the stage needs to say is said by the component's own content, not by a caption.
 - **Gestures keep their real controls.** A button you press is a button with a label ("Send"). A toast you swipe has a Dismiss control. Nothing on the entry page is a decorative stand-in for a control.
-- **Cards show the same component, smaller.** Text stays legible at 308px; if a component cannot shrink that far, the card shows its essential part (the toolbar, not the whole editor).
+- **Cards stay wireframe.** The same layout and motion as the entry stage, drawn with the `--demo-*` bars and shapes, no text and no icons. The entry page is where the component is named.
+- **Shapes match the component.** A toolbar is a pill and its buttons are circles; a primary button is a pill. Square buttons inside a pill read as wrong.
+- **Every element on a comparison stage says its own rule.** If a stage shows a button that scales beside a toolbar that does not, both carry a caption (`button: scale 0.97` / `toolbar: colour only`). A reader must not have to infer one element's behaviour from the other's caption.
 
 ## What does not change
 
