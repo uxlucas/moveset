@@ -474,13 +474,13 @@ export default defineTerm({
         : `CSS route: the button's computed \`transition-duration\` for \`scale\` is \`0s\` at rest and while pressed. Motion route: the \`transition\` prop is \`{ duration: 0, backgroundColor: { duration: ${PRESS_MS / 1000} } }\` (in the source).`,
       glide
         ? `Pressed and held, sampled every frame from \`pointerdown\`: the scale (computed \`scale\`, or the first value of the \`transform\` matrix) falls from 1 toward ${s} without passing it, with in-between frames, and is within 0.001 of ${s} by ${PRESS_MS}ms (±1 frame); held longer, it stays there.`
-        : `Pressed, the scale (computed \`scale\`, or the first value of the \`transform\` matrix) is ${s} in the first frame after \`pointerdown\`, with no in-between frames, and stays there while held.`,
+        : `Pressed, the scale (computed \`scale\`, or the first value of the \`transform\` matrix) is ${s} within two frames of \`pointerdown\` (CSS: the first frame), with no in-between frames, and stays there while held.`,
       glide
         ? `Released, the scale rises from ${s} back to 1 without passing it and is within 0.001 of 1 by ${PRESS_MS}ms (±1 frame) from \`pointerup\`.`
-        : 'Released, the scale is 1 in the first frame after `pointerup`, with no in-between frames.',
+        : 'Released, the scale is 1 within two frames of `pointerup` (CSS: the first frame), with no in-between frames.',
       ...(glide
         ? [
-            `Released 50ms into the press, it turns back from where it is: no frame step larger than 0.025 in \`scale\`, and it never reaches ${s}.`,
+            `Released 50ms into the press, it turns back from where it is: no frame step larger than ${((1 - Number(s)) / 2).toFixed(3)} in \`scale\` (half the press depth), and it never reaches ${s}.`,
           ]
         : []),
       `The primary button's \`offsetWidth\` and \`offsetHeight\` never change during a press. \`elementFromPoint\` 21px above and 21px below its centre (edges exclusive) returns the button at rest${

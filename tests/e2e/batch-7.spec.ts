@@ -176,7 +176,7 @@ test.describe('Press Scale', () => {
     await expect(prompt(page)).toContainText('Reduced motion: keep the pressed scale, drop the transitions (the colour one too). CSS: `transition: none` under `prefers-reduced-motion: reduce`, repeated for `[data-still]`; Motion: `useReducedMotion()` sets `transition={{ duration: 0 }}`.')
     await expect(prompt(page)).not.toContainText('the house ships')
     // No "why" clauses in the prompt. A regex, because toContainText trims a string and ' so ' would match "absolute".
-    await expect(prompt(page)).not.toContainText(/\bso\b/)
+    await expect(prompt(page)).not.toContainText(/\bso\b/i)
     await expect(label(page)).toHaveText('scale 0.97 · 150ms ease-out')
 
     await option(page, 'Amount', '0.95').click()
