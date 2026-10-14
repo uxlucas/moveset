@@ -1,6 +1,6 @@
 ---
 name: moveset
-description: "Design engineering vocabulary with copy-ready prompts: turns a vague description of motion or interaction into its exact term and a prompt with acceptance criteria. Use when someone describes an effect loosely (\"the header stays put while I scroll\", \"things fade in as they come into view\"), asks what an effect is called, or wants a precise prompt for building one. Terms: Scroll-triggered, Scroll-linked, Parallax, Sticky, Scroll Snap, Ease-out, Ease-in-out, Spring, Stagger, Duration, Overshoot, Enter and Exit, Icon Swap."
+description: "Design engineering vocabulary with copy-ready prompts: turns a vague description of motion or interaction into its exact term and a prompt with acceptance criteria. Use when someone describes an effect loosely (\"the header stays put while I scroll\", \"things fade in as they come into view\"), asks what an effect is called, or wants a precise prompt for building one. Terms: Scroll-triggered, Scroll-linked, Parallax, Sticky, Scroll Snap, Ease-out, Ease-in-out, Spring, Stagger, Duration, Overshoot, Enter and Exit, Icon Swap, Press Scale, Swipe to Dismiss."
 ---
 
 # moveset
@@ -38,6 +38,11 @@ A visual dictionary of design engineering terms. Each one shows the idea moving,
 
 - **Enter and Exit**: The animations an element plays when it is added to the screen and when it is removed. Also called: entrance and exit, mount and unmount animation, appear and disappear, fade in and out, exit animation, enter animation, AnimatePresence. Read `terms/enter-and-exit.md`.
 - **Icon Swap**: One icon turns into another in place with a quick scale, fade and blur, like copy becoming a check. Also called: icon transition, copy to check, play to pause, icon cross-fade, icon change animation. Read `terms/icon-swap.md`.
+
+### Gestures
+
+- **Press Scale**: A button shrinks slightly while pressed, so the click feels physical. Also called: scale on press, active scale, button press animation, tap feedback, press feedback, pressed state. Read `terms/press-scale.md`.
+- **Swipe to Dismiss**: Dragging an element off screen closes it, and a quick flick counts as much as a long drag. Also called: swipe away, drag to dismiss, flick to dismiss, swipe gesture, swipeable toast, swipe to delete. Read `terms/swipe-to-dismiss.md`.
 
 ## House motion tokens
 
