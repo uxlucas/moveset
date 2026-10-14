@@ -457,7 +457,7 @@ const springObject = (p: typeof EXIT_SPRING) => `{ type: 'spring', stiffness: ${
 // The prompt's spring text: duration and bounce to design by, physics to ship.
 const springText = (text: string) => text.replace('{ type: "spring", ', '{ ')
 
-// The width the prompt's numbers are read against: the demo's toast on the entry page (a third of it is 125px).
+// The width the prompt's numbers are read against: the demo's toast on the entry page (a third of it is 125.3px).
 const TOAST_WIDTH = 376
 
 // The prompt's physics text: stiffness and damping; mass 1 is said once on the line.
@@ -465,24 +465,30 @@ const shipText = (p: typeof EXIT_SPRING) => `{ stiffness: ${p.stiffness}, dampin
 
 function thresholdLine(v: V): string {
   if (v.threshold === 'both') {
-    return `- Threshold: \`|x| ≥ width / 3\`, or \`|v| ≥ ${VELOCITY}px/ms\` (${VELOCITY * 1000}px/s) signed like \`x\`, leaves toward \`sign(x)\`; else back.`
+    return `- Threshold: \`|x| ≥ width / 3\`, or \`|v| ≥ ${VELOCITY}px/ms\` signed like \`x\`, leaves toward \`sign(x)\`; else back.`
   }
   return `- Threshold, distance only: \`|x| ≥ width / 3\` leaves toward \`sign(x)\`; else back (the mistake; house: also \`|v| ≥ ${VELOCITY}px/ms\` signed like \`x\`).`
 }
 
 function releaseLine(v: V): string {
   if (v.release === 'spring') {
-    return `- Exit: to \`±(width + ${EDGE}px)\`, spring \`${springText(EXIT_TEXT)}\` out, \`${springText(BACK_TEXT)}\` back. Ship them as physics (mass 1), \`${shipText(EXIT_SPRING)}\` and \`${shipText(BACK_SPRING)}\`, plus \`velocity\` (px/s); remove after the exit.`
+    return `- Exit: to \`±(width + ${EDGE}px)\`, spring \`${springText(EXIT_TEXT)}\` out, \`${springText(BACK_TEXT)}\` back. Ship as physics (mass 1): \`${shipText(EXIT_SPRING)}\` and \`${shipText(BACK_SPRING)}\`, plus \`velocity\` (px/s); remove after the exit.`
   }
-  return `- Exit: to \`±(width + ${EDGE}px)\` and back to 0 on a ${EASE_MS}ms \`var(--ease-out)\` tween, release velocity thrown away (the mistake; house: springs, mass 1, \`velocity\` in px/s: \`${shipText(EXIT_SPRING)}\` out, \`${shipText(BACK_SPRING)}\` back); remove after the exit.`
+  return `- Exit: to \`±(width + ${EDGE}px)\` and back to 0 on a ${EASE_MS}ms \`var(--ease-out)\` tween, release velocity thrown away (the mistake; house: springs that carry it, \`${shipText(BACK_SPRING)}\` back); remove after the exit.`
+}
+
+// The Dismiss button's exit has no speed; `velocity` only means something on the springs.
+function dismissLine(v: V): string {
+  const speed = v.release === 'spring' ? ', `velocity: 0`' : ''
+  return `- Visible Dismiss button: the exit to the right${speed}; focus inside returns to the opener, or its container (\`focus({ preventScroll: true })\`); always-mounted \`role="status"\` region.`
 }
 
 function routeLines(v: V): string[] {
   const spring = v.release === 'spring'
   const call = spring ? '`animate(x, target, { ...spring, velocity: v * 1000 })`' : `\`animate(x, target, { duration: ${EASE_MS / 1000}, ease: ${EASE.motion} })\``
   return [
-    `- JS route (\`motionValue\`, \`animate\`; \`x.on("change")\` writes \`translateX\`): \`pointerdown\` (not on Dismiss): \`x.stop()\`, \`setPointerCapture\`; \`pointermove\`: \`x.set(start + dx)\`, log \`(e.timeStamp, x)\`; \`pointerup\`, \`pointercancel\`, \`lostpointercapture\`: \`v\` = Δx / Δt, last ${WINDOW_MS}ms (0 under two samples ${MIN_SPAN_MS}ms apart), then ${call}.`,
-    `- Motion route: \`useMotionValue(0)\`; \`<motion.div drag="x" dragMomentum={false} style={{ x }} onDragStart onDragEnd onPointerUp>\`; decide on \`x.get()\` and \`info.velocity.x\` (px/s), same \`animate\`, \`onDismiss()\` in \`onComplete\`; \`onPointerUp\` without a drag: same rule, \`velocity: 0\`.`,
+    `- JS route (\`motionValue\`, \`animate\`; \`x.on("change")\` writes \`translateX\`): \`pointerdown\` (not on Dismiss): \`x.stop()\`, \`setPointerCapture\`; \`pointermove\`: \`x.set(start + dx)\`, log \`(e.timeStamp, x)\`; \`pointerup\`, \`pointercancel\`, \`lostpointercapture\`: \`v\` = Δx / Δt over the ${WINDOW_MS}ms ending at \`pointerup\` (0 under two samples ${MIN_SPAN_MS}ms apart), then ${call}.`,
+    "- Motion route: the JS route's pointer events on the `motion.div`, `useMotionValue(0)`, `style={{ x }}`, `animate(x, …)`; not `drag`; `onDismiss()` in `onComplete`.",
   ]
 }
 
@@ -596,13 +602,15 @@ function jsCode(v: V): string {
 function motionCode(v: V): string {
   const spring = v.release === 'spring'
   return [
-    "import { animate, motion, useMotionValue, useReducedMotion, type PanInfo } from 'motion/react'",
-    "import { useRef, type ReactNode, type RefObject } from 'react'",
+    "import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'",
+    "import { useRef, type PointerEvent, type ReactNode, type RefObject } from 'react'",
     '',
     "const DISTANCE = 1 / 3 // of the toast's width, the house number (Sonner 45px, Vaul 25%)",
     ...(v.threshold === 'both'
-      ? [`const VELOCITY = ${VELOCITY * 1000} // px/s (${VELOCITY}px/ms): Emil's ~0.1px/ms, read by Motion over its last 100ms`]
-      : ['// Distance only: a flick that stops short goes back. The house also leaves on', `// a velocity of ${VELOCITY * 1000}px/s in the direction of the drag.`]),
+      ? [`const VELOCITY = ${VELOCITY} // px/ms: Emil's ~0.1px/ms, here read over the last 100ms`]
+      : ['// Distance only: a flick that stops short goes back. The house also leaves on', `// a velocity of ${VELOCITY}px/ms in the direction of the drag.`]),
+    `const WINDOW = ${WINDOW_MS} // ms of movement the velocity is read over`,
+    `const SPAN = ${MIN_SPAN_MS} // ms: samples closer than this read as no velocity`,
     `const EDGE = ${EDGE} // px past the width, so a shadow clears too`,
     ...(spring
       ? [
@@ -620,64 +628,96 @@ function motionCode(v: V): string {
           `const tween = { duration: ${EASE_MS / 1000}, ease: ${EASE.motion} } as const`,
         ]),
     '// The toast spans its container (a flex column, or give it margin-inline: auto)',
-    '// less an inset, so its own width plus a margin takes it clear. drag="x" sets',
-    '// touch-action: pan-y itself, so a vertical swipe still scrolls the page.',
-    "const box = { position: 'relative', inlineSize: 'calc(100% - 24px)', userSelect: 'none' } as const",
+    '// less an inset, so its own width plus a margin takes it clear. No stylesheet',
+    '// assumed: a vertical swipe still scrolls the page, and nothing is selected',
+    '// mid-drag.',
+    "const box = { position: 'relative', inlineSize: 'calc(100% - 24px)', touchAction: 'pan-y', userSelect: 'none' } as const",
+    '',
+    'type Sample = { t: number; x: number }',
+    'type Drag = { pointerId: number; startX: number; base: number; samples: Sample[] }',
+    '',
+    '// Velocity in px/ms over the last WINDOW ms of movement; a drag that stopped',
+    '// before the release has none, and samples under SPAN apart read as none too.',
+    'function velocityOf(samples: Sample[], now: number) {',
+    '  const recent = samples.filter((s) => s.t >= now - WINDOW)',
+    '  if (recent.length < 2) return 0',
+    '  const a = recent[0]',
+    '  const b = recent[recent.length - 1]',
+    '  return b.t - a.t < SPAN ? 0 : (b.x - a.x) / (b.t - a.t)',
+    '}',
     '',
     'type Props = { onDismiss: () => void; opener: RefObject<HTMLElement | null>; children: ReactNode }',
     '',
     'export function Toast({ onDismiss, opener, children }: Props) {',
     '  const ref = useRef<HTMLDivElement>(null)',
-    '  const dragging = useRef(false)',
+    '  const drag = useRef<Drag | null>(null)',
     '  const x = useMotionValue(0)',
     '  const reduced = useReducedMotion()',
     '',
     '  // Off toward the sign of x, or back to 0, from where it is and at the speed it',
-    '  // was going. Under reduced motion the release jumps to the end.',
-    '  const release = (side: number, velocity: number) => {',
+    '  // was going (v in px/ms). Under reduced motion the release jumps to the end.',
+    '  const release = (side: number, v: number) => {',
     '    const target = side * ((ref.current?.offsetWidth ?? 0) + EDGE)',
     '    const onComplete = () => side && onDismiss()',
     '    if (reduced) {',
     '      x.jump(target)',
     '      return onComplete()',
     '    }',
-    spring ? '    animate(x, target, { ...(side ? exit : back), velocity, onComplete })' : '    animate(x, target, { ...tween, onComplete })',
+    ...(spring
+      ? ['    // Motion wants units per second; v is px/ms.', '    animate(x, target, { ...(side ? exit : back), velocity: v * 1000, onComplete })']
+      : ['    animate(x, target, { ...tween, onComplete })']),
     '  }',
     '',
     '  // Past a third of the width, or flicked faster than VELOCITY in the direction of',
-    '  // the drag. Decided on x.get(), the position, not info.offset.x, which is from',
-    '  // the grab point: a toast caught on its way back has both. velocity is px/s.',
-    '  const decide = (velocity: number) => {',
-    '    const px = x.get()',
+    '  // the drag: off toward the sign of x. Otherwise back. Decided on x.get(), the',
+    '  // position: a toast caught on its way back is not at the grab point.',
+    '  const leave = (px: number, v: number) => {',
     '    const width = ref.current?.offsetWidth ?? 0',
     '    const side = Math.sign(px)',
     ...(v.threshold === 'both'
-      ? ['    const fast = Math.abs(velocity) >= VELOCITY && Math.sign(velocity) === side', '    release(Math.abs(px) >= width * DISTANCE || fast ? side : 0, velocity)']
-      : ['    release(Math.abs(px) >= width * DISTANCE ? side : 0, velocity)']),
+      ? ['    const fast = Math.abs(v) >= VELOCITY && Math.sign(v) === side', '    return Math.abs(px) >= width * DISTANCE || fast ? side : 0']
+      : ['    return Math.abs(px) >= width * DISTANCE ? side : 0']),
+    '  }',
+    '',
+    '  // The drag starts on the toast body, not on its Dismiss button, and picks the',
+    '  // toast up from wherever it is, even mid-spring.',
+    '  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {',
+    "    if (!e.isPrimary || e.button !== 0 || drag.current || (e.target as HTMLElement).closest('button')) return",
+    '    e.currentTarget.setPointerCapture(e.pointerId) // moves and the release stay ours',
+    '    x.stop() // picked up mid-spring, it comes from where it is',
+    '    drag.current = { pointerId: e.pointerId, startX: e.clientX, base: x.get(), samples: [] }',
+    '  }',
+    '',
+    '  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {',
+    '    const d = drag.current',
+    '    if (!d || e.pointerId !== d.pointerId) return',
+    '    const px = d.base + e.clientX - d.startX // 1:1 with the pointer',
+    '    x.set(px)',
+    "    d.samples.push({ t: e.timeStamp, x: px }) // the event's clock, not the handler's",
+    '  }',
+    '',
+    '  // pointerup, pointercancel (a touch that became a scroll) or the capture lost:',
+    '  // whichever comes first is the release.',
+    '  const end = (e: PointerEvent<HTMLDivElement>) => {',
+    '    const d = drag.current',
+    '    if (!d || e.pointerId !== d.pointerId) return',
+    '    drag.current = null',
+    '    const v = velocityOf(d.samples, e.timeStamp)',
+    '    release(leave(x.get(), v), v)',
     '  }',
     '',
     '  return (',
-    '    // drag="x" follows the pointer 1:1 once it has moved 3px; dragMomentum={false}',
-    '    // leaves the release to us, so one spring (not an inertia animation) carries the',
-    '    // velocity. The drag prop stays: pointerdown stops the spring, but a drag only',
-    '    // starts after 3px and onDragEnd only fires after one, so a grab let go without',
-    '    // moving is released from onPointerUp instead, with no speed.',
+    '    // Pointer events, not drag="x": the drag prop starts after 3px, decides in',
+    '    // postRender, has no cancel path before the drag starts and drags from child buttons.',
     '    <motion.div',
     '      ref={ref}',
     '      className="toast"',
     '      style={{ ...box, x }}',
-    '      drag="x"',
-    '      dragMomentum={false}',
-    '      onDragStart={() => {',
-    '        dragging.current = true',
-    '      }}',
-    '      onDragEnd={(_, info: PanInfo) => {',
-    '        dragging.current = false',
-    '        decide(info.velocity.x)',
-    '      }}',
-    '      onPointerUp={() => {',
-    '        if (!dragging.current && x.get() !== 0) decide(0)',
-    '      }}',
+    '      onPointerDown={onPointerDown}',
+    '      onPointerMove={onPointerMove}',
+    '      onPointerUp={end}',
+    '      onPointerCancel={end}',
+    '      onLostPointerCapture={end}',
     '    >',
     '      {children}',
     '      {/* The non-gesture way out: the same exit, to the right, with no speed. Focus',
@@ -729,30 +769,30 @@ export default defineTerm({
     [
       'Make this toast swipe away sideways.',
       '',
-      `- Toast: ${TOAST_WIDTH}px wide (a third: ${Math.round(TOAST_WIDTH * DISTANCE)}px), clipped by its container.`,
+      `- Reference toast: ${TOAST_WIDTH}px wide; a third of its width (${(TOAST_WIDTH * DISTANCE).toFixed(1)}px; at or past it counts); scale to yours; its container clips.`,
       '- Drag: 1:1 (`translateX` per move, no transition); `touch-action: pan-y`; pointer capture; `user-select: none`.',
       thresholdLine(v),
       releaseLine(v),
       ...routeLines(v),
-      '- Visible Dismiss button: the exit to the right, `velocity: 0`; focus inside returns to the opener or its container (`focus({ preventScroll: true })`); always-mounted `role="status"` region.',
+      dismissLine(v),
       '- Reduced motion: drag still follows; `x.jump(target)` on release: gone or at rest next frame (`matchMedia`; Motion: `useReducedMotion()`).',
     ].join('\n'),
   acceptance: (v) => {
     const spring = v.release === 'spring'
     return [
-      'The toast has no CSS transition on `transform` (computed `transition-duration` is `0s`), and while dragged its `translateX` equals the pointer\'s `clientX` minus its value at `pointerdown`, ±0.5px, in the frame after every move (Motion route: within 3px until the drag starts, then exactly); `touch-action` computes to `pan-y`.',
-      'Released from a third of its width (±0.5px) or further, with no movement in the last 100ms, it leaves toward the side it was dragged to; released short of a third with no movement, it goes back to `x: 0`.',
+      'The toast has no CSS transition on `transform` (computed `transition-duration` is `0s`), and while dragged its `translateX` equals the pointer\'s `clientX` minus its value at `pointerdown`, ±0.5px, in the frame after every move; `touch-action` computes to `pan-y`.',
+      'Released from a third of its width (±0.5px) or further, with no movement in the 100ms ending at `pointerup`, it leaves toward the side it was dragged to; released short of a third with no movement, it goes back to `x: 0`.',
       v.threshold === 'both'
-        ? `A flick: released at a fifth of its width after moving at ${VELOCITY}px/ms or more in that direction over the last 100ms (on \`event.timeStamp\`, from \`pointermove\` samples at least ${MIN_SPAN_MS}ms apart), it leaves; the same distance at under ${VELOCITY}px/ms goes back.`
-        : `Distance only: released at a fifth of its width, it goes back however fast it moved, even ${VELOCITY}px/ms or more over the last 100ms on \`event.timeStamp\` (the house would leave).`,
+        ? `A flick: released at a fifth of its width after moving at ${VELOCITY}px/ms or more in that direction over the 100ms ending at \`pointerup\` (on \`event.timeStamp\`, from \`pointermove\` samples at least ${MIN_SPAN_MS}ms apart), it leaves; the same distance at under ${VELOCITY}px/ms goes back.`
+        : `Distance only: released at a fifth of its width, it goes back however fast it moved, even ${VELOCITY}px/ms or more over the 100ms ending at \`pointerup\` on \`event.timeStamp\` (the house would leave).`,
       spring
         ? `Leaving, sampled every frame from \`pointerup\`: \`x\` moves on from its release value in the release direction, every frame further than the one before, and the first frame's step is at least the release velocity times the frame length (±2px): the speed carries. It passes \`±width\` and settles within 0.5px of \`±(width + ${EDGE}px)\` by 300ms (±1 frame); it is then removed.`
-        : `Leaving, sampled every frame from \`pointerup\`: \`x\` runs from its release value to \`±(width + ${EDGE}px)\` on \`${EASE.css}\` and is within 0.5px of it by ${EASE_MS}ms (±1 frame), whatever the release velocity; it is then removed.`,
+        : `Leaving, sampled every frame from \`pointerup\`: \`x\` runs from its release value to \`±(width + ${EDGE}px)\` on \`${EASE.css}\`: every frame further than the one before, at 100ms within ±3% of the travel of the curve's value, and within 0.5px of the target by ${EASE_MS}ms (±1 frame), whatever the release velocity; it is then removed.`,
       spring
         ? 'Going back from a release with no movement in the last 100ms, `x` never passes 0 (bounce 0) and is within 0.5px of 0 by 500ms (±1 frame) from `pointerup`; released while moving toward 0, it carries that speed and may pass 0 once.'
         : `Going back, \`x\` is within 0.5px of 0 by ${EASE_MS}ms (±1 frame) from \`pointerup\`.`,
       'Grabbed while it is going back, it stops where it is and follows the pointer again from there; released again, the rule applies from the new `x` (Motion route: `x.get()`, not the drag offset), and a grab let go without moving goes back from where it was caught.',
-      'Enter or Space on the Dismiss button plays the exit to the right from `x: 0`, and focus lands on the opener or on the toast\'s container, not on `body`.',
+      'Enter or Space on the Dismiss button plays the exit to the right from `x: 0`, and focus lands on the opener, or its container, not on `body`. A drag that starts on Dismiss does nothing (the toast stays at `x: 0`); Dismiss still clicks.',
       'A vertical swipe that starts on the toast scrolls the page; the pointer is cancelled and the toast goes back to `x: 0`.',
       'With reduced motion on, the drag still follows the pointer, and after `pointerup` the next frame has the toast at `±(width + 16px)` (then removed) or at `x: 0`, with no in-between frames.',
     ]

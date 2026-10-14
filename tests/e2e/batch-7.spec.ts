@@ -166,15 +166,17 @@ test.describe('Press Scale', () => {
     await expect(prompt(page)).toContainText('Pressed: `scale: 0.97`, `transform-origin: center`. Emil ships 0.96 to 0.97; never below 0.95 (cartoon).')
     await expect(prompt(page)).toContainText('Transition: `transition: scale 150ms var(--ease-out)` (`--duration-1`) on the base rule, not the pressed one (both directions).')
     // The keyboard claim is told per route: CSS :active presses on Space, Motion's whileTap on Enter.
-    await expect(prompt(page)).toContainText('Pressed selector: `:not(:disabled):active`: the pointer, and Space held (Enter clicks with no press).')
-    // The hit area sits inside the scaled button, so the prompt says what it measures while pressed.
-    await expect(prompt(page)).toContainText('Hit area: `position: relative` and a centred `::after`, `width: max(100%, 46px)`, same height; it scales with the button (44.6px while pressed); the layout box never changes.')
-    await expect(prompt(page)).toContainText('Opt-out: dense or high-frequency controls (toolbars, list rows, 100+ uses a day) get `background-color: var(--button-pressed)` (`#e0e0e0`) over 150ms and `scale: none`: `data-still` (CSS) or a `still` prop (Motion).')
+    // The :active rule is the CSS route's; the Motion route presses through whileTap.
+    await expect(prompt(page)).toContainText('CSS route: pressed selector `:not(:disabled):active`: the pointer, and Space held (Enter clicks with no press).')
+    // The hit area is spelled out (content, positioning, both sizes) and the prompt says what it measures while pressed.
+    await expect(prompt(page)).toContainText('Hit area: the button `position: relative`; its `::after`: `content: ""`, `position: absolute`, `inset: 50% auto auto 50%`, `translate: -50% -50%`, `width` and `height` `max(100%, 46px)`; it scales with the button (44.6px while pressed); the layout box never changes.')
+    await expect(prompt(page)).toContainText('Opt-out: dense or high-frequency controls (toolbars, list rows, 100+ uses a day) get `background-color: var(--button-pressed)` (`#e0e0e0`) over 150ms `ease` and `scale: none`: `data-still` (CSS) or a `still` prop (Motion).')
     await expect(prompt(page)).toContainText('Motion route: `whileTap={{ scale: 0.97 }}`, `transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}`: the pointer, and Enter held (not Space); `still`: `whileTap={{ backgroundColor: "#e0e0e0" }}`. No CSS transition on `scale` there.')
-    await expect(prompt(page)).toContainText('Reduced motion: keep the pressed scale, drop the transitions (the colour one too). CSS: `transition: none` under `prefers-reduced-motion: reduce`; Motion: `useReducedMotion()` sets `transition={{ duration: 0 }}`.')
+    // The [data-still] rule has its own transition, so the reduced-motion reset names it too.
+    await expect(prompt(page)).toContainText('Reduced motion: keep the pressed scale, drop the transitions (the colour one too). CSS: `transition: none` under `prefers-reduced-motion: reduce`, repeated for `[data-still]`; Motion: `useReducedMotion()` sets `transition={{ duration: 0 }}`.')
     await expect(prompt(page)).not.toContainText('the house ships')
-    // No "why" clauses in the prompt.
-    await expect(prompt(page)).not.toContainText(' so ')
+    // No "why" clauses in the prompt. A regex, because toContainText trims a string and ' so ' would match "absolute".
+    await expect(prompt(page)).not.toContainText(/\bso\b/)
     await expect(label(page)).toHaveText('scale 0.97 · 150ms ease-out')
 
     await option(page, 'Amount', '0.95').click()
@@ -191,7 +193,8 @@ test.describe('Press Scale', () => {
     await option(page, 'Amount', '0.97 (house)').click()
     await option(page, 'Release', 'Snap').click()
     await expect(prompt(page)).toContainText('No transition: it jumps to `scale: 0.97` on press and back on release (the mistake; the house ships `transition: scale 150ms var(--ease-out)` on the base rule, both directions).')
-    await expect(prompt(page)).toContainText('`whileTap={{ scale: 0.97 }}`, `transition={{ duration: 0 }}`')
+    // Snap zeroes the scale's transition only: the opt-out colour still takes its 150ms.
+    await expect(prompt(page)).toContainText('`whileTap={{ scale: 0.97 }}`, `transition={{ duration: 0, backgroundColor: { duration: 0.15 } }}`')
     await expect(prompt(page)).toContainText('Reduced motion: as shipped, the pressed scale with no transition.')
     await expect(prompt(page)).not.toContainText('useReducedMotion')
     await expect(label(page)).toHaveText('scale 0.97 · snap')
@@ -477,17 +480,19 @@ test.describe('Swipe to Dismiss', () => {
   test('controls rewrite the prompt and the labels', async ({ page }) => {
     await page.goto('/terms/swipe-to-dismiss')
     await expect(prompt(page)).toContainText('Make this toast swipe away sideways.')
-    // The width the numbers are read against: the demo's toast.
-    await expect(prompt(page)).toContainText('Toast: 376px wide (a third: 125px), clipped by its container.')
+    // The width the numbers are read against is a reference, not a size to build to; the exact third is stated.
+    await expect(prompt(page)).toContainText('Reference toast: 376px wide; a third of its width (125.3px; at or past it counts); scale to yours; its container clips.')
     await expect(prompt(page)).toContainText('Drag: 1:1 (`translateX` per move, no transition); `touch-action: pan-y`; pointer capture; `user-select: none`.')
-    await expect(prompt(page)).toContainText('Threshold: `|x| ≥ width / 3`, or `|v| ≥ 0.1px/ms` (100px/s) signed like `x`, leaves toward `sign(x)`; else back.')
-    await expect(prompt(page)).toContainText('Exit: to `±(width + 16px)`, spring `{ duration: 0.3, bounce: 0 }` out, `{ duration: 0.5, bounce: 0 }` back. Ship them as physics (mass 1), `{ stiffness: 947, damping: 61.6 }` and `{ stiffness: 341, damping: 36.9 }`, plus `velocity` (px/s); remove after the exit.')
-    // The JS route stops the running spring and adds the grab position; samples are on the event's clock.
-    await expect(prompt(page)).toContainText('JS route (`motionValue`, `animate`; `x.on("change")` writes `translateX`): `pointerdown` (not on Dismiss): `x.stop()`, `setPointerCapture`; `pointermove`: `x.set(start + dx)`, log `(e.timeStamp, x)`; `pointerup`, `pointercancel`, `lostpointercapture`: `v` = Δx / Δt, last 100ms (0 under two samples 8ms apart), then `animate(x, target, { ...spring, velocity: v * 1000 })`.')
-    // The Motion route decides on the position, not the drag offset, and releases a grab that never became a drag.
-    await expect(prompt(page)).toContainText('Motion route: `useMotionValue(0)`; `<motion.div drag="x" dragMomentum={false} style={{ x }} onDragStart onDragEnd onPointerUp>`; decide on `x.get()` and `info.velocity.x` (px/s), same `animate`, `onDismiss()` in `onComplete`; `onPointerUp` without a drag: same rule, `velocity: 0`.')
-    await expect(prompt(page)).not.toContainText('info.offset.x')
-    await expect(prompt(page)).toContainText('Visible Dismiss button: the exit to the right, `velocity: 0`; focus inside returns to the opener or its container (`focus({ preventScroll: true })`); always-mounted `role="status"` region.')
+    await expect(prompt(page)).toContainText('Threshold: `|x| ≥ width / 3`, or `|v| ≥ 0.1px/ms` signed like `x`, leaves toward `sign(x)`; else back.')
+    await expect(prompt(page)).toContainText('Exit: to `±(width + 16px)`, spring `{ duration: 0.3, bounce: 0 }` out, `{ duration: 0.5, bounce: 0 }` back. Ship as physics (mass 1): `{ stiffness: 947, damping: 61.6 }` and `{ stiffness: 341, damping: 36.9 }`, plus `velocity` (px/s); remove after the exit.')
+    // The JS route stops the running spring and adds the grab position; samples are on the event's clock, over a
+    // window that ends at the release.
+    await expect(prompt(page)).toContainText('JS route (`motionValue`, `animate`; `x.on("change")` writes `translateX`): `pointerdown` (not on Dismiss): `x.stop()`, `setPointerCapture`; `pointermove`: `x.set(start + dx)`, log `(e.timeStamp, x)`; `pointerup`, `pointercancel`, `lostpointercapture`: `v` = Δx / Δt over the 100ms ending at `pointerup` (0 under two samples 8ms apart), then `animate(x, target, { ...spring, velocity: v * 1000 })`.')
+    // The Motion route is the JS route's pointer events on a motion.div, not the drag prop.
+    await expect(prompt(page)).toContainText("Motion route: the JS route's pointer events on the `motion.div`, `useMotionValue(0)`, `style={{ x }}`, `animate(x, …)`; not `drag`; `onDismiss()` in `onComplete`.")
+    await expect(prompt(page)).not.toContainText('drag="x"')
+    await expect(prompt(page)).not.toContainText('info.')
+    await expect(prompt(page)).toContainText('Visible Dismiss button: the exit to the right, `velocity: 0`; focus inside returns to the opener, or its container (`focus({ preventScroll: true })`); always-mounted `role="status"` region.')
     await expect(prompt(page)).toContainText('Reduced motion: drag still follows; `x.jump(target)` on release: gone or at rest next frame (`matchMedia`; Motion: `useReducedMotion()`).')
     await expect(prompt(page)).not.toContainText('Escape')
     await expect(prompt(page)).not.toContainText('the house')
@@ -501,10 +506,44 @@ test.describe('Swipe to Dismiss', () => {
 
     await option(page, 'Threshold', 'Distance or velocity').click()
     await option(page, 'Release', 'Ease-out 200ms').click()
-    await expect(prompt(page)).toContainText('Exit: to `±(width + 16px)` and back to 0 on a 200ms `var(--ease-out)` tween, release velocity thrown away (the mistake; house: springs, mass 1, `velocity` in px/s: `{ stiffness: 947, damping: 61.6 }` out, `{ stiffness: 341, damping: 36.9 }` back); remove after the exit.')
+    // With a tween the release velocity means nothing, so the ease variant drops the exit spring's numbers and the
+    // Dismiss button's `velocity: 0`; the house's back spring stays as the reference.
+    await expect(prompt(page)).toContainText('Exit: to `±(width + 16px)` and back to 0 on a 200ms `var(--ease-out)` tween, release velocity thrown away (the mistake; house: springs that carry it, `{ stiffness: 341, damping: 36.9 }` back); remove after the exit.')
     await expect(prompt(page)).toContainText('then `animate(x, target, { duration: 0.2, ease: [0.23, 1, 0.32, 1] })`.')
     await expect(prompt(page)).not.toContainText('velocity: v * 1000')
+    await expect(prompt(page)).not.toContainText('947')
+    await expect(prompt(page)).toContainText('Visible Dismiss button: the exit to the right; focus inside returns to the opener, or its container')
+    await expect(prompt(page)).not.toContainText('velocity: 0')
     await expect(releaseLabel(page)).toHaveText('ease-out 200ms')
+  })
+
+  test('a drag that starts on the Dismiss button does not move the toast; its release still clicks Dismiss', async ({ page, isMobile }) => {
+    await page.goto('/terms/swipe-to-dismiss')
+    await settled(page)
+    const width = await widthOf(page)
+    const to = Math.round(width * 0.4)
+    const pointer = await pointerOn(page, dismiss(page), isMobile)
+    await pointer.down()
+    // Not a drag: the toast is not picked up, so the cycle keeps the stage and nothing follows the pointer.
+    await expect(toast(page)).toHaveAttribute('data-dragging', 'false')
+    await pointer.moveBy(to, 0, 4, 20)
+    await page.waitForTimeout(150)
+    expect(await xOf(page)).toBe(0)
+    await expect(hint(page)).toHaveText('Drag the toast sideways, or flick it')
+    await expect(status(page)).toHaveText('')
+    await pointer.up()
+    await page.waitForTimeout(200)
+    expect(await xOf(page)).toBe(0)
+    await expect(wrap(page)).toHaveAttribute('data-state', 'open')
+    await expect(status(page)).toHaveText('')
+
+    // The button itself still works: a click runs the exit to the right.
+    await watchState(page)
+    await dismiss(page).click()
+    await expect(hint(page)).toHaveText('Dismiss button: gone')
+    await expect(status(page)).toHaveText('Dismissed')
+    await expect.poll(() => stateLog(page), { timeout: 2000 }).toContain('closed:hidden')
+    await expect(wrap(page)).toHaveAttribute('data-state', 'open', { timeout: 2000 })
   })
 
   test('dragged, the toast follows the pointer 1:1 with no transition; released short of a third at rest, it springs back without passing 0 and the cycle stays off', async ({ page, isMobile }) => {

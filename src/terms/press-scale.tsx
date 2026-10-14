@@ -298,11 +298,12 @@ function transitionLine(v: V): string {
 function hitLine(v: V): string {
   const pressed = hitPressed(v)
   const note = v.amount === HOUSE ? `${pressed}px while pressed` : v.amount === FLOOR ? `${pressed}px while pressed, about 44` : `${pressed}px while pressed, under 44`
-  return `- Hit area: \`position: relative\` and a centred \`::after\`, \`width: max(100%, ${HIT}px)\`, same height; it scales with the button (${note}); the layout box never changes.`
+  return `- Hit area: the button \`position: relative\`; its \`::after\`: \`content: ""\`, \`position: absolute\`, \`inset: 50% auto auto 50%\`, \`translate: -50% -50%\`, \`width\` and \`height\` \`max(100%, ${HIT}px)\`; it scales with the button (${note}); the layout box never changes.`
 }
 
 function motionLine(v: V): string {
-  const transition = v.release === 'glide' ? `transition={{ duration: ${PRESS_MS / 1000}, ease: ${EASE.motion} }}` : 'transition={{ duration: 0 }}'
+  // Snap zeroes the scale's transition only: the opt-out colour keeps its 150ms.
+  const transition = v.release === 'glide' ? `transition={{ duration: ${PRESS_MS / 1000}, ease: ${EASE.motion} }}` : `transition={{ duration: 0, backgroundColor: { duration: ${PRESS_MS / 1000} } }}`
   return `- Motion route: \`whileTap={{ scale: ${v.amount} }}\`, \`${transition}\`: the pointer, and Enter held (not Space); \`still\`: \`whileTap={{ backgroundColor: "${PRESSED_COLOR}" }}\`. No CSS transition on \`scale\` there.`
 }
 
@@ -338,8 +339,7 @@ function cssCode(v: V): string {
     '.button::after {',
     "  content: '';",
     '  position: absolute;',
-    '  top: 50%;',
-    '  left: 50%;',
+    '  inset: 50% auto auto 50%;',
     `  width: max(100%, ${HIT}px);`,
     `  height: max(100%, ${HIT}px);`,
     '  translate: -50% -50%;',
@@ -408,7 +408,12 @@ function motionCode(v: V): string {
     `      whileTap={still ? { backgroundColor: pressed } : { scale: ${v.amount} }}`,
     ...(glide
       ? [`      transition={reduced ? { duration: 0 } : { duration: ${PRESS_MS / 1000}, ease }}`]
-      : ['      // No transition: the common mistake. It jumps to the pressed scale and back.', `      // The house ships { duration: ${PRESS_MS / 1000}, ease } here.`, '      transition={{ duration: 0 }}']),
+      : [
+          '      // No transition on the scale: the common mistake. It jumps to the pressed',
+          `      // scale and back; the opt-out colour keeps its ${PRESS_MS}ms. The house ships`,
+          `      // { duration: ${PRESS_MS / 1000}, ease } here.`,
+          `      transition={{ duration: 0, backgroundColor: { duration: ${PRESS_MS / 1000} } }}`,
+        ]),
     '      // whileTap covers the pointer and Enter held (not Space: that key activates',
     '      // with no press), and ends on pointerup anywhere or pointercancel.',
     '      {...rest}',
@@ -427,11 +432,11 @@ export default defineTerm({
   definition: 'A button shrinks slightly while pressed, so the click feels physical.',
   aliases: ['scale on press', 'active scale', 'button press animation', 'tap feedback', 'press feedback', 'pressed state'],
   description:
-    'Press feedback answers the finger: while a button is held it scales down a little, and when it is let go it comes back. The amount is small, 0.97 (Emil ships 0.96 to 0.97), and never below 0.95, where it starts to read as cartoon. What makes it feel right is the transition: 150ms on an ease-out curve, declared on the base rule, so it runs both ways: a quick tap or a release mid-press glides back instead of snapping. The layout box never changes, and the hit area is a 46px pseudo-element that scales with the button, so it is still over 44px while pressed. And not every button needs it: dense or high-frequency controls opt out with a colour change instead.',
+    'Press feedback answers the finger: while a button is held it scales down a little, and when it is let go it comes back. The amount is small, 0.97 (Emil ships 0.96 to 0.97), and never below 0.95, where it starts to read as cartoon. What makes it feel right is the transition: 150ms on an ease-out curve, declared on the base rule, so it runs both ways: a quick tap or a release mid-press glides back instead of snapping. The layout box never changes, and the hit area is a 46px pseudo-element that scales with the button, so it is still over 44px while pressed at 0.97. And not every button needs it: dense or high-frequency controls opt out with a colour change instead.',
   useWhen: [
     'Primary and secondary buttons, cards that act as buttons, and chips: anything pressed a few times a session.',
     'Touch targets, where the finger covers the control and the scale is the only sign the press landed.',
-    'Icon buttons with a hit area extended by a pseudo-element: 46px at rest, so it is still over 44px while pressed.',
+    'Icon buttons with a hit area extended by a pseudo-element: 46px at rest, so it is still over 44px while pressed at 0.97.',
   ],
   avoidWhen: [
     'Dense or high-frequency UI: toolbars, list rows, keyboard-driven menus, anything used 100+ times a day. A 150ms colour change, or nothing.',
@@ -452,12 +457,12 @@ export default defineTerm({
       '',
       amountLine(v),
       transitionLine(v),
-      '- Pressed selector: `:not(:disabled):active`: the pointer, and Space held (Enter clicks with no press). A press driven from JS (pointer capture, a loop) sets `data-pressed="true"`; style both.',
+      '- CSS route: pressed selector `:not(:disabled):active`: the pointer, and Space held (Enter clicks with no press). A press driven from JS (pointer capture, a loop) sets `data-pressed="true"`; style both.',
       hitLine(v),
-      `- Opt-out: dense or high-frequency controls (toolbars, list rows, 100+ uses a day) get \`background-color: var(--button-pressed)\` (\`${PRESSED_COLOR}\`) over ${PRESS_MS}ms and \`scale: none\`: \`data-still\` (CSS) or a \`still\` prop (Motion).`,
+      `- Opt-out: dense or high-frequency controls (toolbars, list rows, 100+ uses a day) get \`background-color: var(--button-pressed)\` (\`${PRESSED_COLOR}\`) over ${PRESS_MS}ms \`ease\` and \`scale: none\`: \`data-still\` (CSS) or a \`still\` prop (Motion).`,
       motionLine(v),
       v.release === 'glide'
-        ? '- Reduced motion: keep the pressed scale, drop the transitions (the colour one too). CSS: `transition: none` under `prefers-reduced-motion: reduce`; Motion: `useReducedMotion()` sets `transition={{ duration: 0 }}`.'
+        ? '- Reduced motion: keep the pressed scale, drop the transitions (the colour one too). CSS: `transition: none` under `prefers-reduced-motion: reduce`, repeated for `[data-still]`; Motion: `useReducedMotion()` sets `transition={{ duration: 0 }}`.'
         : '- Reduced motion: as shipped, the pressed scale with no transition.',
     ].join('\n'),
   acceptance: (v) => {
@@ -466,7 +471,7 @@ export default defineTerm({
     return [
       glide
         ? `CSS route: the button's computed \`transition-property\` is \`scale\`, \`transition-duration\` \`${PRESS_MS / 1000}s\` and \`transition-timing-function\` \`${EASE.css}\`, the same at rest and while pressed. Motion route: the \`transition\` prop is \`{ duration: ${PRESS_MS / 1000}, ease: ${EASE.motion} }\` (in the source; the computed transition is not it).`
-        : `CSS route: the button's computed \`transition-duration\` for \`scale\` is \`0s\` at rest and while pressed. Motion route: the \`transition\` prop is \`{ duration: 0 }\` (in the source).`,
+        : `CSS route: the button's computed \`transition-duration\` for \`scale\` is \`0s\` at rest and while pressed. Motion route: the \`transition\` prop is \`{ duration: 0, backgroundColor: { duration: ${PRESS_MS / 1000} } }\` (in the source).`,
       glide
         ? `Pressed and held, sampled every frame from \`pointerdown\`: the scale (computed \`scale\`, or the first value of the \`transform\` matrix) falls from 1 toward ${s} without passing it, with in-between frames, and is within 0.001 of ${s} by ${PRESS_MS}ms (±1 frame); held longer, it stays there.`
         : `Pressed, the scale (computed \`scale\`, or the first value of the \`transform\` matrix) is ${s} in the first frame after \`pointerdown\`, with no in-between frames, and stays there while held.`,
@@ -475,7 +480,7 @@ export default defineTerm({
         : 'Released, the scale is 1 in the first frame after `pointerup`, with no in-between frames.',
       ...(glide
         ? [
-            `Released 50ms into the press, it turns back from where it is: no frame steps more than the press's own largest step (±0.002), and it never reaches ${s}.`,
+            `Released 50ms into the press, it turns back from where it is: no frame step larger than 0.025 in \`scale\`, and it never reaches ${s}.`,
           ]
         : []),
       `The primary button's \`offsetWidth\` and \`offsetHeight\` never change during a press. \`elementFromPoint\` 21px above and 21px below its centre (edges exclusive) returns the button at rest${
@@ -486,8 +491,8 @@ export default defineTerm({
       'Held with the pointer, it presses on both routes. Held from the keyboard, Space presses the CSS route and Enter the Motion route; the other key activates it with no feedback. `keyup` releases.',
       `A \`data-still\` (or \`still\`) control pressed the same way keeps \`scale\` at \`none\` (\`transform\` identity) in every frame and changes only its colour, to \`${PRESSED_COLOR}\`, over ${PRESS_MS}ms.`,
       glide
-        ? `With reduced motion on, the scale is ${s} within one frame of \`pointerdown\` (CSS: the first frame) and 1 within one frame of \`pointerup\`, with no in-between frames.`
-        : `With reduced motion on, nothing changes: the scale is ${s} within one frame of \`pointerdown\` (CSS: the first frame) and 1 within one frame of \`pointerup\`.`,
+        ? `With reduced motion on, the scale is ${s} within two frames of \`pointerdown\` (CSS: the first frame) and 1 within two frames of \`pointerup\`, with no in-between frames.`
+        : `With reduced motion on, nothing changes: the scale is ${s} within two frames of \`pointerdown\` (CSS: the first frame) and 1 within two frames of \`pointerup\`.`,
     ]
   },
   code: (v) => ({ css: cssCode(v), motion: motionCode(v) }),
