@@ -64,6 +64,12 @@ type Order = Record<(typeof ITEMS)[number], number>
 const HOME: Order = { a: 0, b: 1, c: 2 }
 const MOVED: Order = { a: 2, b: 0, c: 1 }
 const SIZE = { card: { w: 64, h: 48, gap: 8 }, detail: { w: 104, h: 68, gap: 12 } }
+// The entry page's cards: a kanban board's, a column tag over a title. The card draws each as a square and a bar.
+const CARDS: Record<(typeof ITEMS)[number], { tag: string; title: string }> = {
+  a: { tag: 'Design', title: 'Write the brief' },
+  b: { tag: 'Build', title: 'Ship the sidebar' },
+  c: { tag: 'Review', title: 'Review the demos' },
+}
 const SETTLE_MS = 150
 const HOLD_MS = 1100
 const REST_MS = 200
@@ -92,10 +98,20 @@ function Row({ size, ease, label }: { size: DemoProps['size']; ease: string; lab
                 '--e': ease,
               } as CSSProperties
             }
-            className={`absolute left-0 top-0 flex flex-col justify-between rounded-lg bg-surface shadow-card [--o:0] data-[order=1]:[--o:1] data-[order=2]:[--o:2] transition-[transform] duration-(--d) ease-(--e) group-data-[snap=true]/stage:transition-none ${id === 'a' ? 'z-10' : ''} ${detail ? 'p-3' : 'p-2'}`}
+            className={`absolute left-0 top-0 flex flex-col rounded-lg bg-surface p-2 shadow-card [--o:0] data-[order=1]:[--o:1] data-[order=2]:[--o:2] transition-[transform] duration-(--d) ease-(--e) group-data-[snap=true]/stage:transition-none ${id === 'a' ? 'z-10' : ''} ${detail ? 'gap-0.5' : 'justify-between'}`}
           >
-            <span className={`rounded-sm ${id === 'a' ? 'bg-demo-subject' : 'bg-demo-2'} ${detail ? 'size-4' : 'size-3'}`} />
-            <span className={`h-1.5 rounded-full bg-demo-2 ${id === 'b' ? 'w-2/3' : 'w-1/2'}`} />
+            {detail ? (
+              // Two lines of 16px and a 12px tag in the 52px inside the card: the title may wrap once.
+              <>
+                <span className="text-[12px] leading-4 text-ink-muted">{CARDS[id].tag}</span>
+                <span className="text-[13px] font-medium leading-4 text-ink [text-wrap:balance]">{CARDS[id].title}</span>
+              </>
+            ) : (
+              <>
+                <span className={`size-3 rounded-sm ${id === 'a' ? 'bg-demo-subject' : 'bg-demo-2'}`} />
+                <span className={`h-1.5 rounded-full bg-demo-2 ${id === 'b' ? 'w-2/3' : 'w-1/2'}`} />
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -343,7 +359,7 @@ export default defineTerm({
   demo: {
     component: EaseInOutDemo,
     label:
-      'A row of three cards. The first card slides to the end while the other two shift over, slow at the start, fast in the middle and slow at the end. It holds, then moves back. With a comparison picked, a twin row below makes the same move at the same instant with the CSS ease-in-out keyword, ease-out or linear.',
+      "On the entry page, a row of three kanban cards, each a column tag over a title: Design, Write the brief; Build, Ship the sidebar; Review, Review the demos. The first card slides to the end while the other two shift over, slow at the start, fast in the middle and slow at the end. It holds, then moves back. With a comparison picked, a twin row below makes the same move at the same instant with the CSS ease-in-out keyword, ease-out or linear, each row under its curve name. The index card is a wireframe of the same three cards: a square and a bar each.",
     controls,
     glyph: EaseInOutGlyph,
   },

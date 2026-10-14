@@ -1,3 +1,4 @@
+import { ChevronDown, CreditCard, LayoutDashboard, LogOut, Settings, type LucideIcon } from 'lucide-react'
 import { useRef, type CSSProperties } from 'react'
 import { scaled } from '@/components/demo/playback'
 import { snap, useCycle } from '@/components/demo/use-cycle'
@@ -66,6 +67,15 @@ const HOLD_MS = 1100
 
 const s = (ms: number) => ms / 1000
 
+// The entry page's menu: the user menu under an "Options" button, as on Duration. The card draws the same four rows
+// as bars.
+const MENU: { label: string; Icon: LucideIcon }[] = [
+  { label: 'Dashboard', Icon: LayoutDashboard },
+  { label: 'Billing', Icon: CreditCard },
+  { label: 'Settings', Icon: Settings },
+  { label: 'Log out', Icon: LogOut },
+]
+
 function Menu({ size, ease, label }: { size: DemoProps['size']; ease: string; label?: string }) {
   const detail = size === 'detail'
   return (
@@ -77,8 +87,17 @@ function Menu({ size, ease, label }: { size: DemoProps['size']; ease: string; la
           data-pressed="false"
           className={`flex items-center justify-between rounded-md bg-surface shadow-card transition-transform duration-(--p) ease-out group-data-[snap=true]/stage:transition-none data-[pressed=true]:[transform:scale(0.97)] ${detail ? 'h-8 w-24 px-2.5' : 'h-6 w-16 px-2'}`}
         >
-          <span className={`h-1.5 rounded-full bg-demo-2 ${detail ? 'w-11' : 'w-7'}`} />
-          <span className="size-1.5 rotate-45 border-b border-r border-ink-faint" />
+          {detail ? (
+            <>
+              <span className="text-[13px] text-ink">Options</span>
+              <ChevronDown size={14} aria-hidden className="shrink-0 text-ink-muted" />
+            </>
+          ) : (
+            <>
+              <span className="h-1.5 w-7 rounded-full bg-demo-2" />
+              <span className="size-1.5 rotate-45 border-b border-r border-ink-faint" />
+            </>
+          )}
         </div>
         <div
           data-popover=""
@@ -86,12 +105,19 @@ function Menu({ size, ease, label }: { size: DemoProps['size']; ease: string; la
           style={{ '--e': ease } as CSSProperties}
           className={`absolute inset-x-0 origin-top-left rounded-lg bg-surface p-1 opacity-0 shadow-card [transform:scale(0.95)] transition-[opacity,transform] duration-(--x) ease-(--e) group-data-[snap=true]/stage:transition-none data-[open=true]:opacity-100 data-[open=true]:[transform:none] data-[open=true]:duration-(--d) ${detail ? 'top-10' : 'top-7.5'}`}
         >
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className={`flex items-center rounded-md ${detail ? 'h-7 gap-2 px-2' : 'h-5 gap-1.5 px-1.5'} ${i === 0 ? 'bg-demo' : ''}`}>
-              <span className={`shrink-0 rounded-sm ${i === 0 ? 'bg-demo-subject' : 'bg-demo-2'} ${detail ? 'size-2.5' : 'size-2'}`} />
-              <span className={`h-1.5 rounded-full bg-demo-2 ${['w-3/5', 'w-1/2', 'w-2/3', 'w-2/5'][i]}`} />
-            </div>
-          ))}
+          {detail
+            ? MENU.map(({ label, Icon }, i) => (
+                <div key={label} className={`flex h-7 items-center gap-2 rounded-md px-2 text-[13px] text-ink ${i === 0 ? 'bg-demo' : ''}`}>
+                  <Icon size={14} aria-hidden className="shrink-0 text-ink-muted" />
+                  <span className="min-w-0 truncate">{label}</span>
+                </div>
+              ))
+            : [0, 1, 2, 3].map((i) => (
+                <div key={i} className={`flex h-5 items-center gap-1.5 rounded-md px-1.5 ${i === 0 ? 'bg-demo' : ''}`}>
+                  <span className={`size-2 shrink-0 rounded-sm ${i === 0 ? 'bg-demo-subject' : 'bg-demo-2'}`} />
+                  <span className={`h-1.5 rounded-full bg-demo-2 ${['w-3/5', 'w-1/2', 'w-2/3', 'w-2/5'][i]}`} />
+                </div>
+              ))}
         </div>
       </div>
       {/* Room for the open menu, so opening never moves anything else. */}
@@ -353,7 +379,7 @@ export default defineTerm({
   demo: {
     component: EaseOutDemo,
     label:
-      'A button is pressed and a menu opens below it, growing from 95% size and fading in from the corner next to the button, fast at first and then settling. It holds, then closes a little faster. With a comparison picked, a second menu opens beside it at the same instant with the CSS ease-out keyword, ease-in or linear.',
+      'On the entry page, an Options button is pressed and a user menu opens below it: Dashboard, Billing, Settings and Log out, each with an icon, the first row highlighted. The menu grows from 95% size and fades in from the corner next to the button, fast at first and then settling. It holds, then closes a little faster. With a comparison picked, a second menu opens beside it at the same instant with the CSS ease-out keyword, ease-in or linear, each under its curve name. The index card is a wireframe of the same button and menu: bars for the words, no text.',
     controls,
     glyph: EaseOutGlyph,
   },
