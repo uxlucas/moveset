@@ -80,62 +80,56 @@ const SHEET: { label: string; short: string; Icon: LucideIcon }[] = [
   { label: 'Send to…', short: 'Send', Icon: Send },
 ]
 
-// Spans throughout: on the entry page the frame is a <button>, which holds phrasing content only. Below `sm` the entry
-// page's columns are about as narrow as the card's (88px against 80px), so the detail stage wears the card's compact
-// look there and its own from `sm:` up.
-function Element({ kind, ms, detail }: { kind: Kind; ms: number; detail: boolean }) {
+// The entry page's element: the real interface. Spans throughout: the frame is a <button>, which holds phrasing
+// content only. Below `sm` the columns are about as narrow as the card's (88px against 80px), so the stage wears a
+// compact look there (three menu rows without icons, the sheet's short words) and its own from `sm:` up.
+function Element({ kind, ms }: { kind: Kind; ms: number }) {
   if (kind === 'tooltip') {
     return (
       <>
-        <span className={`absolute inset-x-0 flex justify-center ${detail ? 'bottom-[calc(42%+8px)]' : 'bottom-[calc(42%+5px)]'}`}>
+        <span className="absolute inset-x-0 bottom-[calc(42%+8px)] flex justify-center">
           {/* Inverted, as tooltips are, so the whole body carries the fade against the frame. */}
           <span
             data-duration-item=""
             data-ms={ms}
             data-open="true"
-            className={`${ITEM} flex origin-bottom items-center whitespace-nowrap rounded-md bg-demo-subject text-surface opacity-0 shadow-card [transform:scale(0.97)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'h-8 gap-1.5 px-2.5 text-[13px]' : 'h-6 gap-1 px-2 text-[12px]'}`}
+            className={`${ITEM} flex h-8 origin-bottom items-center gap-1.5 whitespace-nowrap rounded-md bg-demo-subject px-2.5 text-[13px] text-surface opacity-0 shadow-card [transform:scale(0.97)] data-[open=true]:opacity-100 data-[open=true]:[transform:none]`}
           >
             Bold
-            <span className={`font-mono ${detail ? 'text-[12px]' : 'text-[11px]'}`}>⌘B</span>
+            <span className="font-mono text-[12px]">⌘B</span>
           </span>
         </span>
-        {/* The trigger: a toolbar button. On the entry page a mouse hovers it, so `hit` gives the cursor a 44px zone to
-            cross. The icon takes no pointer events, so the trigger has no event targets inside it: pointerover on it
-            is the mouse arriving and pointerout the mouse leaving. */}
+        {/* The trigger: a toolbar button. A mouse hovers it, so `hit` gives the cursor a 44px zone to cross. The icon
+            takes no pointer events, so the trigger has no event targets inside it: pointerover on it is the mouse
+            arriving and pointerout the mouse leaving. */}
         <span className="absolute inset-x-0 top-[58%] flex justify-center">
-          <span data-duration-trigger="" className={`flex items-center justify-center rounded-md bg-surface text-ink shadow-card ${detail ? 'hit size-8' : 'size-7'}`}>
-            <Bold size={detail ? 16 : 14} aria-hidden className="pointer-events-none" />
+          <span data-duration-trigger="" className="hit flex size-8 items-center justify-center rounded-md bg-surface text-ink shadow-card">
+            <Bold size={16} aria-hidden className="pointer-events-none" />
           </span>
         </span>
       </>
     )
   }
   if (kind === 'dropdown') {
-    const rows = detail ? MENU : MENU.slice(1)
     return (
       <>
-        <span
-          className={`absolute flex items-center whitespace-nowrap rounded-md bg-surface text-ink shadow-card ${detail ? 'left-2 top-2 h-6 gap-1 px-1.5 text-[12px] sm:left-3 sm:top-3 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]' : 'left-1.5 top-1.5 h-6 gap-1 px-1.5 text-[12px]'}`}
-        >
+        <span className="absolute left-2 top-2 flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-surface px-1.5 text-[12px] text-ink shadow-card sm:left-3 sm:top-3 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
           Options
-          <ChevronDown size={detail ? 14 : 12} aria-hidden className="text-ink-muted" />
+          <ChevronDown size={14} aria-hidden className="text-ink-muted" />
         </span>
         <span
           data-duration-item=""
           data-ms={ms}
           data-open="true"
-          className={`${ITEM} absolute block origin-top-left rounded-lg bg-surface p-1 opacity-0 shadow-card [transform:scale(0.95)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] ${detail ? 'inset-x-2 top-9 sm:inset-x-3 sm:top-12' : 'inset-x-1.5 top-[34px]'}`}
+          className={`${ITEM} absolute inset-x-2 top-9 block origin-top-left rounded-lg bg-surface p-1 opacity-0 shadow-card [transform:scale(0.95)] data-[open=true]:opacity-100 data-[open=true]:[transform:none] sm:inset-x-3 sm:top-12`}
         >
-          {/* The first row is highlighted. On the entry page below `sm` the first row is hidden, so the second takes
-              the highlight there. */}
-          {rows.map(({ label, Icon }, i) => (
+          {/* The first row is highlighted. Below `sm` the first row is hidden, so the second takes the highlight there. */}
+          {MENU.map(({ label, Icon }, i) => (
             <span
               key={label}
-              className={`flex items-center rounded-md text-ink ${detail ? 'h-6 px-1.5 text-[12px] sm:h-7 sm:gap-2 sm:px-2 sm:text-[13px]' : 'h-5 px-1.5 text-[12px]'} ${
-                i === 0 ? 'bg-demo' : i === 1 && detail ? 'max-sm:bg-demo' : ''
-              } ${i === 0 && detail ? 'max-sm:hidden' : ''}`}
+              className={`flex h-6 items-center rounded-md px-1.5 text-[12px] text-ink sm:h-7 sm:gap-2 sm:px-2 sm:text-[13px] ${i === 0 ? 'bg-demo max-sm:hidden' : i === 1 ? 'max-sm:bg-demo' : ''}`}
             >
-              {detail && <Icon size={14} aria-hidden className="shrink-0 text-ink-muted max-sm:hidden" />}
+              <Icon size={14} aria-hidden className="shrink-0 text-ink-muted max-sm:hidden" />
               <span className="min-w-0 truncate">{label}</span>
             </span>
           ))}
@@ -146,7 +140,7 @@ function Element({ kind, ms, detail }: { kind: Kind; ms: number; detail: boolean
   return (
     <>
       {/* The page behind the sheet: body copy, not the point, so bars. */}
-      <span className={`absolute inset-x-0 top-0 flex flex-col ${detail ? 'gap-2 p-3' : 'gap-1.5 p-2'}`}>
+      <span className="absolute inset-x-0 top-0 flex flex-col gap-2 p-3">
         <span className="h-1.5 w-1/2 rounded-full bg-demo-2" />
         <span className="h-1.5 w-2/3 rounded-full bg-demo-2" />
       </span>
@@ -155,23 +149,87 @@ function Element({ kind, ms, detail }: { kind: Kind; ms: number; detail: boolean
         data-duration-item=""
         data-ms={ms}
         data-open="true"
-        className={`${ITEM} ${SHEET_REDUCED} absolute inset-x-1 bottom-0 top-[22%] flex flex-col items-center rounded-t-xl bg-surface shadow-card [transform:translateY(calc(100%_+_4px))] data-[open=true]:[transform:none] ${detail ? 'gap-2 px-2 pt-2 sm:gap-2.5 sm:px-3' : 'gap-1 px-2 pt-1.5'}`}
+        className={`${ITEM} ${SHEET_REDUCED} absolute inset-x-1 bottom-0 top-[22%] flex flex-col items-center gap-2 rounded-t-xl bg-surface px-2 pt-2 shadow-card [transform:translateY(calc(100%_+_4px))] data-[open=true]:[transform:none] sm:gap-2.5 sm:px-3`}
       >
-        <span className={`h-1 rounded-full bg-demo-2 ${detail ? 'w-8' : 'w-5'}`} />
-        <span className={`self-start font-medium text-ink ${detail ? 'text-[12px] sm:text-[13px]' : 'text-[12px]'}`}>Share</span>
+        <span className="h-1 w-8 rounded-full bg-demo-2" />
+        <span className="self-start text-[12px] font-medium text-ink sm:text-[13px]">Share</span>
         {SHEET.map(({ label, short, Icon }) => (
-          <span key={label} className={`flex w-full items-center text-ink ${detail ? 'h-6 gap-1.5 text-[12px] sm:h-7 sm:gap-2 sm:text-[13px]' : 'h-5 gap-1.5 text-[12px]'}`}>
+          <span key={label} className="flex h-6 w-full items-center gap-1.5 text-[12px] text-ink sm:h-7 sm:gap-2 sm:text-[13px]">
             <Icon size={14} aria-hidden className="shrink-0 text-ink-muted" />
-            {detail ? (
-              <span className="min-w-0 truncate">
-                <span className="sm:hidden">{short}</span>
-                <span className="max-sm:hidden">{label}</span>
-              </span>
-            ) : (
-              <span className="min-w-0 truncate">{short}</span>
-            )}
+            <span className="min-w-0 truncate">
+              <span className="sm:hidden">{short}</span>
+              <span className="max-sm:hidden">{label}</span>
+            </span>
           </span>
         ))}
+      </span>
+    </>
+  )
+}
+
+// The card's element: a wireframe of the same component in the same place, drawn with the demo shapes (bars for the
+// words, a square for the toolbar button), no text and no icons. The same data hooks, so the cycle runs it alike.
+function Wireframe({ kind, ms }: { kind: Kind; ms: number }) {
+  if (kind === 'tooltip') {
+    return (
+      <>
+        <span className="absolute inset-x-0 bottom-[calc(42%+5px)] flex justify-center">
+          <span
+            data-duration-item=""
+            data-ms={ms}
+            data-open="true"
+            className={`${ITEM} flex h-5 origin-bottom items-center rounded-md bg-demo-subject px-1.5 opacity-0 shadow-card [transform:scale(0.97)] data-[open=true]:opacity-100 data-[open=true]:[transform:none]`}
+          >
+            <span className="h-1.5 w-7 rounded-full bg-surface" />
+          </span>
+        </span>
+        <span className="absolute inset-x-0 top-[58%] flex justify-center">
+          <span data-duration-trigger="" className="flex size-7 items-center justify-center rounded-md bg-surface shadow-card">
+            <span className="size-2 rounded-sm bg-demo-2" />
+          </span>
+        </span>
+      </>
+    )
+  }
+  if (kind === 'dropdown') {
+    return (
+      <>
+        <span className="absolute left-2 top-2 flex h-5 w-12 items-center justify-between rounded-md bg-surface px-1.5 shadow-card">
+          <span className="h-1.5 w-5 rounded-full bg-demo-2" />
+          <span className="size-1.5 rotate-45 border-b border-r border-ink-faint" />
+        </span>
+        <span
+          data-duration-item=""
+          data-ms={ms}
+          data-open="true"
+          className={`${ITEM} absolute inset-x-2 top-8 block origin-top-left rounded-lg bg-surface p-1 opacity-0 shadow-card [transform:scale(0.95)] data-[open=true]:opacity-100 data-[open=true]:[transform:none]`}
+        >
+          {[0, 1, 2].map((i) => (
+            <span key={i} className={`flex h-[18px] items-center gap-1.5 rounded-md px-1 ${i === 0 ? 'bg-demo' : ''}`}>
+              <span className={`size-2 shrink-0 rounded-sm ${i === 0 ? 'bg-demo-subject' : 'bg-demo-2'}`} />
+              <span className={`h-1.5 rounded-full bg-demo-2 ${['w-3/5', 'w-1/2', 'w-2/3'][i]}`} />
+            </span>
+          ))}
+        </span>
+      </>
+    )
+  }
+  return (
+    <>
+      <span className="absolute inset-x-0 top-0 flex flex-col gap-1.5 p-2">
+        <span className="h-1.5 w-1/2 rounded-full bg-demo-2" />
+        <span className="h-1.5 w-2/3 rounded-full bg-demo-2" />
+      </span>
+      <span
+        data-duration-item=""
+        data-ms={ms}
+        data-open="true"
+        className={`${ITEM} ${SHEET_REDUCED} absolute inset-x-1 bottom-0 top-[22%] flex flex-col items-center gap-1.5 rounded-t-xl bg-surface px-2 pt-1.5 shadow-card [transform:translateY(calc(100%_+_4px))] data-[open=true]:[transform:none]`}
+      >
+        <span className="h-1 w-5 rounded-full bg-demo-2" />
+        <span className="h-1.5 w-3/4 self-start rounded-full bg-demo-subject" />
+        <span className="h-1.5 w-full rounded-full bg-demo-2" />
+        <span className="h-1.5 w-4/5 self-start rounded-full bg-demo-2" />
       </span>
     </>
   )
@@ -199,11 +257,11 @@ function Column({ kind, ms, exit, timeScale, detail }: { kind: Kind; ms: number;
           style={vars}
           className={`${frame} touch-pan-y select-none [-webkit-touch-callout:none] ${kind === 'tooltip' ? '' : 'cursor-pointer'}`}
         >
-          <Element kind={kind} ms={ms} detail={detail} />
+          <Element kind={kind} ms={ms} />
         </button>
       ) : (
         <div data-duration-frame="" style={vars} className={frame}>
-          <Element kind={kind} ms={ms} detail={detail} />
+          <Wireframe kind={kind} ms={ms} />
         </div>
       )}
       <p className={`font-mono ${text} ${word === 'right' ? 'text-ink' : 'text-ink-muted'}`}>{word}</p>
@@ -600,7 +658,7 @@ export default defineTerm({
   demo: {
     component: DurationDemo,
     label:
-      'Three identical frames side by side, labelled 150ms, 300ms and 500ms. In each, the same user menu (Dashboard, Billing, Settings, Log out) opens under an Options button at the same instant on the same curve, so the 150ms one lands first and the 500ms one last; under each, a verdict says whether that duration suits the element. They hold, then close about 25% faster. On the entry page, holding a frame opens that one element at its duration, and letting go closes it at its exit duration. With a mouse, the tooltip (Bold, ⌘B, over a toolbar button) opens when the pointer moves onto the button and closes when it moves away; on touch it is held like the others. Switching to the tooltip or to a share sheet (Copy link, Send to…) changes the element and the verdicts: 150ms is right for a tooltip and abrupt for a sheet.',
+      'Three identical frames side by side, labelled 150ms, 300ms and 500ms. In each, on the entry page, the same user menu (Dashboard, Billing, Settings, Log out) opens under an Options button at the same instant on the same curve, so the 150ms one lands first and the 500ms one last; under each, a verdict says whether that duration suits the element. They hold, then close about 25% faster. Holding a frame opens that one element at its duration, and letting go closes it at its exit duration. With a mouse, the tooltip (Bold, ⌘B, over a toolbar button) opens when the pointer moves onto the button and closes when it moves away; on touch it is held like the others. Switching to the tooltip or to a share sheet (Copy link, Send to…) changes the element and the verdicts: 150ms is right for a tooltip and abrupt for a sheet. The index card is a wireframe of the same three frames and the same motion: bars for the words, no text.',
     controls,
     glyph: DurationGlyph,
   },

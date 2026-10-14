@@ -71,63 +71,82 @@ const TOOLBAR: { name: string; Icon: LucideIcon }[] = [
   { name: 'Link', Icon: Link },
 ]
 
-function Frame({ size }: { size: DemoProps['size'] }) {
+// The entry page shows the real interface; the card is a wireframe of the same layout (a pill button over a pill
+// toolbar of five circles), drawn with the demo shapes: a bar for the label, a dot for each icon, no captions.
+function Frame({ size, amount }: { size: DemoProps['size']; amount: string }) {
   const detail = size === 'detail'
   // The card button is close to the entry's size (120 × 36 against 128 × 40), so 0.97 reads as a press there too.
-  const face = `${BUTTON} flex items-center justify-center gap-2 rounded-lg bg-demo-subject font-medium text-surface shadow-card ${detail ? 'h-10 w-32 text-[14px]' : 'h-9 w-[120px] text-[13px]'}`
-  const label = (
-    <>
+  const face = `${BUTTON} flex items-center justify-center gap-2 rounded-full bg-demo-subject font-medium text-surface shadow-card ${detail ? 'h-10 w-32 text-[14px]' : 'h-9 w-[120px]'}`
+  const still = `${STILL} flex items-center justify-center rounded-full ${detail ? 'size-8 text-ink' : 'size-5'}`
+  // One caption under each element, the same distance from it, so neither rule has to be inferred from the other's.
+  const captioned = 'flex flex-col items-center gap-2'
+  const caption = 'font-mono tabular-nums text-[11px] text-ink-muted'
+  const button = detail ? (
+    // The primary action. On the entry page it is a real button: a press must not scroll the page sideways, select
+    // text or open the long-press menu; a vertical swipe still scrolls, and the browser then cancels the pointer.
+    // Its hit area is 46px (--hit), so it is still over 44px while pressed at 0.97.
+    <button
+      type="button"
+      data-press-button=""
+      data-press-target=""
+      data-pressed="false"
+      className={`${face} hit [--hit:46px] cursor-pointer touch-manipulation select-none [-webkit-touch-callout:none]`}
+    >
       <Send size={14} aria-hidden />
       Send
-    </>
+    </button>
+  ) : (
+    <div data-press-button="" data-pressed="false" className={face}>
+      <span className="h-2 w-12 rounded-full bg-surface" />
+    </div>
   )
-  const still = `${STILL} flex items-center justify-center rounded-md text-ink ${detail ? 'size-8' : 'size-7'}`
-  const iconPx = detail ? 16 : 14
-  return (
-    <div data-press-frame="" className={`relative flex w-full flex-col items-center justify-center overflow-hidden rounded-lg bg-demo ${detail ? 'h-40 gap-5 sm:h-52' : 'h-[112px] gap-3'}`}>
-      {/* The primary action. On the entry page it is a real button: a press must not scroll the page sideways, select
-          text or open the long-press menu; a vertical swipe still scrolls, and the browser then cancels the pointer.
-          Its hit area is 46px (--hit), so it is still over 44px while pressed at 0.97. */}
-      {detail ? (
-        <button
-          type="button"
-          data-press-button=""
-          data-press-target=""
-          data-pressed="false"
-          className={`${face} hit [--hit:46px] cursor-pointer touch-manipulation select-none [-webkit-touch-callout:none]`}
-        >
-          {label}
-        </button>
-      ) : (
-        <div data-press-button="" data-pressed="false" className={face}>
-          {label}
-        </div>
+  // The toolbar: the opt-out. Pressed, its buttons change colour and stay the same size.
+  const toolbar = (
+    <div data-press-row="" className={`flex rounded-full bg-surface p-1 shadow-card ${detail ? 'gap-1' : 'gap-0.5'}`}>
+      {TOOLBAR.map(({ name, Icon }) =>
+        detail ? (
+          <button
+            key={name}
+            type="button"
+            data-press-still=""
+            data-press-target=""
+            data-pressed="false"
+            aria-label={name}
+            className={`${still} hit cursor-pointer touch-manipulation select-none [-webkit-touch-callout:none]`}
+          >
+            <Icon size={16} aria-hidden />
+          </button>
+        ) : (
+          <span key={name} data-press-still="" data-pressed="false" className={still}>
+            <span className="size-2 rounded-full bg-demo-2" />
+          </span>
+        ),
       )}
-      {/* The toolbar: the opt-out. Pressed, its buttons change colour and stay the same size. */}
-      <div className={`flex flex-col items-center ${detail ? 'gap-2' : 'gap-1.5'}`}>
-        <div data-press-row="" className={`flex rounded-full bg-surface p-1 shadow-card ${detail ? 'gap-1' : 'gap-0.5'}`}>
-          {TOOLBAR.map(({ name, Icon }) =>
-            detail ? (
-              <button
-                key={name}
-                type="button"
-                data-press-still=""
-                data-press-target=""
-                data-pressed="false"
-                aria-label={name}
-                className={`${still} hit cursor-pointer touch-manipulation select-none [-webkit-touch-callout:none]`}
-              >
-                <Icon size={iconPx} aria-hidden />
-              </button>
-            ) : (
-              <span key={name} data-press-still="" data-pressed="false" className={still}>
-                <Icon size={iconPx} aria-hidden />
-              </span>
-            ),
-          )}
-        </div>
-        <p className={`font-mono text-ink-muted ${detail ? 'text-[11px]' : 'text-[10px]'}`}>{detail ? 'toolbar: colour only, no scale' : 'colour only'}</p>
-      </div>
+    </div>
+  )
+  return (
+    <div data-press-frame="" className={`relative flex w-full flex-col items-center justify-center overflow-hidden rounded-lg bg-demo ${detail ? 'h-44 gap-5 sm:h-52' : 'h-[112px] gap-3'}`}>
+      {detail ? (
+        <>
+          <div className={captioned}>
+            {button}
+            <p data-press-button-caption="" className={caption}>
+              button: scale {amount}
+            </p>
+          </div>
+          <div className={captioned}>
+            {toolbar}
+            <p data-press-row-caption="" className={caption}>
+              toolbar: colour only, no scale
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          {button}
+          {toolbar}
+        </>
+      )}
     </div>
   )
 }
@@ -273,7 +292,7 @@ function PressScaleDemo({ values, playing, replayKey, size, timeScale, onCycleEn
       className={`group/stage flex h-full flex-col items-center justify-center ${detail ? 'gap-3 px-4' : 'gap-2 px-3'}`}
     >
       <div className={`flex w-full flex-col ${detail ? 'max-w-[400px] gap-2' : 'max-w-[220px] gap-1.5'}`}>
-        <Frame size={size} />
+        <Frame size={size} amount={values.amount} />
         {/* The press's numbers. On the card they sit above the frame, clear of the play button that reduced motion
             adds. */}
         <p data-press-label="" className={`font-mono tabular-nums text-ink-muted ${detail ? text : `order-first ${text}`}`}>
@@ -463,7 +482,7 @@ export default defineTerm({
   demo: {
     component: PressScaleDemo,
     label:
-      'A Send button sits in a frame above a text editor\'s formatting toolbar: Bold, Italic, Underline, Strikethrough and Link, with a caption that says the toolbar changes colour only, never scale. The Send button is pressed: it scales down to 0.97 over 150ms on an ease-out curve, holds, and glides back when released; the toolbar never moves. Under the frame, the amount and the transition. On the entry page the buttons are real: pressing and holding Send, with a mouse, a finger or Space, scales it, and letting go glides it back from wherever it has got to; pressing a toolbar button changes its colour and nothing else. The amount can be set to 0.95, the floor, or 0.90, which reads as cartoon, and the release can be made to snap, the common mistake.',
+      'On the entry page, a pill-shaped Send button sits in a frame above a text editor\'s formatting toolbar, a pill of five round buttons: Bold, Italic, Underline, Strikethrough and Link. A caption under each says its rule: the button scales to 0.97, the toolbar changes colour only, never scale. The Send button is pressed: it scales down to 0.97 over 150ms on an ease-out curve, holds, and glides back when released; the toolbar never moves. Under the frame, the amount and the transition. The buttons are real: pressing and holding Send, with a mouse, a finger or Space, scales it, and letting go glides it back from wherever it has got to; pressing a toolbar button changes its colour and nothing else. The amount can be set to 0.95, the floor, or 0.90, which reads as cartoon, and the release can be made to snap, the common mistake. The index card is a wireframe of the same layout and motion: a bar for the label, a dot for each icon, no captions inside the frame.',
     controls,
     glyph: PressScaleGlyph,
   },
