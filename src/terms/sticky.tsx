@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { BrowserFrame } from '@/components/demo/browser-frame'
 import { useAutoScroll, type Bezier, type TrackPoint } from '@/components/demo/use-auto-scroll'
@@ -22,14 +23,20 @@ const controls = [
 type V = ControlValues<typeof controls>
 
 // Long enough that two handoffs play at detail size and the scroll ends with a header pinned partway through its section.
+// The entry page names people from computing history (none living); the card draws the same rows as bars.
 const SECTIONS = [
-  { letter: 'A', rows: 3 },
-  { letter: 'B', rows: 5 },
-  { letter: 'C', rows: 5 },
-  { letter: 'D', rows: 6 },
-  { letter: 'E', rows: 4 },
+  { letter: 'A', people: ['Ada Lovelace', 'Alan Turing', 'Anita Borg'] },
+  { letter: 'B', people: ['Beatrice Worsley', 'Bernard Galler', 'Bert Sutherland', 'Betty Holberton', 'Bob Bemer'] },
+  { letter: 'C', people: ['Carl Petri', 'Charles Babbage', 'Christopher Strachey', 'Claude Shannon', 'Corrado Böhm'] },
+  { letter: 'D', people: ['Danny Cohen', 'David Wheeler', 'Dennis Ritchie', 'Donald Davies', 'Dorothy Vaughan', 'Douglas Engelbart'] },
+  { letter: 'E', people: ['Edgar Codd', 'Edmund Berkeley', 'Edsger Dijkstra', 'Evelyn Berezin'] },
 ]
 const LINE_WIDTHS = ['w-24', 'w-20', 'w-28', 'w-16']
+const initials = (name: string) =>
+  name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
 // Used until the track is measured.
 const SCROLL_EASE = [0.45, 0, 0.55, 1] as const
 const PUSH_MS = 400
@@ -113,13 +120,24 @@ function StickyDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
 
   useAutoScroll(scrollRef, { playing, replayKey, timeScale, onCycleEnd, interactive: size === 'detail', durationMs: 4400, stillPx, ease: SCROLL_EASE, track })
   useStuckHeaders(scrollRef, offset)
+  const detail = size === 'detail'
 
+  // The entry page is the real list: a Contacts bar when there is an offset, letter headers in ink, rows with an
+  // initials avatar and a name. The card is a wireframe of the same rows (a dot and a bar each), so the scroll maths,
+  // which measures the layout, holds for both.
   return (
     <BrowserFrame scrollRef={scrollRef} size={size} label="Contact list with sticky letter headers">
       <div className="dark:[--stuck-shadow:0_1px_0_var(--line-strong),0_4px_12px_rgb(0_0_0/0.4)]">
         {offset > 0 && (
-          <div className="sticky top-0 z-20 flex items-center border-b border-line bg-surface px-3" style={{ height: offset }}>
-            <span className="h-2 w-14 rounded-full bg-demo-2" />
+          <div className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface px-3" style={{ height: offset }}>
+            {detail ? (
+              <>
+                <span className="text-[13px] font-medium leading-5 text-ink">Contacts</span>
+                <Search size={14} aria-hidden className="text-ink-muted" />
+              </>
+            ) : (
+              <span className="h-2 w-14 rounded-full bg-demo-2" />
+            )}
           </div>
         )}
         {SECTIONS.map((section, index) => (
@@ -129,17 +147,26 @@ function StickyDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }:
               data-sticky-header=""
               data-stuck="false"
               style={{ top: offset }}
-              className={`sticky z-10 flex min-h-8 items-center bg-surface px-3 text-[10px] font-medium text-ink-muted transition-shadow duration-150 ease-[ease] motion-reduce:transition-none ${values.shadow ? 'data-[stuck=true]:[box-shadow:var(--stuck-shadow,0_1px_0_var(--line),0_4px_12px_oklch(0_0_0/0.06))]' : ''}`}
+              className={`sticky z-10 flex min-h-8 items-center bg-surface px-3 transition-shadow duration-150 ease-[ease] motion-reduce:transition-none ${detail ? 'text-[13px] font-semibold text-ink' : 'text-[10px] font-medium text-ink-muted'} ${values.shadow ? 'data-[stuck=true]:[box-shadow:var(--stuck-shadow,0_1px_0_var(--line),0_4px_12px_oklch(0_0_0/0.06))]' : ''}`}
             >
               {section.letter}
             </div>
-            {Array.from({ length: section.rows }, (_, i) => (
-              <div key={i} data-row="" className="flex items-center gap-2.5 border-b border-line px-3 py-2">
-                <span className="size-5 shrink-0 rounded-full bg-demo" />
-                <span className={`h-2 rounded-full bg-demo-2 ${LINE_WIDTHS[(i + section.rows) % LINE_WIDTHS.length]}`} />
-                <span className="ml-auto h-2 w-10 rounded-full bg-demo" />
-              </div>
-            ))}
+            {section.people.map((name, i) =>
+              detail ? (
+                <div key={name} data-row="" className="flex items-center gap-2.5 border-b border-line px-3 py-2">
+                  <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-full bg-demo-2 text-[11px] font-medium text-ink">
+                    {initials(name)}
+                  </span>
+                  <span className="text-[13px] leading-5 text-ink">{name}</span>
+                </div>
+              ) : (
+                <div key={name} data-row="" className="flex items-center gap-2.5 border-b border-line px-3 py-2">
+                  <span className="size-5 shrink-0 rounded-full bg-demo" />
+                  <span className={`h-2 rounded-full bg-demo-2 ${LINE_WIDTHS[(i + section.people.length) % LINE_WIDTHS.length]}`} />
+                  <span className="ml-auto h-2 w-10 rounded-full bg-demo" />
+                </div>
+              ),
+            )}
           </div>
         ))}
       </div>
@@ -192,7 +219,13 @@ export default defineTerm({
     'Stacking several sticky bars, which leaves little room to read.',
     'When the element must stay visible past the end of its parent. Sticky cannot leave its container, so use a fixed element instead.',
   ],
-  demo: { component: StickyDemo, label: 'A contact list scrolls inside a small browser window. Each letter header pins to the top while its section passes underneath, then the next header pushes it away.', controls, glyph: StickyGlyph },
+  demo: {
+    component: StickyDemo,
+    label:
+      'On the entry page, a contact list scrolls inside a small browser window: letter headers A to E over rows of names from computing history, each with a round initials avatar. Each letter header pins to the top while its section passes underneath, then the next header pushes it away. With a top offset, a Contacts bar stays pinned above the headers. The index card is a wireframe of the same list: a dot and a bar for each row.',
+    controls,
+    glyph: StickyGlyph,
+  },
   prompt: (v) => {
     const offset = Number(v.offset)
     const padding = offset > 0 ? `calc(32px + ${offset}px)` : '32px'

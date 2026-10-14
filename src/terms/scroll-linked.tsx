@@ -1,3 +1,4 @@
+import { Image as ImageIcon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { BrowserFrame } from '@/components/demo/browser-frame'
 import { useAutoScroll } from '@/components/demo/use-auto-scroll'
@@ -59,7 +60,15 @@ const PARAGRAPHS = { card: { bar: 3, figure: 2, after: 4 }, detail: { bar: 5, fi
 // The figure's own entry range is as long as the figure is tall, so a tall figure gives the
 // fade and scale enough scroll to read as scrubbing rather than a quick entrance. The bar's figure
 // stays short; its two extra paragraphs keep the scroll length close to the figure layouts.
-const FIGURE_HEIGHT = { card: { bar: 'h-32', figure: 'h-32' }, detail: { bar: 'h-36', figure: 'h-80' } }
+// On the entry page the figure is an image block with a caption under it (16px line, 8px above), so the
+// image is 24px shorter and the figure, which is what the effects measure, is 144px and 320px as before.
+const FIGURE_HEIGHT = { card: { bar: 'h-32', figure: 'h-32' }, detail: { bar: 'h-30', figure: 'h-74' } }
+
+// The entry page's title, byline and the two sentences that open the body; the rest of the body stays bars.
+const TITLE = 'Why motion needs a vocabulary'
+const BYLINE = '6 min read'
+const LEAD = 'A designer asks for a menu that feels quick, and the engineer hears 150 milliseconds. Shared words turn that guess into a decision both can check.'
+const CAPTION = 'Figure 1. Scroll position mapped to progress'
 
 const isFigureEntry = (v: V) => v.effect !== 'bar' && v.range === 'section'
 
@@ -136,6 +145,20 @@ function Paragraph({ widths, detail }: { widths: readonly number[]; detail: bool
   )
 }
 
+// The entry page's first paragraph: two real sentences, then bars. It is as tall as the six bars it replaces (92px
+// with its margin), so nothing the scroll measures moves. From `sm` the text is two 20px lines, so three bars and a
+// 10px margin make up the rest; below `sm` it wraps to four lines, which are the whole 80px, and the margin is 12px.
+function LeadParagraph({ widths }: { widths: readonly number[] }) {
+  return (
+    <div className="mb-2.5 space-y-2 max-sm:mb-3">
+      <p className="text-[13px] leading-5 text-ink">{LEAD}</p>
+      {widths.map((w, i) => (
+        <div key={i} style={{ width: `${w}%` }} className="h-1.5 rounded-full bg-demo max-sm:hidden" />
+      ))}
+    </div>
+  )
+}
+
 function ScrollLinkedDemo({ values, playing, replayKey, size, timeScale, onCycleEnd }: DemoProps<V>) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
@@ -166,11 +189,21 @@ function ScrollLinkedDemo({ values, playing, replayKey, size, timeScale, onCycle
         </div>
       )}
       <article className={detail ? 'px-6 pb-6 pt-5' : 'px-3.5 pb-3.5 pt-3'}>
-        <div className={detail ? 'mb-5 space-y-2.5' : 'mb-3 space-y-1.5'}>
-          <div className={`w-3/5 rounded-full bg-demo-2 ${detail ? 'h-3' : 'h-2'}`} />
-          <div className={`w-1/4 rounded-full bg-demo ${detail ? 'h-1.5' : 'h-1'}`} />
-        </div>
-        {BEFORE.slice(0, PARAGRAPHS[size][isBar ? 'bar' : 'figure']).map((p, i) => <Paragraph key={i} widths={p} detail={detail} />)}
+        {detail ? (
+          // Title and byline: 38px plus a 10px margin, the 48px the two bars and their margin took.
+          <div className="mb-2.5 space-y-0.5">
+            <p className="text-[15px] font-semibold leading-5 text-ink">{TITLE}</p>
+            <p className="text-[12px] leading-4 text-ink-muted">{BYLINE}</p>
+          </div>
+        ) : (
+          <div className="mb-3 space-y-1.5">
+            <div className="h-2 w-3/5 rounded-full bg-demo-2" />
+            <div className="h-1 w-1/4 rounded-full bg-demo" />
+          </div>
+        )}
+        {BEFORE.slice(0, PARAGRAPHS[size][isBar ? 'bar' : 'figure']).map((p, i) =>
+          detail && i === 0 ? <LeadParagraph key={i} widths={p.slice(3)} /> : <Paragraph key={i} widths={p} detail={detail} />,
+        )}
         <section
           ref={sectionRef}
           data-section=""
@@ -178,11 +211,19 @@ function ScrollLinkedDemo({ values, playing, replayKey, size, timeScale, onCycle
           className={`border-l-2 border-transparent transition-colors duration-150 ease-[ease] data-[marked=true]:border-demo-subject ${detail ? '-ml-4 pl-3.5' : '-ml-2.5 pl-2'}`}
         >
           <Paragraph widths={SECTION_TOP} detail={detail} />
-          <figure
-            ref={figureRef}
-            data-figure=""
-            className={`rounded-lg ${isBar ? 'bg-demo-2' : 'bg-demo-subject'} ${FIGURE_HEIGHT[size][isBar ? 'bar' : 'figure']} ${detail ? 'mb-4' : 'mb-2.5'}`}
-          />
+          {/* The subject of a fade or scale keeps the strongest contrast; the bar's figure is ordinary content. */}
+          {detail ? (
+            <figure ref={figureRef} data-figure="" className="mb-4">
+              <div
+                className={`flex items-center justify-center rounded-lg ${isBar ? 'bg-demo-2 text-ink-muted' : 'bg-demo-subject text-surface'} ${FIGURE_HEIGHT.detail[isBar ? 'bar' : 'figure']}`}
+              >
+                <ImageIcon size={20} aria-hidden />
+              </div>
+              <figcaption className="mt-2 text-[12px] leading-4 text-ink-muted">{CAPTION}</figcaption>
+            </figure>
+          ) : (
+            <figure ref={figureRef} data-figure="" className={`mb-2.5 rounded-lg ${isBar ? 'bg-demo-2' : 'bg-demo-subject'} ${FIGURE_HEIGHT.card[isBar ? 'bar' : 'figure']}`} />
+          )}
           <Paragraph widths={SECTION_BOTTOM} detail={detail} />
         </section>
         {AFTER.slice(0, PARAGRAPHS[size].after).map((p, i) => <Paragraph key={i} widths={p} detail={detail} />)}
@@ -548,7 +589,7 @@ export default defineTerm({
   demo: {
     component: ScrollLinkedDemo,
     label:
-      'A wireframe article scrolls down and back up inside a small browser window. A thin bar across the top grows with the scroll position and shrinks again on the way up. The controls switch the effect to a figure that fades or scales, and measure progress over the whole page or over the element while it is in view.',
+      'On the entry page, an article scrolls down and back up inside a small browser window: a title, a byline, two real opening sentences, bars for the rest of the body, and a captioned figure part way down. A thin bar across the top grows with the scroll position and shrinks again on the way up. The controls switch the effect to the figure, which fades or scales, and measure progress over the whole page or over the figure while it is in view. The index card is a wireframe of the same article: bars for every line, a blank figure, no text.',
     controls,
     glyph: ScrollLinkedGlyph,
   },

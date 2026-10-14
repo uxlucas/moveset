@@ -127,6 +127,8 @@ test.describe('Scroll-linked', () => {
         s.scrollTop = (s.scrollHeight - s.clientHeight) * f
       }, fraction)
 
+    // The still frame (45% down) is written when the demo hydrates; a scroll made before that is undone by it.
+    await expect.poll(() => el.evaluate((s) => s.scrollTop)).toBeGreaterThan(0)
     await scrollTo(0.5)
     await expect.poll(scaleX).toBeCloseTo(0.5, 1)
     await scrollTo(0)
