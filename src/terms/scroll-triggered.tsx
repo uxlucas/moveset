@@ -1,3 +1,4 @@
+import { Clock, Download, Globe, Keyboard, Layers, Lock, Search, Share2, Shield, Tag, WifiOff, Zap, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { BrowserFrame } from '@/components/demo/browser-frame'
 import { scaled } from '@/components/demo/playback'
@@ -43,6 +44,24 @@ const STAGGER_MS = 60
 const MAX_STEPS = 4
 const TILES = 12
 const FAILSAFE_MS = 3000
+
+// The entry page's cards: a landing page's feature grid, one card per tile. At 375px a card's text column is 113px,
+// about 18 characters of body: each title fits one line and each body breaks into two, never three, so a card is an
+// icon, a title and two lines of body in its 96px.
+const FEATURES: { Icon: LucideIcon; title: string; body: string }[] = [
+  { Icon: Zap, title: 'Instant sync', body: 'Edits reach every device at once.' },
+  { Icon: Shield, title: 'Stays private', body: 'Encrypted on your device first.' },
+  { Icon: WifiOff, title: 'Works offline', body: 'Keep writing; it catches up later.' },
+  { Icon: Keyboard, title: 'Keyboard first', body: 'Every action has a shortcut.' },
+  { Icon: Layers, title: 'Shared layouts', body: 'One template for the whole team.' },
+  { Icon: Clock, title: 'Version history', body: 'Every save, back to the first.' },
+  { Icon: Globe, title: 'Any language', body: 'Thirty languages in one interface.' },
+  { Icon: Search, title: 'Fast search', body: 'Finds notes as you type.' },
+  { Icon: Lock, title: 'Locked notes', body: 'A passcode for the private ones.' },
+  { Icon: Share2, title: 'Share a link', body: 'Anyone with the link can read.' },
+  { Icon: Tag, title: 'Tags', body: 'Sort notes any way you like.' },
+  { Icon: Download, title: 'Export anytime', body: 'Markdown, PDF or plain text.' },
+]
 
 // Down at an unhurried pace (rows reveal about half a second apart), a short hold, then a quicker way back
 // up, which only has to show that nothing replays. With the runtime's 1.2s hold the card loops in 6.8s.
@@ -173,29 +192,57 @@ function ScrollTriggeredDemo({ values, playing, replayKey, size, timeScale, onCy
   useReveals(scrollRef, pageRef, { playing, cycle, timeScale, duration: Number(values.duration), stagger: values.stagger })
   const detail = size === 'detail'
 
+  // The inner box is what animates (and what the observer leaves alone); on the entry page it is a feature card, on
+  // the index card a tile with two bars. A ghost (the still frame's "to come") is the outline of either.
+  const box =
+    'absolute inset-0 overflow-hidden rounded-md opacity-0 [transform:translateY(14px)] transition-[opacity,transform] duration-(--d) ease-(--e) group-data-[ghost=true]:bg-transparent group-data-[ghost=true]:opacity-100 group-data-[ghost=true]:shadow-[inset_0_0_0_1px_var(--demo-2)] group-data-[ghost=true]:[transform:none] group-data-[in=true]:opacity-100 group-data-[in=true]:[transform:none]'
+
   return (
-    <BrowserFrame scrollRef={scrollRef} size={size} label="Page of tiles that reveal as they scroll into view">
+    <BrowserFrame scrollRef={scrollRef} size={size} label="Landing page of feature cards that reveal as they scroll into view">
       <div ref={pageRef} style={{ '--e': EASING[values.easing].css } as CSSProperties} className={detail ? 'p-5' : 'p-3'}>
-        <div className={detail ? 'mb-5 space-y-2' : 'mb-3 space-y-1.5'}>
-          <div className="h-2.5 w-2/5 rounded-full bg-demo-2" />
-          <div className="h-1.5 w-3/4 rounded-full bg-demo" />
-          <div className="h-1.5 w-1/2 rounded-full bg-demo" />
-        </div>
+        {detail ? (
+          // 38px, the same as the card's three bars, so the grid starts where it did.
+          <div className="mb-5 space-y-0.5">
+            <p className="text-[15px] font-semibold leading-5 text-ink">Features</p>
+            <p className="text-[12px] leading-4 text-ink-muted">Included on every plan.</p>
+          </div>
+        ) : (
+          <div className="mb-3 space-y-1.5">
+            <div className="h-2.5 w-2/5 rounded-full bg-demo-2" />
+            <div className="h-1.5 w-3/4 rounded-full bg-demo" />
+            <div className="h-1.5 w-1/2 rounded-full bg-demo" />
+          </div>
+        )}
         <div className={`grid grid-cols-2 ${detail ? 'gap-3' : 'gap-2'}`}>
-          {Array.from({ length: TILES }, (_, i) => (
-            <div
-              key={i}
-              data-tile=""
-              data-in="false"
-              data-ghost="false"
-              className={`group relative ${detail ? 'h-24' : 'h-14'}`}
-            >
-              <div className="absolute inset-0 rounded-md bg-demo-2 opacity-0 [transform:translateY(14px)] transition-[opacity,transform] duration-(--d) ease-(--e) group-data-[ghost=true]:bg-transparent group-data-[ghost=true]:opacity-100 group-data-[ghost=true]:shadow-[inset_0_0_0_1px_var(--demo-2)] group-data-[ghost=true]:[transform:none] group-data-[in=true]:opacity-100 group-data-[in=true]:[transform:none]">
-                <span className={`absolute left-3 h-1.5 w-2/5 rounded-full bg-demo-subject group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-5' : 'bottom-4'}`} />
-                <span className={`absolute left-3 h-1.5 w-1/4 rounded-full bg-demo group-data-[ghost=true]:opacity-0 ${detail ? 'bottom-2.5' : 'bottom-2'}`} />
+          {Array.from({ length: TILES }, (_, i) => {
+            const { Icon, title, body } = FEATURES[i % FEATURES.length]
+            return (
+              <div
+                key={i}
+                data-tile=""
+                data-in="false"
+                data-ghost="false"
+                className={`group relative ${detail ? 'h-24' : 'h-14'}`}
+              >
+                {detail ? (
+                  <div className={`${box} bg-demo`}>
+                    <div className="flex h-full flex-col justify-between p-2.5 group-data-[ghost=true]:opacity-0">
+                      <Icon size={16} aria-hidden className="text-ink" />
+                      <div>
+                        <p className="text-[13px] font-medium leading-[18px] text-ink">{title}</p>
+                        <p className="text-[12px] leading-4 text-ink-muted">{body}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`${box} bg-demo-2`}>
+                    <span className="absolute bottom-4 left-3 h-1.5 w-2/5 rounded-full bg-demo-subject group-data-[ghost=true]:opacity-0" />
+                    <span className="absolute bottom-2 left-3 h-1.5 w-1/4 rounded-full bg-demo group-data-[ghost=true]:opacity-0" />
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </BrowserFrame>
@@ -469,7 +516,7 @@ export default defineTerm({
   demo: {
     component: ScrollTriggeredDemo,
     label:
-      'A page of gray tiles scrolls down inside a small browser window, then back up. Tiles already in view are simply there. Each tile below fades in and rises 14px the first time it is 15% in view, tiles entering together start a moment apart, and on the way back up every tile stays where it is.',
+      'On the entry page, a landing page scrolls down inside a small browser window, then back up: a Features heading over a grid of twelve feature cards, each with an icon, a title and one line of text. Cards already in view are simply there. Each card below fades in and rises 14px the first time it is 15% in view, cards entering together start a moment apart, and on the way back up every card stays where it is. The index card is a wireframe of the same page: grey tiles with two bars each, no text.',
     controls,
     glyph: ScrollTriggeredGlyph,
   },
