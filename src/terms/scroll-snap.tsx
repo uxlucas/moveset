@@ -1,3 +1,4 @@
+import { Bell, Check, Lock, Sparkles, Users, type LucideIcon } from 'lucide-react'
 import { useRef } from 'react'
 import { BrowserFrame } from '@/components/demo/browser-frame'
 import { useAutoScroll, type Bezier, type TrackPoint } from '@/components/demo/use-auto-scroll'
@@ -30,6 +31,14 @@ const controls = [
 type V = ControlValues<typeof controls>
 
 const PANELS = 5
+// The entry page's panels: a mobile app's onboarding, one screen each. The card keeps the numbers.
+const SCREENS: { Icon: LucideIcon; title: string; body: string }[] = [
+  { Icon: Sparkles, title: 'Welcome', body: "Three screens, then you're in." },
+  { Icon: Bell, title: 'Notifications', body: 'Only the ones you asked for.' },
+  { Icon: Users, title: 'Invite your team', body: 'Boards are better shared.' },
+  { Icon: Lock, title: 'Privacy', body: 'Your data stays yours.' },
+  { Icon: Check, title: 'All set', body: 'Start your first board.' },
+]
 // The prompt's numbers: what shows below a resting panel (the 8px gap, then the next panel), and the gap.
 const PEEK = 48
 const GAP = 8
@@ -125,18 +134,34 @@ function ScrollSnapDemo({ values, playing, replayKey, size, timeScale, onCycleEn
 
   return (
     <div className={`h-full ${center ? '' : START_PADDING_CLASS} ${SNAP_CLASS[values.strictness][playing ? 'takeover' : 'still']}`}>
-      <BrowserFrame scrollRef={scrollRef} size={size} label="Numbered panels that snap into place as the page scrolls">
+      <BrowserFrame scrollRef={scrollRef} size={size} label="Onboarding screens that snap into place as the page scrolls">
         <div aria-hidden style={{ height: before }} />
-        {Array.from({ length: PANELS }, (_, i) => (
-          <div
-            key={i}
-            data-panel={i + 1}
-            style={{ height: `calc(100% - ${inset + peek}px)`, marginTop: i > 0 ? GAP : 0 }}
-            className={`flex items-center justify-center rounded-lg bg-demo ${center ? 'snap-center' : 'snap-start'} ${detail ? 'mx-4' : 'mx-3'}`}
-          >
-            <span className={`font-medium tabular-nums tracking-[-0.02em] text-demo-subject ${detail ? 'text-5xl' : 'text-3xl'}`}>{i + 1}</span>
-          </div>
-        ))}
+        {Array.from({ length: PANELS }, (_, i) => {
+          const { Icon, title, body } = SCREENS[i]
+          return (
+            <div
+              key={i}
+              data-panel={i + 1}
+              style={{ height: `calc(100% - ${inset + peek}px)`, marginTop: i > 0 ? GAP : 0 }}
+              className={`relative flex items-center justify-center rounded-lg bg-demo ${center ? 'snap-center' : 'snap-start'} ${detail ? 'mx-4' : 'mx-3'}`}
+            >
+              {detail ? (
+                <>
+                  <div className="flex flex-col items-center px-6 text-center">
+                    <Icon size={24} aria-hidden className="text-ink" />
+                    <p className="mt-3 text-[15px] font-semibold leading-5 text-ink">{title}</p>
+                    <p className="mt-0.5 text-[12px] leading-4 text-ink-muted">{body}</p>
+                  </div>
+                  <span className="absolute bottom-3 font-mono text-[11px] tabular-nums text-ink-muted">
+                    {i + 1} / {PANELS}
+                  </span>
+                </>
+              ) : (
+                <span className="text-3xl font-medium tabular-nums tracking-[-0.02em] text-demo-subject">{i + 1}</span>
+              )}
+            </div>
+          )
+        })}
         <div aria-hidden style={{ height: after }} />
       </BrowserFrame>
     </div>
@@ -313,7 +338,7 @@ export default defineTerm({
   demo: {
     component: ScrollSnapDemo,
     label:
-      'Five numbered panels inside a small browser window. Each scroll starts as a small nudge, then the page settles exactly on the next panel, never between two. With proximity, one slow scroll stops halfway and stays. The controls switch between mandatory and proximity, and between aligning panels at the top or in the middle.',
+      "On the entry page, five onboarding screens of a mobile app inside a small browser window, each one screen tall with an icon, a title and one line of text, and a small 1 / 5 counter at the bottom: Welcome, Notifications, Invite your team, Privacy, All set. Each scroll starts as a small nudge, then the page settles exactly on the next screen, never between two. With proximity, one slow scroll stops halfway and stays. The controls switch between mandatory and proximity, and between aligning screens at the top or in the middle. The index card is a wireframe of the same page: five numbered panels.",
     controls,
     glyph: ScrollSnapGlyph,
   },
