@@ -190,7 +190,7 @@ These are starting defaults. Lucas reviews the first milestone in the browser an
 - Inter for text, Geist Mono for prompt and code blocks. Balanced wrapping on headings, tabular figures for numbers, antialiased text.
 - Color has one job: each category icon gets its own hue. Category icons now appear only on entry pages (the sidebar and index headings are neutral). Everything else is neutral.
 - One accent, `--accent` (violet, from #946AFF; `--accent-ink` for text, `--accent-soft` for selection), marks where you are and what is on: the current term in the rail, link underlines and link hover, the toggle's on state, the selected segment and filter pill, focus rings, `::selection`, the copied check, and the `npx` in the install command. Never on cards, buttons, backgrounds or demos.
-- Demos are grayscale wireframes. The moving subject gets the strongest contrast.
+- Demos are grayscale and show real interface: real labels, lucide icons, a recognisable component (decision 2026-10-14). The moving subject gets the strongest contrast.
 - Icons: Lucide at 16px (swappable for Keyline later).
 
 ### Motion tokens (shared by site, demos and prompts)

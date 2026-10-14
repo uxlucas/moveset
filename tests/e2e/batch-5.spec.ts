@@ -363,8 +363,8 @@ test.describe('Duration', () => {
     await expect(trigger(page, 300)).toBeVisible()
     const box = (await trigger(page, 300).boundingBox())!
     expect(box.height).toBeLessThan(44)
-    // 6px below the visible trigger, inside the 44px zone.
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height + 6)
+    // 4px below the visible 32px trigger: 20px from its centre, inside the 44px zone.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height + 4)
     await expect(frame(page, 300, 'tooltip')).toHaveAttribute('aria-pressed', 'true')
     expect(await opens(page)).toEqual(['false', 'true', 'false'])
     // Well below it, out of the zone.
@@ -434,6 +434,8 @@ test.describe('Duration', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/terms/duration')
     await expect(demo(page, 'duration')).toHaveAttribute('data-playing', 'false')
+    // The still frame is also the server HTML; the Play button only renders once hydrated, so the hold lands.
+    await expect(page.getByRole('button', { name: 'Play Duration demo' })).toBeVisible()
     expect(await opens(page)).toEqual(['true', 'true', 'true'])
     await recordOpen(page, 500)
     const pointer = await pointerOn(page, frame(page, 500), isMobile)
