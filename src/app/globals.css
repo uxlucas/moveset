@@ -97,7 +97,8 @@
   }
 }
 
-/* Extends the pointer hit area to 44px without changing the visual size. */
+/* Extends the pointer hit area to 44px (or --hit) without changing the visual size. The pseudo-element sits inside the
+   element, so a scaled element scales it too: Press Scale sets --hit to 46px so it is still over 44px while pressed. */
 @utility hit {
   position: relative;
   &::after {
@@ -105,8 +106,8 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: max(100%, 44px);
-    height: max(100%, 44px);
+    width: max(100%, var(--hit, 44px));
+    height: max(100%, var(--hit, 44px));
     translate: -50% -50%;
   }
 }
@@ -247,6 +248,17 @@
   .gl[data-glyph='icon-swap'][data-active='true'] .m.b {
     animation-name: g-swap-b;
   }
+  /* A button pressed: it shrinks a little from its centre, holds, and glides back. */
+  .gl[data-glyph='press-scale'] .m {
+    transform-origin: center;
+  }
+  .gl[data-glyph='press-scale'][data-active='true'] .m {
+    animation-name: g-press;
+  }
+  /* A toast dragged a short way and let go springs back; flicked, it leaves to the right; it fades back in at rest. */
+  .gl[data-glyph='swipe-to-dismiss'][data-active='true'] .m {
+    animation-name: g-swipe;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .gl .m {
@@ -349,6 +361,21 @@
   0%, 38% { transform: scale(0.3); opacity: 0; }
   50%, 88% { transform: none; opacity: 1; }
   100% { transform: scale(0.3); opacity: 0; }
+}
+/* Press 20% to 28% of the loop, held to 55%, released by 63%: the release takes as long as the press. */
+@keyframes g-press {
+  0%, 20% { transform: none; }
+  28%, 55% { transform: scale(0.82); }
+  63%, 100% { transform: none; }
+}
+/* A short drag out (to 1.4px) and a spring back, then a flick that leaves to the right, and a fade back in at rest. */
+@keyframes g-swipe {
+  0%, 8% { transform: none; opacity: 1; }
+  22% { transform: translateX(1.4px); }
+  40%, 52% { transform: none; }
+  64% { transform: translateX(8px); opacity: 1; }
+  65% { transform: none; opacity: 0; }
+  84%, 100% { transform: none; opacity: 1; }
 }
 
 /* Stagger demo (src/terms/stagger.tsx): the one-shot entrance each item runs. The exit is a transition on the list. */

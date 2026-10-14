@@ -46,6 +46,10 @@ test('category headings show the written count and a one-line description', asyn
   const transitions = main.getByRole('heading', { level: 2, name: 'Transitions' })
   await expect(transitions).toContainText('2 / 7')
   await expect(transitions).toHaveAccessibleName(/2 of 7 written/)
+  // Gestures has Press Scale and Swipe to Dismiss in review (a build without review mode shows "0 / 6").
+  const gestures = main.getByRole('heading', { level: 2, name: 'Gestures' })
+  await expect(gestures).toContainText('2 / 6')
+  await expect(gestures).toHaveAccessibleName(/2 of 6 written/)
   await expect(main.getByText('Motion that scrolling drives or triggers.')).toBeVisible()
 })
 
