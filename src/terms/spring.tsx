@@ -1,3 +1,4 @@
+import { Bell } from 'lucide-react'
 import { animate, motionValue, spring, type AnimationPlaybackControls, type MotionValue } from 'motion/react'
 import { useEffect, useRef, type MouseEvent, type PointerEvent } from 'react'
 import { scaled } from '@/components/demo/playback'
@@ -105,13 +106,28 @@ function linearPoints(v: V): string[] {
 
 function Track({ size, label, twin }: { size: DemoProps['size']; label?: string; twin?: boolean }) {
   const detail = size === 'detail'
-  const face = (
+  // The entry page's card is a notification: a bell, a title and a line under it; the spring card's bell is the
+  // subject, in ink. Below `sm` the line is shorter, so it fits the narrower card. The index card draws a square and a bar.
+  const face = detail ? (
     <>
-      <span className={`shrink-0 rounded-sm ${twin ? 'bg-demo-2' : 'bg-demo-subject'} ${detail ? 'size-3.5' : 'size-2.5'}`} />
+      <Bell size={16} aria-hidden className={`shrink-0 ${twin ? 'text-ink-muted' : 'text-ink'}`} />
+      <span className="flex min-w-0 flex-col text-left">
+        <span className="truncate text-[13px] font-medium leading-4 text-ink">Reminder</span>
+        <span className="truncate text-[12px] leading-4 text-ink-muted">
+          <span className="sm:hidden">Standup in 10 min</span>
+          <span className="max-sm:hidden">Standup in 10 minutes</span>
+        </span>
+      </span>
+    </>
+  ) : (
+    <>
+      <span className={`size-2.5 shrink-0 rounded-sm ${twin ? 'bg-demo-2' : 'bg-demo-subject'}`} />
       <span className="h-1.5 flex-1 rounded-full bg-demo-2" />
     </>
   )
-  const box = detail ? 'h-12 w-[72px]' : 'h-8 w-12'
+  // The notification needs more than the card's 72px: 160px below `sm` (two slots fit the 331px track at 375), 176px
+  // from it. The travel is measured from the track, so the spring maths is unchanged.
+  const box = detail ? 'h-12 w-40 sm:w-44' : 'h-8 w-12'
   const card = `relative flex items-center rounded-lg bg-surface shadow-card ${box} ${detail ? 'gap-2 px-2.5' : 'gap-1.5 px-1.5'}`
   // The two spots, drawn as empty slots under the card so the far end reads as a destination.
   const slot = `absolute rounded-lg border border-dashed border-line-strong ${box} ${detail ? 'top-1.5' : 'top-1'}`
@@ -538,7 +554,7 @@ export default defineTerm({
   demo: {
     component: SpringDemo,
     label:
-      'A card sits at the left end of a track. It springs toward the right end and, partway there, is sent back: it keeps its speed for a moment, slows, turns and settles at the start without stopping dead. On the entry page, holding the card sends it toward the other end, and letting go at any moment sends it back from wherever it is. With a comparison picked, a twin card below makes the same moves on a fixed ease-out curve and reverses at full speed.',
+      'On the entry page, a notification card (a bell, Reminder, Standup in 10 minutes) sits at the left end of a track with an empty slot at each end. It springs toward the right slot and, partway there, is sent back: it keeps its speed for a moment, slows, turns and settles at the start without stopping dead. Holding the card sends it toward the other end, and letting go at any moment sends it back from wherever it is. With a comparison picked, a twin notification below makes the same moves on a fixed ease-out curve and reverses at full speed; each track is named, spring or ease-out. The index card is a wireframe of the same card and track: a square and a bar.',
     controls,
     glyph: SpringGlyph,
   },
