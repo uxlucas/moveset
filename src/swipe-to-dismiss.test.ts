@@ -1,6 +1,6 @@
 import { spring } from 'motion/react'
 import { describe, expect, test } from 'vitest'
-import { BACK_SPRING, decide, DISTANCE, EXIT_SPRING, VELOCITY, velocityOf, WINDOW_MS, type Sample } from '@/terms/swipe-to-dismiss'
+import { BACK_SPRING, decide, DISTANCE, EXIT_SPRING, MIN_SPAN_MS, VELOCITY, velocityOf, WINDOW_MS, type Sample } from '@/terms/swipe-to-dismiss'
 
 const WIDTH = 300
 
@@ -30,6 +30,13 @@ describe('velocityOf', () => {
     expect(velocityOf([], 0)).toBe(0)
     expect(velocityOf([{ t: 10, x: 5 }], 10)).toBe(0)
     expect(velocityOf([{ t: 10, x: 5 }, { t: 10, x: 9 }], 10)).toBe(0)
+  })
+
+  test('is 0 when the samples span less than MIN_SPAN_MS: bunched events cannot read as a 100px/ms flick', () => {
+    // Three events delivered in a burst, 1ms apart, 60px in all: no velocity, not 30px/ms.
+    expect(velocityOf([{ t: 100, x: 0 }, { t: 101, x: 30 }, { t: 102, x: 60 }], 102)).toBe(0)
+    // Spaced out to the minimum span, the same movement reads as its slope.
+    expect(velocityOf([{ t: 100, x: 0 }, { t: 100 + MIN_SPAN_MS, x: 8 }], 100 + MIN_SPAN_MS)).toBeCloseTo(1, 6)
   })
 
   test('is signed with the direction of travel', () => {

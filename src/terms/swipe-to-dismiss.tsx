@@ -34,12 +34,14 @@ type V = ControlValues<typeof controls>
 export type Sample = { t: number; x: number }
 export type Side = -1 | 0 | 1
 
-// The rule: past a third of the width, or flicked at 0.1px/ms (Emil: swipeAmount / timeTaken over 0.10), in the
-// direction of the drag. The velocity is read over the last 100ms of movement, so a drag that stops before the
-// release has none.
+// The rule: past a third of the width (the house number; Sonner uses 45px, Vaul a quarter), or flicked at 0.1px/ms in
+// the direction of the drag (Emil's ~0.1px/ms, here read over the last 100ms instead of the whole drag, so a drag that
+// stops before the release has none). Samples are stamped with the event's own clock, and two of them under 8ms apart
+// read as 0, so events that arrive bunched cannot read as a 100px/ms flick.
 export const DISTANCE = 1 / 3
 export const VELOCITY = 0.1
 export const WINDOW_MS = 100
+export const MIN_SPAN_MS = 8
 // The exit ends this far past the element's own width: clear of its container, with room for a shadow.
 const EDGE = 16
 
@@ -75,13 +77,17 @@ const HOLD_MS = 900
 const RETURN_MS = 800
 const HINT = 'Drag the toast sideways, or flick it'
 
-/** Velocity in px/ms over the samples of the last WINDOW_MS before `now`; 0 with fewer than two. */
+/**
+ * Velocity in px/ms over the samples of the last WINDOW_MS before `now` (all on `event.timeStamp`); 0 with fewer than
+ * two, or with less than MIN_SPAN_MS between the first and the last.
+ */
 export function velocityOf(samples: readonly Sample[], now: number): number {
   const recent = samples.filter((s) => s.t >= now - WINDOW_MS)
   if (recent.length < 2) return 0
   const first = recent[0]
   const last = recent[recent.length - 1]
-  return last.t === first.t ? 0 : (last.x - first.x) / (last.t - first.t)
+  const span = last.t - first.t
+  return span < MIN_SPAN_MS ? 0 : (last.x - first.x) / span
 }
 
 /** Where a release sends the element: off to one side (the sign), or back to rest (0). */
@@ -344,7 +350,8 @@ function SwipeToDismissDemo({ values, playing, replayKey, size, timeScale, onCyc
     takeOver()
     stop()
     const base = xOf().get()
-    drag.current = { pointerId: e.pointerId, startX: e.clientX, base, samples: [{ t: performance.now(), x: base }] }
+    // Samples are stamped with the event's clock, not the handler's, so bunched events keep their real spacing.
+    drag.current = { pointerId: e.pointerId, startX: e.clientX, base, samples: [{ t: e.timeStamp, x: base }] }
     toast.dataset.dragging = 'true'
   }
 
@@ -354,10 +361,9 @@ function SwipeToDismissDemo({ values, playing, replayKey, size, timeScale, onCyc
     if (!d || e.pointerId !== d.pointerId) return
     const px = d.base + e.clientX - d.startX
     xOf().set(px)
-    const now = performance.now()
-    d.samples.push({ t: now, x: px })
+    d.samples.push({ t: e.timeStamp, x: px })
     if (d.samples.length > 60) d.samples.splice(0, d.samples.length - 30)
-    const v = velocityOf(d.samples, now)
+    const v = velocityOf(d.samples, e.timeStamp)
     setHint(`${Math.round(Math.abs(px))} of ${thirdOf()}px · ${Math.abs(v).toFixed(2)} px/ms`)
   }
 
@@ -367,14 +373,19 @@ function SwipeToDismissDemo({ values, playing, replayKey, size, timeScale, onCyc
     if (!d || e.pointerId !== d.pointerId) return
     drag.current = null
     if (toastRef.current) toastRef.current.dataset.dragging = 'false'
-    const now = performance.now()
     const px = xOf().get()
-    const v = velocityOf(d.samples, now)
+    const v = velocityOf(d.samples, e.timeStamp)
     const side = decide(px, v, widthOf(), values.threshold)
-    const fast = Math.abs(v) >= VELOCITY && Math.sign(v) === Math.sign(px)
+    const speed = `${Math.abs(v).toFixed(2)} px/ms`
+    const fast = Math.abs(v) >= VELOCITY
+    const withDrag = Math.sign(v) === Math.sign(px)
     const far = Math.abs(px) >= widthOf() * DISTANCE
-    if (side === 0) setHint(fast && values.threshold === 'distance' ? `${Math.abs(v).toFixed(2)} px/ms, ${Math.round(Math.abs(px))}px: distance only, back` : `${Math.round(Math.abs(px))} of ${thirdOf()}px, ${Math.abs(v).toFixed(2)} px/ms: back`)
-    else dismissed(far ? `${Math.round(Math.abs(px))}px, past a third: gone` : `${Math.abs(v).toFixed(2)} px/ms, a flick: gone`)
+    // The hint names the reason: a fast release that goes back was either against the rule (distance only) or toward rest.
+    if (side === 0) {
+      if (fast && withDrag && values.threshold === 'distance') setHint(`${speed}, ${Math.round(Math.abs(px))}px: distance only, back`)
+      else if (fast && !withDrag) setHint(`${Math.round(Math.abs(px))} of ${thirdOf()}px, ${speed} toward rest: back`)
+      else setHint(`${Math.round(Math.abs(px))} of ${thirdOf()}px, ${speed}: back`)
+    } else dismissed(far ? `${Math.round(Math.abs(px))}px, past a third: gone` : `${speed}, a flick: gone`)
     release(side, v)
   }
 
@@ -439,32 +450,39 @@ function SwipeToDismissGlyph({ active }: GlyphProps) {
   )
 }
 
-const physicsText = (p: typeof EXIT_SPRING) => `{ stiffness: ${p.stiffness}, damping: ${p.damping}, mass: 1 }`
+// The springs as the tabs ship them: physics with mass 1 (Motion's default), flat, so the velocity carries.
+const physicsText = (p: typeof EXIT_SPRING) => `{ stiffness: ${p.stiffness}, damping: ${p.damping}, mass: ${p.mass} }`
+const springObject = (p: typeof EXIT_SPRING) => `{ type: 'spring', stiffness: ${p.stiffness}, damping: ${p.damping}, mass: ${p.mass} }`
 
-// The prompt's spring text: duration and bounce to design by, physics (mass 1, Motion's default) to ship.
+// The prompt's spring text: duration and bounce to design by, physics to ship.
 const springText = (text: string) => text.replace('{ type: "spring", ', '{ ')
+
+// The width the prompt's numbers are read against: the demo's toast on the entry page (a third of it is 125px).
+const TOAST_WIDTH = 376
+
+// The prompt's physics text: stiffness and damping; mass 1 is said once on the line.
 const shipText = (p: typeof EXIT_SPRING) => `{ stiffness: ${p.stiffness}, damping: ${p.damping} }`
 
 function thresholdLine(v: V): string {
   if (v.threshold === 'both') {
-    return `- Threshold: \`|x| ≥ width / 3\`, or \`|v| ≥ ${VELOCITY}px/ms\` (${VELOCITY * 1000}px/s) signed like \`x\`, leaves toward the sign of \`x\`; else back.`
+    return `- Threshold: \`|x| ≥ width / 3\`, or \`|v| ≥ ${VELOCITY}px/ms\` (${VELOCITY * 1000}px/s) signed like \`x\`, leaves toward \`sign(x)\`; else back.`
   }
-  return `- Threshold, distance only: \`|x| ≥ width / 3\` leaves toward the sign of \`x\`; else back (the mistake; the house also leaves on \`|v| ≥ ${VELOCITY}px/ms\` signed like \`x\`).`
+  return `- Threshold, distance only: \`|x| ≥ width / 3\` leaves toward \`sign(x)\`; else back (the mistake; house: also \`|v| ≥ ${VELOCITY}px/ms\` signed like \`x\`).`
 }
 
 function releaseLine(v: V): string {
   if (v.release === 'spring') {
-    return `- Exit: to \`±(width + ${EDGE}px)\`, spring \`${springText(EXIT_TEXT)}\` out, \`${springText(BACK_TEXT)}\` back. Ship them as physics, \`${shipText(EXIT_SPRING)}\` and \`${shipText(BACK_SPRING)}\`, plus \`velocity\` (px/s; Motion 14 drops it on duration/bounce springs); remove after the exit.`
+    return `- Exit: to \`±(width + ${EDGE}px)\`, spring \`${springText(EXIT_TEXT)}\` out, \`${springText(BACK_TEXT)}\` back. Ship them as physics (mass 1), \`${shipText(EXIT_SPRING)}\` and \`${shipText(BACK_SPRING)}\`, plus \`velocity\` (px/s); remove after the exit.`
   }
-  return `- Exit: to \`±(width + ${EDGE}px)\`, and back to 0, both a ${EASE_MS}ms \`var(--ease-out)\` tween; the release velocity is thrown away (the mistake; the house ships springs plus \`velocity\` in px/s: \`${shipText(EXIT_SPRING)}\` out, \`${shipText(BACK_SPRING)}\` back); remove after the exit.`
+  return `- Exit: to \`±(width + ${EDGE}px)\` and back to 0 on a ${EASE_MS}ms \`var(--ease-out)\` tween, release velocity thrown away (the mistake; house: springs, mass 1, \`velocity\` in px/s: \`${shipText(EXIT_SPRING)}\` out, \`${shipText(BACK_SPRING)}\` back); remove after the exit.`
 }
 
 function routeLines(v: V): string[] {
   const spring = v.release === 'spring'
   const call = spring ? '`animate(x, target, { ...spring, velocity: v * 1000 })`' : `\`animate(x, target, { duration: ${EASE_MS / 1000}, ease: ${EASE.motion} })\``
   return [
-    `- JS route (\`motion\`'s \`animate\` and \`motionValue\`; \`x.on("change")\` writes \`translateX\`): \`pointerdown\` (not on Dismiss): \`setPointerCapture\`; \`pointermove\`: \`x.set(dx)\`, log \`(t, x)\`; \`pointerup\`, \`pointercancel\`, \`lostpointercapture\`: \`v\` = Δx / Δt over the last ${WINDOW_MS}ms (0 under two), then ${call}.`,
-    `- Motion route: \`useMotionValue(0)\`; \`<motion.div drag="x" dragMomentum={false} style={{ x, touchAction: "pan-y" }} onDragEnd>\`; decide on \`info.offset.x\` and \`info.velocity.x\` (px/s), same \`animate\`, \`onDismiss()\` in \`onComplete\`.`,
+    `- JS route (\`motionValue\`, \`animate\`; \`x.on("change")\` writes \`translateX\`): \`pointerdown\` (not on Dismiss): \`x.stop()\`, \`setPointerCapture\`; \`pointermove\`: \`x.set(start + dx)\`, log \`(e.timeStamp, x)\`; \`pointerup\`, \`pointercancel\`, \`lostpointercapture\`: \`v\` = Δx / Δt, last ${WINDOW_MS}ms (0 under two samples ${MIN_SPAN_MS}ms apart), then ${call}.`,
+    `- Motion route: \`useMotionValue(0)\`; \`<motion.div drag="x" dragMomentum={false} style={{ x }} onDragStart onDragEnd onPointerUp>\`; decide on \`x.get()\` and \`info.velocity.x\` (px/s), same \`animate\`, \`onDismiss()\` in \`onComplete\`; \`onPointerUp\` without a drag: same rule, \`velocity: 0\`.`,
   ]
 }
 
@@ -473,32 +491,38 @@ function jsCode(v: V): string {
   return [
     "import { animate, motionValue } from 'motion'",
     '',
-    `// Markup: <div class="toast">…<button class="dismiss">Dismiss</button></div>,`,
-    '// shown by <button class="show-toast">. The toast spans its container less an',
-    '// inset, so its own width plus a margin takes it clear. No CSS transition on',
-    '// .toast: the transform is written here.',
-    `const DISTANCE = 1 / 3 // of the width`,
-    ...(v.threshold === 'both' ? [`const VELOCITY = ${VELOCITY} // px/ms, Emil's swipeAmount / timeTaken over 0.10`] : ['// Distance only: a flick that stops short goes back. The house also leaves on', `// a velocity of ${VELOCITY}px/ms in the direction of the drag.`]),
+    '// Markup: <div role="status"><div class="toast">…<button class="dismiss">Dismiss',
+    '// </button></div></div>, shown by <button class="show-toast">. The toast spans',
+    '// its container less an inset, so its own width plus a margin takes it clear.',
+    '// No CSS transition on .toast: the transform is written here.',
+    `const DISTANCE = 1 / 3 // of the toast's width, the house number (Sonner 45px, Vaul 25%)`,
+    ...(v.threshold === 'both' ? [`const VELOCITY = ${VELOCITY} // px/ms: Emil's ~0.1px/ms, here read over the last 100ms`] : ['// Distance only: a flick that stops short goes back. The house also leaves on', `// a velocity of ${VELOCITY}px/ms in the direction of the drag.`]),
     `const WINDOW = ${WINDOW_MS} // ms of movement the velocity is read over`,
+    `const SPAN = ${MIN_SPAN_MS} // ms: samples closer than this read as no velocity`,
     `const EDGE = ${EDGE} // px past the width, so a shadow clears too`,
     ...(spring
       ? [
           `// ${EXIT_TEXT} and ${BACK_TEXT} as physics: the same`,
           '// curves, and they take the release velocity, which Motion 14 drops on',
           '// duration/bounce springs.',
-          `const exit = { type: 'spring', ...${physicsText(EXIT_SPRING)} } as const`,
-          `const back = { type: 'spring', ...${physicsText(BACK_SPRING)} } as const`,
+          `const exit = ${springObject(EXIT_SPRING)}`,
+          `const back = ${springObject(BACK_SPRING)}`,
         ]
       : [
           `// The mistake: a fixed ${EASE_MS}ms curve cannot take the release velocity, so a`,
           '// flick and a slow drag leave the same way. The house ships springs:',
-          `// exit { type: 'spring', ...${physicsText(EXIT_SPRING)} }, back { type: 'spring', ...${physicsText(BACK_SPRING)} }.`,
-          `const tween = { duration: ${EASE_MS / 1000}, ease: ${EASE.motion} } as const`,
+          `// exit ${springObject(EXIT_SPRING)},`,
+          `// back ${springObject(BACK_SPRING)}.`,
+          `const tween = { duration: ${EASE_MS / 1000}, ease: ${EASE.motion} }`,
         ]),
     "const reduced = matchMedia('(prefers-reduced-motion: reduce)')",
     '',
     "const toast = document.querySelector('.toast')",
     "const opener = document.querySelector('.show-toast')",
+    '// No stylesheet assumed: a vertical swipe still scrolls the page, and nothing is',
+    '// selected mid-drag.',
+    "toast.style.touchAction = 'pan-y'",
+    "toast.style.userSelect = 'none'",
     '// A number Motion can animate from; its change handler writes the transform.',
     'const x = motionValue(0)',
     "x.on('change', (v) => (toast.style.transform = `translateX(${v}px)`))",
@@ -515,17 +539,17 @@ function jsCode(v: V): string {
     '  if (!drag || e.pointerId !== drag.pointerId) return',
     '  const px = drag.base + e.clientX - drag.startX // 1:1 with the pointer',
     '  x.set(px)',
-    '  drag.samples.push({ t: performance.now(), x: px })',
+    "  drag.samples.push({ t: e.timeStamp, x: px }) // the event's clock, not the handler's",
     '})',
     '',
     '// Velocity in px/ms over the last WINDOW ms of movement; a drag that stopped',
-    '// before the release has none.',
+    '// before the release has none, and samples under SPAN apart read as none too.',
     'function velocityOf(samples, now) {',
     '  const recent = samples.filter((s) => s.t >= now - WINDOW)',
     '  if (recent.length < 2) return 0',
     '  const a = recent[0]',
     '  const b = recent[recent.length - 1]',
-    '  return b.t === a.t ? 0 : (b.x - a.x) / (b.t - a.t)',
+    '  return b.t - a.t < SPAN ? 0 : (b.x - a.x) / (b.t - a.t)',
     '}',
     '',
     '// Past a third of the width, or flicked faster than VELOCITY in the direction of',
@@ -554,13 +578,14 @@ function jsCode(v: V): string {
     '  if (!drag || e.pointerId !== drag.pointerId) return',
     '  const { samples } = drag',
     '  drag = null',
-    '  const v = velocityOf(samples, performance.now())',
+    '  const v = velocityOf(samples, e.timeStamp)',
     '  release(leave(x.get(), v, toast.offsetWidth), v)',
     '}',
     "for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) toast.addEventListener(type, end)",
     '',
     '// The non-gesture way out: the same exit, to the right, with no speed. Focus',
-    '// inside the toast goes back to the opener first, or it drops to body.',
+    '// inside the toast goes back to the opener (or its container) first, or it',
+    '// drops to body.',
     "toast.querySelector('.dismiss').addEventListener('click', () => {",
     '  if (toast.contains(document.activeElement)) opener.focus({ preventScroll: true })',
     '  release(1, 0)',
@@ -574,32 +599,36 @@ function motionCode(v: V): string {
     "import { animate, motion, useMotionValue, useReducedMotion, type PanInfo } from 'motion/react'",
     "import { useRef, type ReactNode, type RefObject } from 'react'",
     '',
-    'const DISTANCE = 1 / 3 // of the width',
-    ...(v.threshold === 'both' ? [`const VELOCITY = ${VELOCITY * 1000} // px/s (${VELOCITY}px/ms), Emil's swipeAmount / timeTaken over 0.10`] : ['// Distance only: a flick that stops short goes back. The house also leaves on', `// a velocity of ${VELOCITY * 1000}px/s in the direction of the drag.`]),
+    "const DISTANCE = 1 / 3 // of the toast's width, the house number (Sonner 45px, Vaul 25%)",
+    ...(v.threshold === 'both'
+      ? [`const VELOCITY = ${VELOCITY * 1000} // px/s (${VELOCITY}px/ms): Emil's ~0.1px/ms, read by Motion over its last 100ms`]
+      : ['// Distance only: a flick that stops short goes back. The house also leaves on', `// a velocity of ${VELOCITY * 1000}px/s in the direction of the drag.`]),
     `const EDGE = ${EDGE} // px past the width, so a shadow clears too`,
     ...(spring
       ? [
           `// ${EXIT_TEXT} and ${BACK_TEXT} as physics: the same`,
           '// curves, and they take the release velocity, which Motion 14 drops on',
           '// duration/bounce springs.',
-          `const exit = { type: 'spring', ...${physicsText(EXIT_SPRING)} } as const`,
-          `const back = { type: 'spring', ...${physicsText(BACK_SPRING)} } as const`,
+          `const exit = ${springObject(EXIT_SPRING)} as const`,
+          `const back = ${springObject(BACK_SPRING)} as const`,
         ]
       : [
           `// The mistake: a fixed ${EASE_MS}ms curve cannot take the release velocity, so a`,
           '// flick and a slow drag leave the same way. The house ships springs:',
-          `// exit { type: 'spring', ...${physicsText(EXIT_SPRING)} }, back { type: 'spring', ...${physicsText(BACK_SPRING)} }.`,
+          `// exit ${springObject(EXIT_SPRING)},`,
+          `// back ${springObject(BACK_SPRING)}.`,
           `const tween = { duration: ${EASE_MS / 1000}, ease: ${EASE.motion} } as const`,
         ]),
     '// The toast spans its container (a flex column, or give it margin-inline: auto)',
-    '// less an inset, so its own width plus a margin takes it clear. A vertical',
-    '// swipe still scrolls the page.',
-    "const box = { position: 'relative', inlineSize: 'calc(100% - 24px)', touchAction: 'pan-y', userSelect: 'none' } as const",
+    '// less an inset, so its own width plus a margin takes it clear. drag="x" sets',
+    '// touch-action: pan-y itself, so a vertical swipe still scrolls the page.',
+    "const box = { position: 'relative', inlineSize: 'calc(100% - 24px)', userSelect: 'none' } as const",
     '',
     'type Props = { onDismiss: () => void; opener: RefObject<HTMLElement | null>; children: ReactNode }',
     '',
     'export function Toast({ onDismiss, opener, children }: Props) {',
     '  const ref = useRef<HTMLDivElement>(null)',
+    '  const dragging = useRef(false)',
     '  const x = useMotionValue(0)',
     '  const reduced = useReducedMotion()',
     '',
@@ -616,22 +645,43 @@ function motionCode(v: V): string {
     '  }',
     '',
     '  // Past a third of the width, or flicked faster than VELOCITY in the direction of',
-    '  // the drag. info.velocity.x is px/s.',
-    '  const onDragEnd = (_: unknown, info: PanInfo) => {',
+    '  // the drag. Decided on x.get(), the position, not info.offset.x, which is from',
+    '  // the grab point: a toast caught on its way back has both. velocity is px/s.',
+    '  const decide = (velocity: number) => {',
+    '    const px = x.get()',
     '    const width = ref.current?.offsetWidth ?? 0',
-    '    const side = Math.sign(info.offset.x)',
+    '    const side = Math.sign(px)',
     ...(v.threshold === 'both'
-      ? ['    const fast = Math.abs(info.velocity.x) >= VELOCITY && Math.sign(info.velocity.x) === side', '    release(Math.abs(info.offset.x) >= width * DISTANCE || fast ? side : 0, info.velocity.x)']
-      : ['    release(Math.abs(info.offset.x) >= width * DISTANCE ? side : 0, info.velocity.x)']),
+      ? ['    const fast = Math.abs(velocity) >= VELOCITY && Math.sign(velocity) === side', '    release(Math.abs(px) >= width * DISTANCE || fast ? side : 0, velocity)']
+      : ['    release(Math.abs(px) >= width * DISTANCE ? side : 0, velocity)']),
     '  }',
     '',
     '  return (',
-    '    // drag="x" follows the pointer 1:1; dragMomentum={false} leaves the release to',
-    '    // us, so one spring (not an inertia animation) carries the velocity.',
-    '    <motion.div ref={ref} className="toast" style={{ ...box, x }} drag="x" dragMomentum={false} onDragEnd={onDragEnd}>',
+    '    // drag="x" follows the pointer 1:1 once it has moved 3px; dragMomentum={false}',
+    '    // leaves the release to us, so one spring (not an inertia animation) carries the',
+    '    // velocity. The drag prop stays: pointerdown stops the spring, but a drag only',
+    '    // starts after 3px and onDragEnd only fires after one, so a grab let go without',
+    '    // moving is released from onPointerUp instead, with no speed.',
+    '    <motion.div',
+    '      ref={ref}',
+    '      className="toast"',
+    '      style={{ ...box, x }}',
+    '      drag="x"',
+    '      dragMomentum={false}',
+    '      onDragStart={() => {',
+    '        dragging.current = true',
+    '      }}',
+    '      onDragEnd={(_, info: PanInfo) => {',
+    '        dragging.current = false',
+    '        decide(info.velocity.x)',
+    '      }}',
+    '      onPointerUp={() => {',
+    '        if (!dragging.current && x.get() !== 0) decide(0)',
+    '      }}',
+    '    >',
     '      {children}',
     '      {/* The non-gesture way out: the same exit, to the right, with no speed. Focus',
-    '          goes back to the opener first, or it drops to body. */}',
+    '          goes back to the opener (or its container) first, or it drops to body. */}',
     '      <button',
     '        type="button"',
     '        onClick={() => {',
@@ -656,7 +706,7 @@ export default defineTerm({
   definition: 'Dragging an element off screen closes it, and a quick flick counts as much as a long drag.',
   aliases: ['swipe away', 'drag to dismiss', 'flick to dismiss', 'swipe gesture', 'swipeable toast', 'swipe to delete'],
   description:
-    'A swipeable element follows the finger 1:1 while it is dragged: a transform written on every move, with no transition to lag behind it. The release decides. Past about a third of its width, or flicked faster than about 0.1px/ms in the direction of the drag, it leaves in that direction on a spring that carries the release velocity; otherwise it springs back to rest. A quick flick counts as much as a long drag, which is what makes the gesture feel like throwing something away instead of filing it. A full off-screen slide is right here, because where it went is the information. And there is always a way to dismiss without the gesture.',
+    'A swipeable element follows the finger 1:1 while it is dragged: a transform written on every move, with no transition to lag behind it. The release decides. Past about a third of its width (the house number; Sonner uses 45px, Vaul a quarter), or flicked faster than about 0.1px/ms in the direction of the drag, it leaves in that direction on a spring that carries the release velocity; otherwise it springs back to rest. A quick flick counts as much as a long drag, which is what makes the gesture feel like throwing something away instead of filing it. A full off-screen slide is right here, because where it went is the information. And there is always a way to dismiss without the gesture.',
   useWhen: [
     'Toasts and notifications, where a swipe is already what people do on their phones.',
     'List rows, cards and chips that can be removed or archived, with an undo.',
@@ -677,38 +727,39 @@ export default defineTerm({
   },
   prompt: (v) =>
     [
-      'Let this toast be swiped away sideways.',
+      'Make this toast swipe away sideways.',
       '',
-      '- Dragged, it follows the pointer 1:1 (`translateX` per move, no transition); `touch-action: pan-y`; pointer capture; `user-select: none`.',
+      `- Toast: ${TOAST_WIDTH}px wide (a third: ${Math.round(TOAST_WIDTH * DISTANCE)}px), clipped by its container.`,
+      '- Drag: 1:1 (`translateX` per move, no transition); `touch-action: pan-y`; pointer capture; `user-select: none`.',
       thresholdLine(v),
       releaseLine(v),
       ...routeLines(v),
-      '- Visible Dismiss button on the toast (Enter, Space too) runs the exit to the right, `velocity: 0`; focus inside returns to the opener (`focus({ preventScroll: true })`); always-mounted `role="status"` region.',
-      '- Reduced motion: the drag still follows the pointer; release by `x.jump(target)`, gone or at rest next frame (`matchMedia`; Motion: `useReducedMotion()`).',
+      '- Visible Dismiss button: the exit to the right, `velocity: 0`; focus inside returns to the opener or its container (`focus({ preventScroll: true })`); always-mounted `role="status"` region.',
+      '- Reduced motion: drag still follows; `x.jump(target)` on release: gone or at rest next frame (`matchMedia`; Motion: `useReducedMotion()`).',
     ].join('\n'),
   acceptance: (v) => {
     const spring = v.release === 'spring'
     return [
-      'The toast has no CSS transition on `transform` (computed `transition-duration` is `0s`), and while dragged its `translateX` equals the pointer\'s `clientX` minus its value at `pointerdown`, ±0.5px, on every move; `touch-action` computes to `pan-y`.',
+      'The toast has no CSS transition on `transform` (computed `transition-duration` is `0s`), and while dragged its `translateX` equals the pointer\'s `clientX` minus its value at `pointerdown`, ±0.5px, in the frame after every move (Motion route: within 3px until the drag starts, then exactly); `touch-action` computes to `pan-y`.',
       'Released from a third of its width (±0.5px) or further, with no movement in the last 100ms, it leaves toward the side it was dragged to; released short of a third with no movement, it goes back to `x: 0`.',
       v.threshold === 'both'
-        ? `A flick: released at a fifth of its width after moving at ${VELOCITY}px/ms or more in that direction over the last 100ms, it leaves; the same distance at under ${VELOCITY}px/ms goes back.`
-        : `Distance only: released at a fifth of its width, it goes back however fast it moved, even ${VELOCITY}px/ms or more (the house would leave).`,
+        ? `A flick: released at a fifth of its width after moving at ${VELOCITY}px/ms or more in that direction over the last 100ms (on \`event.timeStamp\`, from \`pointermove\` samples at least ${MIN_SPAN_MS}ms apart), it leaves; the same distance at under ${VELOCITY}px/ms goes back.`
+        : `Distance only: released at a fifth of its width, it goes back however fast it moved, even ${VELOCITY}px/ms or more over the last 100ms on \`event.timeStamp\` (the house would leave).`,
       spring
         ? `Leaving, sampled every frame from \`pointerup\`: \`x\` moves on from its release value in the release direction, every frame further than the one before, and the first frame's step is at least the release velocity times the frame length (±2px): the speed carries. It passes \`±width\` and settles within 0.5px of \`±(width + ${EDGE}px)\` by 300ms (±1 frame); it is then removed.`
         : `Leaving, sampled every frame from \`pointerup\`: \`x\` runs from its release value to \`±(width + ${EDGE}px)\` on \`${EASE.css}\` and is within 0.5px of it by ${EASE_MS}ms (±1 frame), whatever the release velocity; it is then removed.`,
       spring
         ? 'Going back from a release with no movement in the last 100ms, `x` never passes 0 (bounce 0) and is within 0.5px of 0 by 500ms (±1 frame) from `pointerup`; released while moving toward 0, it carries that speed and may pass 0 once.'
         : `Going back, \`x\` is within 0.5px of 0 by ${EASE_MS}ms (±1 frame) from \`pointerup\`.`,
-      'Grabbed while it is going back, it stops where it is and follows the pointer again from there; released again, the rule applies from the new `x`.',
-      'Enter or Space on the Dismiss button plays the exit to the right from `x: 0`, and focus lands on the opener, not on `body`.',
+      'Grabbed while it is going back, it stops where it is and follows the pointer again from there; released again, the rule applies from the new `x` (Motion route: `x.get()`, not the drag offset), and a grab let go without moving goes back from where it was caught.',
+      'Enter or Space on the Dismiss button plays the exit to the right from `x: 0`, and focus lands on the opener or on the toast\'s container, not on `body`.',
       'A vertical swipe that starts on the toast scrolls the page; the pointer is cancelled and the toast goes back to `x: 0`.',
       'With reduced motion on, the drag still follows the pointer, and after `pointerup` the next frame has the toast at `±(width + 16px)` (then removed) or at `x: 0`, with no in-between frames.',
     ]
   },
   code: (v) => ({ js: jsCode(v), motion: motionCode(v) }),
   a11y:
-    'The gesture is never the only way out: keep a visible Dismiss button on the element, and let Enter and Space run the same exit. Keep the toast in an always-mounted `role="status"` region, so it is announced when it appears and nothing waits for the motion. If focus is inside when it is dismissed, move it back to where it was before (`focus({ preventScroll: true })`) so it does not fall to `body`. The drag follows the pointer under reduced motion too: it is direct manipulation, not an animation; only the release animation is replaced by a jump to the end state.',
+    'The gesture is never the only way out: keep a visible Dismiss button on the element, and let Enter and Space run the same exit. Keep the toast in an always-mounted `role="status"` region, so it is announced when it appears and nothing waits for the motion. If focus is inside when it is dismissed, move it to the control that opened the toast, or to its container (`focus({ preventScroll: true })`), so it does not fall to `body`. The drag follows the pointer under reduced motion too: it is direct manipulation, not an animation; only the release animation is replaced by a jump to the end state.',
   related: ['spring', 'enter-and-exit', 'drag-with-momentum', 'rubber-banding', 'interruptibility'],
   confusedWith: [
     {

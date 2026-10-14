@@ -71,27 +71,31 @@ async function pointerOn(page: Page, target: Locator, isMobile: boolean, offset 
 }
 
 /**
- * A whole flick (press, two moves, release) sent to the browser in one burst over CDP, mouse or touch, so it lands
- * inside the demo's 100ms velocity window whatever the test runner's load. Starts 20px left of the target's centre.
+ * A flick (press, three moves, release) over CDP, mouse or touch, with the moves spaced by timers: the demo stamps its
+ * samples with `event.timeStamp` and reads no velocity from samples under 8ms apart, so a burst would not count as a
+ * flick. About 10ms apart they land inside the 100ms window at a few px/ms. Starts 20px left of the target's centre.
  */
 async function flickOn(page: Page, target: Locator, isMobile: boolean, dx: number) {
   const box = (await target.boundingBox())!
   const at = { x: box.x + box.width / 2 - 20, y: box.y + box.height / 2 }
-  const points = [1 / 2, 1].map((f) => ({ x: at.x + dx * f, y: at.y }))
+  const points = [1 / 3, 2 / 3, 1].map((f) => ({ x: at.x + dx * f, y: at.y }))
   const cdp = await page.context().newCDPSession(page)
+  const pause = () => page.waitForTimeout(10)
   if (isMobile) {
-    await Promise.all([
-      cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] }),
-      ...points.map((p) => cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [p] })),
-      cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }),
-    ])
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] })
+    for (const p of points) {
+      await pause()
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [p] })
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   } else {
-    await Promise.all([
-      cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y }),
-      cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'left', buttons: 1, clickCount: 1 }),
-      ...points.map((p) => cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, button: 'left', buttons: 1 })),
-      cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: points[1].x, y: points[1].y, button: 'left', buttons: 0, clickCount: 1 }),
-    ])
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y })
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'left', buttons: 1, clickCount: 1 })
+    for (const p of points) {
+      await pause()
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, button: 'left', buttons: 1 })
+    }
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: points[2].x, y: points[2].y, button: 'left', buttons: 0, clickCount: 1 })
   }
   await cdp.detach()
 }
@@ -159,28 +163,34 @@ test.describe('Press Scale', () => {
   test('controls rewrite the prompt and the label', async ({ page }) => {
     await page.goto('/terms/press-scale')
     await expect(prompt(page)).toContainText('Give this button press feedback.')
-    await expect(prompt(page)).toContainText('Pressed: `scale: 0.97`, `transform-origin: center`. Emil ships 0.96 to 0.97; never below 0.95, which starts to read as cartoon.')
-    await expect(prompt(page)).toContainText('Transition: `transition: scale 150ms var(--ease-out)` (`--duration-1`) on the base rule, not the pressed one, so press and release both glide and a release mid-press turns back from where it is.')
-    await expect(prompt(page)).toContainText('Pressed selector: `:not(:disabled):active`, which fires for the pointer and for keyboard Enter and Space.')
-    await expect(prompt(page)).toContainText('Hit area: `position: relative` and a `::after` of at least 44 × 44px')
-    await expect(prompt(page)).toContainText('Opt-out: dense or high-frequency controls (toolbars, list rows, 100+ uses a day) get `background-color` over 150ms and `scale: none`: `data-still` (CSS) or a `still` prop (Motion).')
-    await expect(prompt(page)).toContainText('Motion route: `whileTap={{ scale: 0.97 }}`, `transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}`; `whileTap` already covers the pointer and keyboard Enter.')
-    await expect(prompt(page)).toContainText('Reduced motion: keep the pressed scale, drop the transition. CSS: `transition: none` under `prefers-reduced-motion: reduce`; Motion: `useReducedMotion()` sets `transition={{ duration: 0 }}`.')
+    await expect(prompt(page)).toContainText('Pressed: `scale: 0.97`, `transform-origin: center`. Emil ships 0.96 to 0.97; never below 0.95 (cartoon).')
+    await expect(prompt(page)).toContainText('Transition: `transition: scale 150ms var(--ease-out)` (`--duration-1`) on the base rule, not the pressed one (both directions).')
+    // The keyboard claim is told per route: CSS :active presses on Space, Motion's whileTap on Enter.
+    await expect(prompt(page)).toContainText('Pressed selector: `:not(:disabled):active`: the pointer, and Space held (Enter clicks with no press).')
+    // The hit area sits inside the scaled button, so the prompt says what it measures while pressed.
+    await expect(prompt(page)).toContainText('Hit area: `position: relative` and a centred `::after`, `width: max(100%, 46px)`, same height; it scales with the button (44.6px while pressed); the layout box never changes.')
+    await expect(prompt(page)).toContainText('Opt-out: dense or high-frequency controls (toolbars, list rows, 100+ uses a day) get `background-color: var(--button-pressed)` (`#e0e0e0`) over 150ms and `scale: none`: `data-still` (CSS) or a `still` prop (Motion).')
+    await expect(prompt(page)).toContainText('Motion route: `whileTap={{ scale: 0.97 }}`, `transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}`: the pointer, and Enter held (not Space); `still`: `whileTap={{ backgroundColor: "#e0e0e0" }}`. No CSS transition on `scale` there.')
+    await expect(prompt(page)).toContainText('Reduced motion: keep the pressed scale, drop the transitions (the colour one too). CSS: `transition: none` under `prefers-reduced-motion: reduce`; Motion: `useReducedMotion()` sets `transition={{ duration: 0 }}`.')
     await expect(prompt(page)).not.toContainText('the house ships')
+    // No "why" clauses in the prompt.
+    await expect(prompt(page)).not.toContainText(' so ')
     await expect(label(page)).toHaveText('scale 0.97 · 150ms ease-out')
 
     await option(page, 'Amount', '0.95').click()
-    await expect(prompt(page)).toContainText('Pressed: `scale: 0.95`, `transform-origin: center`. The floor: anything smaller reads as cartoon (the house ships 0.97).')
+    await expect(prompt(page)).toContainText('Pressed: `scale: 0.95`, `transform-origin: center`. The floor; under it is cartoon (the house ships 0.97).')
+    await expect(prompt(page)).toContainText('it scales with the button (43.7px while pressed, about 44)')
     await expect(prompt(page)).toContainText('`whileTap={{ scale: 0.95 }}`')
     await expect(label(page)).toHaveText('scale 0.95 · 150ms ease-out')
 
     await option(page, 'Amount', '0.90 (cartoon)').click()
     await expect(prompt(page)).toContainText('Pressed: `scale: 0.90`, `transform-origin: center`. Cartoon: under the 0.95 floor (the house ships 0.97).')
+    await expect(prompt(page)).toContainText('it scales with the button (41.4px while pressed, under 44)')
     await expect(label(page)).toHaveText('scale 0.90 · 150ms ease-out')
 
     await option(page, 'Amount', '0.97 (house)').click()
     await option(page, 'Release', 'Snap').click()
-    await expect(prompt(page)).toContainText('No transition: it jumps to `scale: 0.97` on press and back on release (the mistake; the house ships `transition: scale 150ms var(--ease-out)` on the base rule, so both ways glide and a release mid-press turns back from where it is).')
+    await expect(prompt(page)).toContainText('No transition: it jumps to `scale: 0.97` on press and back on release (the mistake; the house ships `transition: scale 150ms var(--ease-out)` on the base rule, both directions).')
     await expect(prompt(page)).toContainText('`whileTap={{ scale: 0.97 }}`, `transition={{ duration: 0 }}`')
     await expect(prompt(page)).toContainText('Reduced motion: as shipped, the pressed scale with no transition.')
     await expect(prompt(page)).not.toContainText('useReducedMotion')
@@ -232,9 +242,12 @@ test.describe('Press Scale', () => {
     expect(landed.t).toBeLessThan(300)
     expect(press.at(-1)!.s).toBeCloseTo(0.97, 3)
     expect(await button(page).evaluate((el: HTMLElement) => [el.offsetWidth, el.offsetHeight])).toEqual(sizeBefore)
-    // 21px above the button's centre is outside its 40px box but inside the 44px hit area.
-    const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('[data-press-button]') !== null, [pointer.at.x, pointer.at.y - 21])
-    expect(hit).toBe(true)
+    // 21px above and below the button's centre is outside its 40px box but inside the 46px hit area, which scales with
+    // the press: 44.6px at 0.97, so both probes still land while pressed.
+    for (const dy of [-21, 21]) {
+      const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('[data-press-button]') !== null, [pointer.at.x, pointer.at.y + dy])
+      expect(hit).toBe(true)
+    }
 
     await startRecording(button(page), 500)
     // The recording starts on the next pointer event: the release is a pointerup, so prime it from the page.
@@ -252,6 +265,25 @@ test.describe('Press Scale', () => {
     await page.waitForTimeout(1200)
     await expect(button(page)).toHaveAttribute('data-pressed', 'false')
     await expect(stage(page, 'press-scale')).toHaveAttribute('data-taken-over', 'true')
+  })
+
+  test('the hit area scales with the press: at 0.90 it is 41.4px while pressed, so 21px holds at rest and 20px pressed', async ({ page, isMobile }) => {
+    await page.goto('/terms/press-scale')
+    await option(page, 'Amount', '0.90 (cartoon)').click()
+    await settled(page)
+    const pointer = await pointerOn(page, button(page), isMobile)
+    const hitAt = (dy: number) => page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('[data-press-button]') !== null, [pointer.at.x, pointer.at.y + dy])
+    // At rest the 46px pseudo-element reaches 23px from the centre.
+    expect(await hitAt(-21)).toBe(true)
+    expect(await hitAt(21)).toBe(true)
+    await pointer.down()
+    await expect(button(page)).toHaveAttribute('data-pressed', 'true')
+    await expect.poll(() => button(page).evaluate((el) => getComputedStyle(el).scale)).toBe('0.9')
+    // Pressed at 0.90 it reaches 20.7px: 20px still lands.
+    expect(await hitAt(-20)).toBe(true)
+    expect(await hitAt(20)).toBe(true)
+    await pointer.up()
+    await expect(button(page)).toHaveAttribute('data-pressed', 'false')
   })
 
   test('released early, the button turns back from where it is and never reaches 0.97', async ({ page, isMobile }) => {
@@ -444,27 +476,32 @@ test.describe('Swipe to Dismiss', () => {
 
   test('controls rewrite the prompt and the labels', async ({ page }) => {
     await page.goto('/terms/swipe-to-dismiss')
-    await expect(prompt(page)).toContainText('Let this toast be swiped away sideways.')
-    await expect(prompt(page)).toContainText('Dragged, it follows the pointer 1:1 (`translateX` per move, no transition); `touch-action: pan-y`; pointer capture; `user-select: none`.')
-    await expect(prompt(page)).toContainText('Threshold: `|x| ≥ width / 3`, or `|v| ≥ 0.1px/ms` (100px/s) signed like `x`, leaves toward the sign of `x`; else back.')
-    await expect(prompt(page)).toContainText('Exit: to `±(width + 16px)`, spring `{ duration: 0.3, bounce: 0 }` out, `{ duration: 0.5, bounce: 0 }` back. Ship them as physics, `{ stiffness: 947, damping: 61.6 }` and `{ stiffness: 341, damping: 36.9 }`, plus `velocity` (px/s; Motion 14 drops it on duration/bounce springs); remove after the exit.')
-    await expect(prompt(page)).toContainText('JS route (`motion`\'s `animate` and `motionValue`; `x.on("change")` writes `translateX`): `pointerdown` (not on Dismiss): `setPointerCapture`; `pointermove`: `x.set(dx)`, log `(t, x)`; `pointerup`, `pointercancel`, `lostpointercapture`: `v` = Δx / Δt over the last 100ms (0 under two), then `animate(x, target, { ...spring, velocity: v * 1000 })`.')
-    await expect(prompt(page)).toContainText('Motion route: `useMotionValue(0)`; `<motion.div drag="x" dragMomentum={false} style={{ x, touchAction: "pan-y" }} onDragEnd>`; decide on `info.offset.x` and `info.velocity.x` (px/s), same `animate`, `onDismiss()` in `onComplete`.')
-    await expect(prompt(page)).toContainText('Visible Dismiss button on the toast (Enter, Space too) runs the exit to the right, `velocity: 0`; focus inside returns to the opener (`focus({ preventScroll: true })`); always-mounted `role="status"` region.')
-    await expect(prompt(page)).toContainText('Reduced motion: the drag still follows the pointer; release by `x.jump(target)`, gone or at rest next frame (`matchMedia`; Motion: `useReducedMotion()`).')
+    await expect(prompt(page)).toContainText('Make this toast swipe away sideways.')
+    // The width the numbers are read against: the demo's toast.
+    await expect(prompt(page)).toContainText('Toast: 376px wide (a third: 125px), clipped by its container.')
+    await expect(prompt(page)).toContainText('Drag: 1:1 (`translateX` per move, no transition); `touch-action: pan-y`; pointer capture; `user-select: none`.')
+    await expect(prompt(page)).toContainText('Threshold: `|x| ≥ width / 3`, or `|v| ≥ 0.1px/ms` (100px/s) signed like `x`, leaves toward `sign(x)`; else back.')
+    await expect(prompt(page)).toContainText('Exit: to `±(width + 16px)`, spring `{ duration: 0.3, bounce: 0 }` out, `{ duration: 0.5, bounce: 0 }` back. Ship them as physics (mass 1), `{ stiffness: 947, damping: 61.6 }` and `{ stiffness: 341, damping: 36.9 }`, plus `velocity` (px/s); remove after the exit.')
+    // The JS route stops the running spring and adds the grab position; samples are on the event's clock.
+    await expect(prompt(page)).toContainText('JS route (`motionValue`, `animate`; `x.on("change")` writes `translateX`): `pointerdown` (not on Dismiss): `x.stop()`, `setPointerCapture`; `pointermove`: `x.set(start + dx)`, log `(e.timeStamp, x)`; `pointerup`, `pointercancel`, `lostpointercapture`: `v` = Δx / Δt, last 100ms (0 under two samples 8ms apart), then `animate(x, target, { ...spring, velocity: v * 1000 })`.')
+    // The Motion route decides on the position, not the drag offset, and releases a grab that never became a drag.
+    await expect(prompt(page)).toContainText('Motion route: `useMotionValue(0)`; `<motion.div drag="x" dragMomentum={false} style={{ x }} onDragStart onDragEnd onPointerUp>`; decide on `x.get()` and `info.velocity.x` (px/s), same `animate`, `onDismiss()` in `onComplete`; `onPointerUp` without a drag: same rule, `velocity: 0`.')
+    await expect(prompt(page)).not.toContainText('info.offset.x')
+    await expect(prompt(page)).toContainText('Visible Dismiss button: the exit to the right, `velocity: 0`; focus inside returns to the opener or its container (`focus({ preventScroll: true })`); always-mounted `role="status"` region.')
+    await expect(prompt(page)).toContainText('Reduced motion: drag still follows; `x.jump(target)` on release: gone or at rest next frame (`matchMedia`; Motion: `useReducedMotion()`).')
     await expect(prompt(page)).not.toContainText('Escape')
     await expect(prompt(page)).not.toContainText('the house')
     await expect(thresholdLabel(page)).toHaveText('width/3 or 0.1px/ms')
     await expect(releaseLabel(page)).toHaveText('spring')
 
     await option(page, 'Threshold', 'Distance only').click()
-    await expect(prompt(page)).toContainText('Threshold, distance only: `|x| ≥ width / 3` leaves toward the sign of `x`; else back (the mistake; the house also leaves on `|v| ≥ 0.1px/ms` signed like `x`).')
+    await expect(prompt(page)).toContainText('Threshold, distance only: `|x| ≥ width / 3` leaves toward `sign(x)`; else back (the mistake; house: also `|v| ≥ 0.1px/ms` signed like `x`).')
     await expect(prompt(page)).not.toContainText('100px/s')
     await expect(thresholdLabel(page)).toHaveText('width/3 only')
 
     await option(page, 'Threshold', 'Distance or velocity').click()
     await option(page, 'Release', 'Ease-out 200ms').click()
-    await expect(prompt(page)).toContainText('Exit: to `±(width + 16px)`, and back to 0, both a 200ms `var(--ease-out)` tween; the release velocity is thrown away (the mistake; the house ships springs plus `velocity` in px/s: `{ stiffness: 947, damping: 61.6 }` out, `{ stiffness: 341, damping: 36.9 }` back); remove after the exit.')
+    await expect(prompt(page)).toContainText('Exit: to `±(width + 16px)` and back to 0 on a 200ms `var(--ease-out)` tween, release velocity thrown away (the mistake; house: springs, mass 1, `velocity` in px/s: `{ stiffness: 947, damping: 61.6 }` out, `{ stiffness: 341, damping: 36.9 }` back); remove after the exit.')
     await expect(prompt(page)).toContainText('then `animate(x, target, { duration: 0.2, ease: [0.23, 1, 0.32, 1] })`.')
     await expect(prompt(page)).not.toContainText('velocity: v * 1000')
     await expect(releaseLabel(page)).toHaveText('ease-out 200ms')
@@ -568,16 +605,19 @@ test.describe('Swipe to Dismiss', () => {
     await option(page, 'Release', 'Ease-out 200ms').click()
     await settled(page)
     const width = await widthOf(page)
+    const to = Math.round(width * 0.2)
     await watchState(page)
-    // The recording starts on the flick's own pointerdown; the exit begins two moves later, within a few ms.
-    await startRecording(toast(page), 500)
-    await flickOn(page, toast(page), isMobile, Math.round(width * 0.2))
+    // The recording starts on the flick's own pointerdown; the flick's moves are spaced by timers, so the exit is timed
+    // from its own first frame (the first one past the release position), not from the pointerdown.
+    await startRecording(toast(page), 700)
+    await flickOn(page, toast(page), isMobile, to)
     await expect(hint(page)).toContainText('a flick: gone')
-    await page.waitForTimeout(600)
+    await page.waitForTimeout(800)
     const rec = (await recorded(page)).filter((f) => f.t > 0 && f.x > 0)
+    const start = rec.find((f) => f.x > to + 1)!
     const gone = rec.find((f) => Math.abs(f.x - (width + 16)) <= 0.5)!
-    expect(gone.t).toBeGreaterThan(100)
-    expect(gone.t).toBeLessThan(320)
+    expect(gone.t - start.t).toBeGreaterThan(100)
+    expect(gone.t - start.t).toBeLessThan(240)
     expect((await stateLog(page))[0]).toBe('closed:hidden')
     await expect(wrap(page)).toHaveAttribute('data-state', 'open', { timeout: 2000 })
     await settled(page)

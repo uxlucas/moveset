@@ -97,7 +97,8 @@
   }
 }
 
-/* Extends the pointer hit area to 44px without changing the visual size. */
+/* Extends the pointer hit area to 44px (or --hit) without changing the visual size. The pseudo-element sits inside the
+   element, so a scaled element scales it too: Press Scale sets --hit to 46px so it is still over 44px while pressed. */
 @utility hit {
   position: relative;
   &::after {
@@ -105,8 +106,8 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: max(100%, 44px);
-    height: max(100%, 44px);
+    width: max(100%, var(--hit, 44px));
+    height: max(100%, var(--hit, 44px));
     translate: -50% -50%;
   }
 }
