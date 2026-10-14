@@ -1,3 +1,4 @@
+import { Archive, CalendarDays, Folder, Inbox, Settings, Sun, type LucideIcon } from 'lucide-react'
 import { useRef } from 'react'
 import { scaled } from '@/components/demo/playback'
 import { snap, useCycle } from '@/components/demo/use-cycle'
@@ -61,33 +62,54 @@ function steps(order: V['order'], count = COUNT): number[] {
 }
 
 const LINE = ['w-3/4', 'w-1/2', 'w-2/3', 'w-2/5', 'w-3/5', 'w-1/2']
+// The entry page's rows: a task app's sidebar, the first row the current one. The card draws the same six rows as bars.
+const ROWS: { Icon: LucideIcon; label: string }[] = [
+  { Icon: Inbox, label: 'Inbox' },
+  { Icon: Sun, label: 'Today' },
+  { Icon: CalendarDays, label: 'Upcoming' },
+  { Icon: Folder, label: 'Projects' },
+  { Icon: Archive, label: 'Archive' },
+  { Icon: Settings, label: 'Settings' },
+]
+
+// The exit belongs to the list, never to the items: an item still waiting to enter must not show. Leaving, the list
+// fades and lifts as one over --x (a transition takes the duration of the state it heads to); any other phase puts it
+// back at once.
+const LIST =
+  'flex flex-col transition-[opacity,transform] duration-0 ease-(--ease-out) group-data-[phase=leave]/stage:duration-(--x) group-data-[phase=leave]/stage:opacity-0 group-data-[phase=leave]/stage:[transform:translateY(-4px)] group-data-[phase=out]/stage:duration-(--x) group-data-[phase=out]/stage:opacity-0 group-data-[phase=out]/stage:[transform:translateY(-4px)]'
+// A one-shot entrance, so keyframes: `both` holds the hidden frame through the delay. The item keeps its space the
+// whole time. Leaving mid-cascade, each item freezes where it is while the list fades. Its step (`--n`, `data-n`) is
+// written by the cycle, not rendered: see StaggerDemo.
+const ITEM =
+  'flex items-center [animation-delay:calc(var(--n)*var(--step))] [animation-duration:var(--d)] [animation-fill-mode:both] [animation-timing-function:var(--ease-out)] group-data-[phase=in]/stage:[animation-name:demo-stagger-in] group-data-[phase=leave]/stage:[animation-name:demo-stagger-in] group-data-[phase=leave]/stage:[animation-play-state:paused]'
 
 function List({ size, label, kind }: { size: DemoProps['size']; label?: string; kind: 'stagger' | 'all' }) {
   const detail = size === 'detail'
   return (
     <div data-list={kind} className={detail ? 'w-[136px] sm:w-52' : 'w-[104px]'}>
       {label && <p className={`font-mono text-ink-muted ${detail ? 'mb-2 text-[11px]' : 'mb-1.5 text-[10px]'}`}>{label}</p>}
-      {/* The exit belongs to the list, never to the items: an item still waiting to enter must not show. Leaving,
-          the list fades and lifts as one over --x (a transition takes the duration of the state it heads to); any
-          other phase puts it back at once. */}
-      <ul
-        data-stagger-list=""
-        className={`flex flex-col transition-[opacity,transform] duration-0 ease-(--ease-out) group-data-[phase=leave]/stage:duration-(--x) group-data-[phase=leave]/stage:opacity-0 group-data-[phase=leave]/stage:[transform:translateY(-4px)] group-data-[phase=out]/stage:duration-(--x) group-data-[phase=out]/stage:opacity-0 group-data-[phase=out]/stage:[transform:translateY(-4px)] ${detail ? 'gap-2' : 'gap-1'}`}
-      >
-        {LINE.map((line, i) => (
-          <li
-            key={i}
-            data-stagger-item=""
-            // A one-shot entrance, so keyframes: `both` holds the hidden frame through the delay. The item keeps its
-            // space the whole time. Leaving mid-cascade, each item freezes where it is while the list fades. Its step
-            // (`--n`, `data-n`) is written by the cycle, not rendered: see StaggerDemo.
-            className={`flex items-center rounded-lg bg-surface shadow-card [animation-delay:calc(var(--n)*var(--step))] [animation-duration:var(--d)] [animation-fill-mode:both] [animation-timing-function:var(--ease-out)] group-data-[phase=in]/stage:[animation-name:demo-stagger-in] group-data-[phase=leave]/stage:[animation-name:demo-stagger-in] group-data-[phase=leave]/stage:[animation-play-state:paused] ${detail ? 'h-7 gap-2 px-2.5' : 'h-[18px] gap-1.5 px-1.5'}`}
-          >
-            <span className={`shrink-0 rounded-sm ${kind === 'stagger' ? 'bg-demo-subject' : 'bg-demo-2'} ${detail ? 'size-3' : 'size-2'}`} />
-            <span className={`h-1.5 rounded-full bg-demo-2 ${line}`} />
-          </li>
-        ))}
-      </ul>
+      {detail ? (
+        // The sidebar panel stays while its rows leave and cascade back in; the rows keep the card's 28px height.
+        <div className="rounded-xl bg-surface p-1.5 shadow-card">
+          <ul data-stagger-list="" className={`${LIST} gap-1`}>
+            {ROWS.map(({ Icon, label }, i) => (
+              <li key={label} data-stagger-item="" className={`${ITEM} h-7 gap-2.5 rounded-md px-2 ${i === 0 ? 'bg-demo' : ''}`}>
+                <Icon size={16} aria-hidden className="shrink-0 text-ink-muted" />
+                <span className="text-[13px] leading-5 text-ink">{label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <ul data-stagger-list="" className={`${LIST} gap-1`}>
+          {LINE.map((line, i) => (
+            <li key={i} data-stagger-item="" className={`${ITEM} h-[18px] gap-1.5 rounded-lg bg-surface px-1.5 shadow-card`}>
+              <span className={`size-2 shrink-0 rounded-sm ${kind === 'stagger' ? 'bg-demo-subject' : 'bg-demo-2'}`} />
+              <span className={`h-1.5 rounded-full bg-demo-2 ${line}`} />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -407,7 +429,7 @@ export default defineTerm({
   demo: {
     component: StaggerDemo,
     label:
-      'A list of six cards. They leave together, quickly, then come back one after another: each fades in, rises 8px and sharpens from a slight blur, a fixed step after the one before. They hold, then the loop repeats. The order can run top down, bottom up or from the middle out. With a comparison picked, a twin list beside it enters all at once at the same instant.',
+      'On the entry page, a task app\'s sidebar: six rows with an icon and a label, Inbox, Today, Upcoming, Projects, Archive and Settings, the first one highlighted as the current one. The rows leave together, quickly, then come back one after another: each fades in, rises 8px and sharpens from a slight blur, a fixed step after the one before. They hold, then the loop repeats. The order can run top down, bottom up or from the middle out. With a comparison picked, a twin sidebar beside it enters all at once at the same instant. The index card is a wireframe of the same list: six small cards with a square and a bar each.',
     controls,
     glyph: StaggerGlyph,
   },

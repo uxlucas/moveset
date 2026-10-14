@@ -1,3 +1,4 @@
+import { Bell, CalendarDays, Mountain, Share2, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, type RefObject } from 'react'
 import { BrowserFrame } from '@/components/demo/browser-frame'
 import { useAutoScroll } from '@/components/demo/use-auto-scroll'
@@ -63,6 +64,18 @@ const PARAGRAPHS = [
   [90, 84, 96, 76],
 ]
 
+// The entry page's hero and card. The hero text sits inside the image block: above it (the open 56px) it would be
+// clipped off the top at the still frame, below it it would be behind the panel. Both lines are ink: muted on demo-2
+// is 4.4:1 in light.
+const HEADLINE = 'Built for the long run'
+const SUBLINE = 'A planner that keeps up with you'
+const CARD_TITLE = "What's new this week"
+const ROWS: { Icon: LucideIcon; label: string }[] = [
+  { Icon: CalendarDays, label: 'Plan the week' },
+  { Icon: Bell, label: 'Quiet notifications' },
+  { Icon: Share2, label: 'Share a board' },
+]
+
 // Writes each layer's transform straight from scrollTop: no React state, no smoothing. The page itself is the hero,
 // so the scroll distance into the hero is scrollTop.
 function useParallax(rootRef: RefObject<HTMLDivElement | null>, { depth, layers }: V) {
@@ -102,7 +115,7 @@ function ParallaxDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
   const layer = 'pointer-events-none absolute inset-0 will-change-transform'
 
   return (
-    <BrowserFrame scrollRef={scrollRef} size={size} label="Page whose background blocks scroll slower than the text panel in front">
+    <BrowserFrame scrollRef={scrollRef} size={size} label="Landing page whose hero image scrolls slower than the card in front">
       {/* The page is the hero, a fixed share of the window so the travel stays short. Its top is open, so the layers
           show until the panel slides over them; the panel's text runs on past the hero's bottom edge, clipped. */}
       <div data-hero="" style={{ height: g.hero }} className="relative flex flex-col overflow-clip">
@@ -112,17 +125,43 @@ function ParallaxDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
           </div>
         )}
         <div data-layer="back" data-ratio={back} aria-hidden className={layer}>
-          <div style={{ paddingTop: g.top }} className={`grid grid-cols-2 ${detail ? 'gap-4 px-10' : 'gap-2.5 px-5'}`}>
-            <div style={{ height: g.block }} className="rounded-md bg-demo-subject" />
-            <div style={{ height: g.block }} className="rounded-md bg-demo-subject" />
-          </div>
+          {detail ? (
+            // One hero block the size of the card's two. Its text is top-aligned: the still frame covers the lower
+            // third with the panel, so everything that reads sits in the top 72px.
+            <div style={{ paddingTop: g.top }} className="px-10">
+              <div style={{ height: g.block }} className="flex flex-col items-center rounded-md bg-demo-2 px-4 pt-2 text-center">
+                <Mountain size={20} className="text-ink-muted" />
+                <p className="mt-1.5 text-[15px] font-semibold leading-5 text-ink">{HEADLINE}</p>
+                <p className="text-[12px] leading-4 text-ink">{SUBLINE}</p>
+              </div>
+            </div>
+          ) : (
+            <div style={{ paddingTop: g.top }} className="grid grid-cols-2 gap-2.5 px-5">
+              <div style={{ height: g.block }} className="rounded-md bg-demo-subject" />
+              <div style={{ height: g.block }} className="rounded-md bg-demo-subject" />
+            </div>
+          )}
         </div>
         <div
           data-layer="front"
           style={{ marginTop: g.panel }}
           className={`relative flex-1 rounded-t-xl bg-surface shadow-[0_-1px_0_var(--line),0_-8px_20px_oklch(0_0_0/0.06)] ${detail ? 'px-6 pt-5' : 'px-3.5 pt-3'}`}
         >
-          <div className={`w-1/2 rounded-full bg-demo-2 ${detail ? 'mb-4 h-3' : 'mb-2.5 h-2'}`} />
+          {detail ? (
+            // 130px to the first bar (title 20 + 12, rows 3 × 28, 14), so at the bottom of the scroll no bar
+            // straddles the hero's edge at either window height (264.8px and 175.2px below the panel's top).
+            <div className="mb-3.5">
+              <p className="mb-3 text-[13px] font-medium leading-5 text-ink">{CARD_TITLE}</p>
+              {ROWS.map(({ Icon, label }) => (
+                <div key={label} className="flex h-7 items-center gap-2.5">
+                  <Icon size={14} aria-hidden className="shrink-0 text-ink-muted" />
+                  <span className="text-[12px] leading-4 text-ink">{label}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mb-2.5 h-2 w-1/2 rounded-full bg-demo-2" />
+          )}
           {PARAGRAPHS.map((widths, i) => (
             <div key={i} className={detail ? 'mb-4 space-y-2' : 'mb-2.5 space-y-1.5'}>
               {widths.map((w, j) => (
@@ -341,7 +380,7 @@ export default defineTerm({
   demo: {
     component: ParallaxDemo,
     label:
-      'A wireframe page scrolls down and back up inside a small browser window. Two solid blocks at the top drift up at a fraction of the scroll speed while a panel of text lines in front scrolls at full speed and slides over them. The controls change how fast the blocks move and add a third, slower layer behind them.',
+      'On the entry page, a product landing page scrolls down and back up inside a small browser window. The hero at the top, an image block with a headline and a line under it, drifts up at a fraction of the scroll speed while a card in front, with a title, three rows of icons and text and bars for the rest, scrolls at full speed and slides over it. The controls change how fast the hero moves and add a second, slower image block behind it. The index card is a wireframe of the same page: two solid blocks and a panel of bars.',
     controls,
     glyph: ParallaxGlyph,
   },
