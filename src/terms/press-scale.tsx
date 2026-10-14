@@ -463,7 +463,7 @@ export default defineTerm({
   name: 'Press Scale',
   category: 'gestures',
   order: 1,
-  status: 'review',
+  status: 'published',
   definition: 'A button shrinks slightly while pressed, so the click feels physical.',
   aliases: ['scale on press', 'active scale', 'button press animation', 'tap feedback', 'press feedback', 'pressed state'],
   description:

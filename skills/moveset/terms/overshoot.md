@@ -134,6 +134,7 @@ Overshoot is extra movement, so under reduced motion drop it along with the trav
 
 - [Spring](https://moveset.lucaslima.design/terms/spring)
 - [Ease-out](https://moveset.lucaslima.design/terms/ease-out)
+- [Press Scale](https://moveset.lucaslima.design/terms/press-scale)
 - [Icon Swap](https://moveset.lucaslima.design/terms/icon-swap)
 
 ## Often confused with

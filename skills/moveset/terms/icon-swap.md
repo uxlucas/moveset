@@ -161,5 +161,6 @@ An icon-only button needs an `aria-label` that names the action, and a 44px hit 
 - [Overshoot](https://moveset.lucaslima.design/terms/overshoot)
 - [Duration](https://moveset.lucaslima.design/terms/duration)
 - [Ease-out](https://moveset.lucaslima.design/terms/ease-out)
+- [Press Scale](https://moveset.lucaslima.design/terms/press-scale)
 
 Source: https://moveset.lucaslima.design/terms/icon-swap

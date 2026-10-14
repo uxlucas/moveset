@@ -742,7 +742,7 @@ export default defineTerm({
   name: 'Swipe to Dismiss',
   category: 'gestures',
   order: 3,
-  status: 'review',
+  status: 'published',
   definition: 'Dragging an element off screen closes it, and a quick flick counts as much as a long drag.',
   aliases: ['swipe away', 'drag to dismiss', 'flick to dismiss', 'swipe gesture', 'swipeable toast', 'swipe to delete'],
   description:
