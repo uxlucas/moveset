@@ -44,6 +44,8 @@ next-env.d.ts
 /src/generated/
 /test-results/
 /playwright-report/
+# screenshots `npm run checkpoint` takes for a visual review
+/docs/checkpoints/
 !.env.development
 
 # generated agent outputs (skills/ is committed)

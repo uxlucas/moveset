@@ -2,6 +2,13 @@
   "name": "moveset",
   "version": "0.1.0",
   "private": true,
+  "description": "A visual dictionary of design engineering terms: each with a live demo, a precise name and a prompt for an AI coding agent.",
+  "homepage": "https://moveset.lucaslima.design",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uxlucas/moveset.git"
+  },
   "engines": {
     "node": "22.x"
   },

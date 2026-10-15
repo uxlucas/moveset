@@ -1,12 +1,16 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// A Chromium already on the machine, used instead of the build Playwright downloads (a container that ships one, say).
+const executablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH
+const launchOptions = executablePath ? { executablePath } : undefined
+
 export default defineConfig({
   testDir: 'tests/e2e',
   globalSetup: './tests/e2e/global-setup.ts',
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
   expect: { timeout: 10_000 },
-  use: { baseURL: 'http://localhost:3100', trace: 'on-first-retry' },
+  use: { baseURL: 'http://localhost:3100', trace: 'on-first-retry', launchOptions },
   webServer: {
     command: 'npm run dev -- --port 3100',
     url: 'http://localhost:3100',
