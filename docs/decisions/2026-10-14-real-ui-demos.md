@@ -18,6 +18,7 @@ Every entry-page stage shows a real component with real content. Index cards kee
 - **Gestures keep their real controls.** A button you press is a button with a label ("Send"). A toast you swipe has a Dismiss control. Nothing on the entry page is a decorative stand-in for a control.
 - **Cards stay wireframe.** The same layout and motion as the entry stage, drawn with the `--demo-*` bars and shapes, no text and no icons. The entry page is where the component is named.
 - **Shapes match the component.** A toolbar is a pill and its buttons are circles; a primary button is a pill. Square buttons inside a pill read as wrong.
+- **Two stages stay abstract.** Spring and Overshoot keep their chip on a track. Their subject is the curve, not a component, and the notification card and the Saved pill tried in pass 3 did not make the motion clearer (owner's call, 2026-10-15; reverted).
 - **Every element on a comparison stage says its own rule.** If a stage shows a button that scales beside a toolbar that does not, both carry a caption (`button: scale 0.97` / `toolbar: colour only`). A reader must not have to infer one element's behaviour from the other's caption.
 
 ## What does not change
@@ -27,7 +28,7 @@ Mechanics, timings, prompts, acceptance lists and code tabs. The verification al
 ## Order
 
 1. Checkpoint: Press Scale (a "Send" button and a B / I / U / S / link toolbar as the opt-out) and Duration (a tooltip on a toolbar button, a user menu under "Options", a bottom sheet), shown to the owner before anything else is converted.
-2. Then the rest, two to four terms per pass, oldest first.
+2. Then the rest, two to four terms per pass, oldest first. Done in four passes (2026-10-14 to 2026-10-15); Spring and Overshoot reverted after the owner's review.
 
 ## Rejected
 

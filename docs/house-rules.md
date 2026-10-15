@@ -67,7 +67,7 @@ The standard every demo, prompt and piece of site chrome is held to. Distilled f
 - Not for rail hover, cards, buttons, backgrounds, gradients or demos. Demos stay grayscale with the `--demo-*` tokens.
 
 ## Demos
-- Every entry-page stage shows a real component with real content: text is text, icons are lucide, the component is the one the term is usually applied to (a tooltip on a toolbar, a user menu, a toast that says what happened). Index cards keep the wireframe (same layout and motion, bars and shapes, no text). Shapes match the component (a toolbar is a pill of circles; a primary button is a pill). On a comparison stage every element carries its own caption. Verdict marks are words and ink, not red and green. See `docs/decisions/2026-10-14-real-ui-demos.md`.
+- Every entry-page stage shows a real component with real content: text is text, icons are lucide, the component is the one the term is usually applied to (a tooltip on a toolbar, a user menu, a toast that says what happened). Index cards keep the wireframe (same layout and motion, bars and shapes, no text). Shapes match the component (a toolbar is a pill of circles; a primary button is a pill). On a comparison stage every element carries its own caption. Verdict marks are words and ink, not red and green. Exception: Spring and Overshoot stay abstract (a chip on a track), since their subject is the curve, not a component. See `docs/decisions/2026-10-14-real-ui-demos.md`.
 - Accent text uses `accent-ink` (5.5:1 or more on light surfaces); plain `accent` is for non-text only (3.8:1).
 
 ## Copy

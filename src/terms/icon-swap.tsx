@@ -71,6 +71,14 @@ const PAIRS: Record<Pair, PairSpec> = {
 
 const cap = (word: string) => word[0].toUpperCase() + word.slice(1)
 
+// The entry page's row: the thing the button acts on, so the icon is the state of something. A command to copy, an
+// episode to play, a post to like. The card draws the same row as bars.
+const ROWS: Record<Pair, { title: string; line: string; mono?: boolean }> = {
+  copy: { title: 'npm install motion', line: 'Install command', mono: true },
+  play: { title: 'Design details', line: 'Episode 12 · 42 min' },
+  heart: { title: 'Shipped the sidebar', line: 'Ada · 2h ago' },
+}
+
 // The house swap: shrink deep, fade, a whisper of blur, no bounce. Without Motion, a firm ease-out stands in for the spring.
 const HOUSE_SCALE = 0.3
 const BLUR_PX = 3
@@ -227,10 +235,17 @@ function IconSwapDemo({ values, playing, replayKey, size, timeScale, onCycleEnd 
           {/* A row with the action at its end, so the icon is the state of something: a snippet to copy, a track to
               play, a post to like. */}
           <div className={`flex w-full items-center rounded-xl bg-surface shadow-card ${detail ? 'max-w-[240px] gap-3 p-2 pl-3.5' : 'max-w-[160px] gap-2 p-1.5 pl-2.5'}`}>
-            <div className={`flex min-w-0 flex-1 flex-col ${detail ? 'gap-2' : 'gap-1.5'}`}>
-              <span className="h-1.5 w-3/4 rounded-full bg-demo-subject" />
-              <span className="h-1.5 w-1/2 rounded-full bg-demo-2" />
-            </div>
+            {detail ? (
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className={`min-w-0 truncate text-ink ${ROWS[values.pair].mono ? 'font-mono text-[12px]' : 'text-[13px]'}`}>{ROWS[values.pair].title}</span>
+                <span className="min-w-0 truncate text-[12px] text-ink-muted">{ROWS[values.pair].line}</span>
+              </div>
+            ) : (
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <span className="h-1.5 w-3/4 rounded-full bg-demo-subject" />
+                <span className="h-1.5 w-1/2 rounded-full bg-demo-2" />
+              </div>
+            )}
             {detail ? (
               // 44px: the whole button is the hit area. The name says what pressing it does; the state is reported by
               // the name (play), aria-pressed (heart) or the always-mounted status region beside it (copy).
@@ -508,7 +523,7 @@ export default defineTerm({
   demo: {
     component: IconSwapDemo,
     label:
-      'A single icon button sits in a frame, showing a copy icon. The icon shrinks deep, fades and blurs away while a check grows into its place, sharp and settled within 300ms; it holds, then swaps back the same way. Beside the frame, the values of the swap. On the entry page the button is real: pressing it swaps the icon and reports the state (the copy button announces Copied and reverts after 1.5 seconds). The pair can be copy to check, play to pause or an outline heart filling in; the depth runs from the house 0.3 to a timid 0.8 to no scale at all, and the blur can be switched off.',
+      'On the entry page, a row holds the thing the button acts on and the icon button at its end: an install command (npm install motion) with a copy button, a podcast episode with a play button, or a post with a heart. The icon shrinks deep, fades and blurs away while the other grows into its place, sharp and settled within 300ms; it holds, then swaps back the same way. Beside the frame, the values of the swap. The button is real: pressing it swaps the icon and reports the state (the copy button announces Copied and reverts after 1.5 seconds). The pair can be copy to check, play to pause or an outline heart filling in; the depth runs from the house 0.3 to a timid 0.8 to no scale at all, and the blur can be switched off. The index card is a wireframe of the same row: two bars and the button, no text.',
     controls,
     glyph: IconSwapGlyph,
   },
