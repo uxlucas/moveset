@@ -57,9 +57,8 @@ Reveal each card once as it scrolls into view.
 :root { --ease-out: cubic-bezier(0.23, 1, 0.32, 1); }
 
 /* Markup: <div class="reveal"><div class="reveal-inner">…</div></div>
-   The observer watches .reveal, which never moves; .reveal-inner animates.
-   The JS tab adds .js only after marking the cards already in view, so the
-   first screen is never hidden, and with JavaScript off nothing is. */
+   .reveal is observed and never moves; .reveal-inner animates. The JS tab adds
+   .js last, so on first paint, or with JavaScript off, nothing is hidden. */
 .js .reveal:not([data-in="true"]) > .reveal-inner {
   opacity: 0;
   transform: translateY(14px);
@@ -89,33 +88,31 @@ Reveal each card once as it scrolls into view.
 ### JS
 
 ```js
-// Load at the end of <body>, or with defer, so it runs by DOMContentLoaded. It
-// shows the cards already on screen before it hides anything, so the first
-// screen never flashes or waits, and if it fails to load, every card stays visible.
+// Load at the end of <body>, or with defer. It shows the cards already on screen
+// before hiding anything, so nothing flashes, and if it never loads nothing hides.
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
-// The card is observed and gets data-in; its .reveal-inner is what animates.
+// The card gets data-in; its .reveal-inner is what animates.
 function show(card, delay = 0) {
   if (delay) {
     const inner = card.querySelector('.reveal-inner')
     inner.style.transitionDelay = `${delay}ms`
-    // Clear it afterwards, so later transitions on the card don't inherit it.
+    // Cleared afterwards, so later transitions on the card don't inherit it.
     const clear = () => (inner.style.transitionDelay = '')
     inner.addEventListener('transitionend', clear, { once: true })
   }
   card.dataset.in = 'true'
-  io.unobserve(card) // once
+  io.unobserve(card)
 }
 
-// The card itself never moves, so threshold 0.15 means 15% of it on screen.
+// threshold 0.15: 15% of the card on screen (the card itself never moves).
 const io = new IntersectionObserver(
   (entries) => {
-    // The first callback reports every observed card; later ones only the
-    // cards whose visibility changed, leaving ones included. Keep entering ones.
+    // The first callback reports every card, leaving ones included: keep the entering ones.
     const entering = entries.filter(
       (e) => e.isIntersecting && e.intersectionRatio >= 0.15,
     )
-    // Cards entering together start 60ms apart, at most 4 steps.
+    // Capped at 4 steps, so a fast jump never queues a long wave.
     entering.forEach((e, i) => {
       show(e.target, reduced() ? 0 : Math.min(i, 4) * 60)
     })
@@ -123,8 +120,8 @@ const io = new IntersectionObserver(
   { threshold: 0.15 },
 )
 
-// First paint: any card with part of it on screen, or already scrolled past,
-// is shown without animating. The threshold above is only for cards to come.
+// First paint: cards on screen, or already scrolled past, show without animating;
+// the threshold above is only for cards to come.
 function showOnScreen() {
   const cards = [...document.querySelectorAll('.reveal:not([data-in="true"])')]
   const onScreen = cards.filter((card) => card.getBoundingClientRect().top < innerHeight)
@@ -137,12 +134,12 @@ function showOnScreen() {
 
 showOnScreen()
 document.querySelectorAll('.reveal:not([data-in="true"])').forEach((card) => io.observe(card))
-// Only now hide the cards that are still to come.
+// Only now hide the cards still to come.
 document.documentElement.classList.add('js')
-// A #hash jump lands at load: run the pass again for the cards it brought on screen.
+// A #hash jump lands at load: run the pass again.
 addEventListener('load', showOnScreen, { once: true })
 
-// Focus can land in a card before it reaches the threshold: start its reveal now.
+// Focus can land in a card before it reaches the threshold: reveal it now.
 document.addEventListener('focusin', (e) => {
   const card = e.target.closest('.reveal:not([data-in="true"])')
   if (card) show(card)
@@ -155,10 +152,9 @@ document.addEventListener('focusin', (e) => {
 import { motion, type Variants } from 'motion/react'
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 
-// Add this to <head>. Motion writes `initial` into the server HTML, so the
-// cards start hidden there; these show them without JavaScript, in print,
-// and after 3s if the bundle never hydrates. If hydration takes longer
-// than 3s, the failsafe stays on: cards show without animating.
+// Add this to <head>. Motion writes `initial` into the server HTML, so the cards
+// start hidden there: these show them without JavaScript, in print, and if the
+// bundle has not hydrated after 3s (then they stay shown and never animate).
 //   <noscript>
 //     <style>.reveal-inner { opacity: 1 !important; transform: none !important; }</style>
 //   </noscript>
@@ -187,8 +183,7 @@ export function RevealFailsafe() {
   return null
 }
 
-// Cards that enter view in the same frame start 60ms apart, at most
-// 4 steps: the same rule as the CSS and JS version.
+// Cards entering in the same frame start 60ms apart, at most 4 steps: the JS tab's rule.
 let step = 0
 let frame = 0
 function nextDelay() {
@@ -215,17 +210,16 @@ const variants: Variants = {
   },
 }
 
-// `above` renders a card visible and never animates it: use it for cards on
-// the first screen. It is decided at render time, so on a taller viewport,
-// cards in view on load that are not marked start hidden in the server HTML
-// and fade in after hydration. Mark generously.
+// `above`: a first-screen card, rendered visible and never animated. It is decided
+// at render time, so on a taller viewport, unmarked cards in view start hidden in
+// the server HTML and fade in after hydration. Mark generously.
 type RevealProps = { children: ReactNode; above?: boolean }
 export function Reveal({ children, above = false }: RevealProps) {
   const delay = useRef<number>(undefined)
   const [focused, setFocused] = useState(false)
   return (
-    // The outer div is observed and never moves, so amount 0.15 is 15% of the
-    // card on screen. Its variant labels pass down to the inner div, which animates.
+    // The outer div is observed and never moves (amount 0.15 is 15% of the card);
+    // its variant labels pass down to the inner div, which animates.
     <motion.div
       className="reveal"
       initial={above ? false : 'hidden'}

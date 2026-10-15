@@ -53,14 +53,14 @@ Swap this button's icon when its state changes: copy to check.
      <svg class="icon icon-a">…</svg>  <!-- copy, in flow -->
      <svg class="icon icon-b">…</svg>  <!-- check, layered over it -->
    </button>. On click, set data-on="true", announce Copied in a role="status"
-   region and revert after 1.5s (a second click restarts the timer). The
-   name stays Copy. Both icons stay mounted, so the revert animates the same
-   way, and a click during it turns back from where it is. */
+   region and revert after 1.5s (a second click restarts the timer); the
+   name stays Copy. Both icons stay mounted, so a click mid-swap turns back
+   from where it is. */
 .icon-button {
-  position: relative; /* .icon-b is placed against the button */
+  position: relative;
   display: inline-grid;
   place-items: center;
-  width: 44px; /* the hit area */
+  width: 44px; /* the hit area, whatever the icon size */
   height: 44px;
 }
 .icon-b {
@@ -75,8 +75,7 @@ Swap this button's icon when its state changes: copy to check.
   transition-duration: 300ms;
   transition-timing-function: cubic-bezier(0.25, 0.1, 0, 1); /* a firm ease-out, standing in for the spring */
 }
-/* The hidden icon: shrunk deep, faded, soft. 0.3, not 0.8: a timid scale
-   reads as a glitch. */
+/* The hidden icon. scale(0.3), not 0.8: a deep scale reads as a swap, a timid one as a glitch. */
 .icon-b,
 .icon-button[data-on="true"] .icon-a {
   opacity: 0;
@@ -89,8 +88,8 @@ Swap this button's icon when its state changes: copy to check.
   filter: blur(0px);
 }
 
-/* Reduced motion: a fade over the same 300ms, no scale and no blur. The state
-   selectors are repeated, so this outranks them. */
+/* Reduced motion: the fade stays, the scale and blur go. The state selectors
+   are repeated so this outranks them. */
 @media (prefers-reduced-motion: reduce) {
   .icon-b,
   .icon-button[data-on="true"] .icon-a {
@@ -109,16 +108,14 @@ import { useEffect, useRef, useState } from 'react'
 
 // Bounce 0: an icon is not a toy.
 const swap = { type: 'spring', duration: 0.35, bounce: 0 } as const
-// The button is a 44px grid box, so the span is a box too and popLayout places
-// the leaving icon against it: the two coincide, and the layout never shifts.
+// A 44px grid box (the hit area): popLayout places the leaving icon against it,
+// so the two icons coincide and the layout never shifts.
 const box = { position: 'relative', display: 'grid', placeItems: 'center', inlineSize: 44, blockSize: 44 } as const
-// Visually hidden, still read by assistive tech.
 const hiddenText = { position: 'absolute', inlineSize: 1, blockSize: 1, overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' } as const
 
 export function CopyButton() {
   const [copied, setCopied] = useState(false)
-  // Not a toggle: the check shows, then reverts after 1.5s; a second click restarts
-  // the timer. The name stays Copy; the status region announces Copied.
+  // Not a toggle: the check reverts on a timer; the name stays and the status region announces.
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(timer.current), [])
   const copy = () => {
@@ -138,10 +135,16 @@ export function CopyButton() {
         aria-label="Copy"
         onClick={copy}
       >
-        {/* initial={false}: the first icon is painted at rest, no swap on page load.
-            popLayout takes the leaving icon out of flow, so the two overlap. */}
+        {/* initial={false}: no swap on page load; the first icon is painted at rest. */}
         <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span key={copied ? 'check' : 'copy'} style={{ display: 'grid' }} initial={hidden} animate={shown} exit={hidden} transition={swap}>
+          <motion.span
+            key={copied ? 'check' : 'copy'}
+            style={{ display: 'grid' }}
+            initial={hidden}
+            animate={shown}
+            exit={hidden}
+            transition={swap}
+          >
             {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
           </motion.span>
         </AnimatePresence>

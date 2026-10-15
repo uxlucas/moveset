@@ -56,19 +56,16 @@ Give this toast an enter and an exit. Bottom centre of its `position: relative` 
 }
 
 /* Markup: <div class="toast" data-state="closed">…<button>Dismiss</button></div>.
-   Kept mounted, not display + @starting-style: that also plays on first paint.
-   Show: data-state="open". Dismiss: data-state="closing",
-   and on its own transitionend (event.target the toast, propertyName
-   "opacity") data-state="closed", the enter origin, so the next show
-   starts from 16px below.
+   Kept mounted rather than display + @starting-style, which also plays on
+   first paint. Show: data-state="open". Dismiss: data-state="closing",
+   then data-state="closed" on its own transitionend (event.target the toast,
+   propertyName "opacity"), the enter origin, so the next show starts from 16px below.
    Focus inside the toast: trigger.focus({ preventScroll: true }) before
    closing, or it drops to body. */
 .toast {
-  /* The exit target: faded, nudged toward the bottom edge, and out of the
-     tab order once the transition ends. visibility is transitioned too, so
-     the toast stays visible for the whole exit. A transition takes the
-     duration of the state it heads to: this rule times the exit, the open
-     rule the enter. */
+  /* The base rule is the exit target, so it times the exit (a transition takes
+     the duration of the state it heads to). visibility is transitioned too,
+     so the toast is hidden from the tab order only once the exit ends. */
   opacity: 0;
   transform: translateY(4px);
   visibility: hidden;
@@ -77,8 +74,8 @@ Give this toast an enter and an exit. Bottom centre of its `position: relative` 
   transition-timing-function: var(--ease-out);
 }
 .toast[data-state="closed"] {
-  /* The enter origin: 16px below its spot, where the exit nudges toward. In
-     no time, so a show right after the exit starts from the full travel. */
+  /* The enter origin, reached in no time, so a show right after the exit
+     starts from the full travel. */
   transform: translateY(16px);
   transition-duration: 0ms;
 }
@@ -86,7 +83,7 @@ Give this toast an enter and an exit. Bottom centre of its `position: relative` 
   opacity: 1;
   transform: none;
   visibility: visible;
-  transition-duration: var(--duration-2); /* enter: 200ms */
+  transition-duration: var(--duration-2);
 }
 
 /* Reduced motion: a fade over the same durations, no travel. */
@@ -113,8 +110,7 @@ export function Toast({ open, onDismiss, trigger, children }: Props) {
   const reduced = useReducedMotion()
   const y = (px: number) => (reduced ? 0 : px)
   return (
-    // initial={false}: a toast open at first paint is painted in place, with no
-    // entrance. It unmounts once the exit has played.
+    // initial={false}: a toast open at first paint gets no entrance.
     <AnimatePresence initial={false}>
       {open && (
         <motion.div
@@ -122,11 +118,11 @@ export function Toast({ open, onDismiss, trigger, children }: Props) {
           initial={{ opacity: 0, y: y(16) }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease }}
-          // Quieter and faster: a few pixels toward the edge it came from, 0.75 × the enter.
+          // Exits are quieter: a few pixels toward the edge it came from, 0.75 × the enter.
           exit={{ opacity: 0, y: y(4), transition: { duration: 0.15, ease } }}
         >
           {children}
-          {/* Focus goes back to the trigger before the exit, or it drops to body when the toast unmounts. */}
+          {/* Focus goes back to the trigger first, or it drops to body when the toast unmounts. */}
           <button
             type="button"
             onClick={() => {

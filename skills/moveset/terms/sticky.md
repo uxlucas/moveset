@@ -51,7 +51,7 @@ Make the section headers in this list sticky.
 ```css
 .list {
   overflow-y: auto;
-  padding: 0; /* put padding on a wrapper, so rootMargin lines up with top */
+  padding: 0; /* padding goes on a wrapper, so rootMargin lines up with the top */
   scroll-padding-top: 32px; /* header height */
 }
 
@@ -86,20 +86,7 @@ Make the section headers in this list sticky.
 ### JS
 
 ```js
-// Watch the headers themselves. A header is stuck while the line
-// 1px below the top of the list cuts through it: clipped at the top,
-// still showing below the line. Pushed fully out, or with its bottom exactly
-// on the line, it is not stuck.
-//
-// Why the details matter:
-// - The 100000px bottom margin keeps the bottom edge from ever clipping a
-//   header. Otherwise a header half under the bottom edge that jumps straight
-//   into the pinned spot (scrollbar drag, anchor link, scrollTop set in code)
-//   stays between thresholds, gets no callback and keeps a stale state.
-// - bottom > line: a header pushed out until its bottom exactly touches the
-//   line still counts as intersecting (ratio 0), with at most 1px showing.
-// - The 0.01 threshold: from that touching state, a header sliding back in
-//   stays inside the same [0, 1] band and would get no callback.
+// A header is stuck while the line 1px below the top of the list cuts through it.
 const list = document.querySelector('.list')
 const io = new IntersectionObserver(
   (entries) => {
@@ -107,9 +94,13 @@ const io = new IntersectionObserver(
       const { top, bottom } = entry.boundingClientRect
       const line = entry.rootBounds.top
       const clipped = entry.isIntersecting && entry.intersectionRatio < 1
+      // bottom > line: pushed out until its bottom touches the line, a header still intersects at ratio 0.
       entry.target.dataset.stuck = String(clipped && top <= line && bottom > line)
     }
   },
+  // The 100000px bottom margin keeps the bottom edge from clipping a header, so a jump
+  // straight to the pinned spot (anchor link, scrollTop set in code) still gets a callback.
+  // The 0.01 threshold: a header sliding back in from ratio 0 gets one too.
   { root: list, rootMargin: '-1px 0px 100000px 0px', threshold: [0, 0.01, 1] },
 )
 list.querySelectorAll('.section-header').forEach((h) => io.observe(h))

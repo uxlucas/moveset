@@ -503,7 +503,7 @@ function cssLook(kind: Kind): { base: string[]; open: string[]; reduced: string[
       base: ['  transform: translateY(100%);', '  transition-property: transform;'],
       open: ['  transform: none;'],
       reduced: [
-        '  /* No slide: it fades in place over the same durations. */',
+        '  /* No slide: a fade in place over the same durations. */',
         '  .sheet {',
         '    transform: none;',
         '    opacity: 0;',
@@ -534,7 +534,7 @@ function cssCode(v: V): string {
   const look = cssLook(v.element)
   return [
     '/* Durations by kind of element. Product UI stays at or under --duration-4;',
-    '   only page-level transitions go further, to 400ms at most. */',
+    '   only page-level transitions go past it, to 400ms at most. */',
     ':root {',
     '  --duration-1: 150ms; /* hover, press, color; tooltips */',
     '  --duration-2: 200ms; /* menus, dropdowns, popovers */',
@@ -544,8 +544,8 @@ function cssCode(v: V): string {
     ...(k.ease === EASE_DRAWER ? ['  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);'] : []),
     '}',
     '',
-    '/* Hover and press: the short end, and only color and scale. Color on ease,',
-    '   the press scale on --ease-out; both the same length each way. */',
+    '/* Hover and press: --duration-1 each way; color on ease, the press scale on',
+    '   --ease-out. */',
     '.button {',
     '  transition-property: background-color, scale;',
     '  transition-duration: var(--duration-1);',
@@ -560,18 +560,19 @@ function cssCode(v: V): string {
     '  scale: 0.97;',
     '}',
     '',
-    `/* The ${k.name}. A transition takes the duration of the state it heads`,
-    `   to: this closed rule times the close, [data-open] the open. To open, set`,
+    `/* The ${k.name}. A transition takes the duration of the state it heads to:`,
+    '   this closed rule times the close, [data-open] the open. To open, set',
     '   data-open and remove inert; to close, the reverse. */',
     `.${v.element} {`,
     ...look.base,
     `  transition-timing-function: ${k.ease.token};`,
-    `  transition-duration: ${exitText(v)}; /* close: ${exit}ms */`,
-    ...(v.exitRatio ? [] : ['  /* Same as the open. The house runs exits 25% faster: × 0.75. */']),
+    v.exitRatio
+      ? `  transition-duration: ${exitText(v)}; /* close: ${exit}ms */`
+      : `  transition-duration: ${exitText(v)}; /* close, same as the open; the house ships × 0.75 */`,
     '}',
     `.${v.element}[data-open] {`,
     ...look.open,
-    `  transition-duration: var(${k.token}); /* open: ${k.ms}ms */`,
+    `  transition-duration: var(${k.token});`,
     '}',
     ...(v.element === 'dropdown'
       ? ['', '/* Arrow keys move the highlight: no transition, ever. */', '.dropdown [role="menuitem"] {', '  transition-property: none;', '}']
@@ -599,7 +600,7 @@ function motionCode(v: V): string {
           '  const shown = { opacity: 1, y: 0 }',
         ]
       : [
-          `  // Reduced motion: no scale, a fade over the same durations.`,
+          '  // Reduced motion: no scale, a fade over the same durations.',
           `  const hidden = { opacity: 0, scale: useReducedMotion() ? 1 : ${v.element === 'tooltip' ? 0.97 : 0.95} }`,
           '  const shown = { opacity: 1, scale: 1 }',
         ]
@@ -607,8 +608,8 @@ function motionCode(v: V): string {
     "import { AnimatePresence, motion, useReducedMotion } from 'motion/react'",
     "import type { ReactNode } from 'react'",
     '',
-    '// Seconds by kind: hover and press 0.15, tooltip 0.15, dropdown 0.2, dialog',
-    '// and toast 0.25, sheet 0.3. Page-level transitions only: up to 0.4.',
+    '// Seconds by kind: hover, press and tooltip 0.15, dropdown 0.2, dialog and',
+    '// toast 0.25, sheet 0.3; only page-level transitions go past that, to 0.4.',
     v.exitRatio ? '// Exits run at 0.75 × the enter.' : '// Exits here match the enter; the house runs them at 0.75 ×.',
     `export function ${Name}({ open, children }: { open: boolean; children: ReactNode }) {`,
     ...states,

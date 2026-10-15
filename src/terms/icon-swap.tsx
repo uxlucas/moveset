@@ -353,21 +353,19 @@ function cssCode(v: V): string {
   const onClick = p.status
     ? [
         `   </button>. On click, set data-on="true", announce ${p.status} in a role="status"`,
-        `   region and revert after ${REVERT_MS / 1000}s (a second click restarts the timer). The`,
-        `   name stays ${p.label[0]}. Both icons stay mounted, so the revert animates the same`,
-        '   way, and a click during it turns back from where it is. */',
+        `   region and revert after ${REVERT_MS / 1000}s (a second click restarts the timer); the`,
+        `   name stays ${p.label[0]}. Both icons stay mounted, so a click mid-swap turns back`,
+        '   from where it is. */',
       ]
     : p.toggle
       ? [
           '   </button>. On click, toggle data-on="true" and aria-pressed. Both icons stay',
-          '   mounted, so the swap back animates the same way, and a second click',
-          '   mid-swap turns back from where it is. */',
+          '   mounted, so a click mid-swap turns back from where it is. */',
         ]
       : [
           `   </button>. On click, toggle data-on="true" and set aria-label to ${p.label[1]},`,
-          `   back to ${p.label[0]} on the next. Both icons stay mounted, so the swap back`,
-          '   animates the same way, and a second click mid-swap turns back from where',
-          '   it is. */',
+          `   back to ${p.label[0]} on the next. Both icons stay mounted, so a click mid-swap`,
+          '   turns back from where it is. */',
         ]
   return [
     `/* Markup: <button class="icon-button" type="button" ${p.toggle ? `aria-label="${p.label[0]}" aria-pressed="false"` : `aria-label="${p.label[0]}"`}>`,
@@ -375,10 +373,10 @@ function cssCode(v: V): string {
     `     <svg class="icon icon-b">…</svg>  <!-- ${p.to}, layered over it -->`,
     ...onClick,
     '.icon-button {',
-    '  position: relative; /* .icon-b is placed against the button */',
+    '  position: relative;',
     '  display: inline-grid;',
     '  place-items: center;',
-    '  width: 44px; /* the hit area */',
+    '  width: 44px; /* the hit area, whatever the icon size */',
     '  height: 44px;',
     '}',
     '.icon-b {',
@@ -394,11 +392,11 @@ function cssCode(v: V): string {
     `  transition-timing-function: ${EASE}; /* a firm ease-out, standing in for the spring */`,
     '}',
     ...(v.depth === 'fade'
-      ? ['/* The hidden icon only fades: it reads as a flicker. The house shrinks it to', '   scale(0.3) as well. */']
+      ? ['/* The hidden icon only fades, which reads as a flicker; the house shrinks it to scale(0.3) too. */']
       : v.depth === '0.8'
-        ? ['/* The hidden icon: faded and shrunk a little. 0.8 is timid and reads as a', '   glitch; the house ships 0.3. */']
-        : ['/* The hidden icon: shrunk deep, faded, soft. 0.3, not 0.8: a timid scale', '   reads as a glitch. */']),
-    ...(v.blur ? [] : ['/* No blur here; the house adds filter: blur(3px), which bridges the two. */']),
+        ? ['/* The hidden icon. 0.8 is timid and reads as a glitch; the house ships 0.3. */']
+        : ['/* The hidden icon. scale(0.3), not 0.8: a deep scale reads as a swap, a timid one as a glitch. */']),
+    ...(v.blur ? [] : ['/* No blur here; the house adds filter: blur(3px) to bridge the two shapes. */']),
     '.icon-b,',
     '.icon-button[data-on="true"] .icon-a {',
     ...hidden.map((l) => `  ${l}`),
@@ -410,12 +408,12 @@ function cssCode(v: V): string {
     '}',
     '',
     ...(reducedLines.length > 0
-      ? [`/* Reduced motion: a fade over the same ${SWAP_MS}ms, no scale and no blur. The state`, '   selectors are repeated, so this outranks them. */']
-      : [`/* Reduced motion: a fade over the same ${SWAP_MS}ms. */`]),
+      ? ['/* Reduced motion: the fade stays, the scale and blur go. The state selectors', '   are repeated so this outranks them. */']
+      : ['/* Reduced motion: already opacity only, so the fade stays as it is. */']),
     '@media (prefers-reduced-motion: reduce) {',
     ...(reducedLines.length > 0
       ? ['  .icon-b,', '  .icon-button[data-on="true"] .icon-a {', ...reducedLines, '  }']
-      : ['  /* Already opacity only: nothing to drop. */', '  .icon {', `    transition-duration: ${SWAP_MS}ms;`, '  }']),
+      : ['  .icon {', `    transition-duration: ${SWAP_MS}ms;`, '  }']),
     '}',
   ].join('\n')
 }
@@ -432,8 +430,7 @@ function motionCode(v: V): string {
   // The copy pair sets its state and reverts on a timer; the others toggle.
   const click = reverts
     ? [
-        `  // Not a toggle: the check shows, then reverts after ${REVERT_MS / 1000}s; a second click restarts`,
-        `  // the timer. The name stays ${p.label[0]}; the status region announces ${p.status}.`,
+        `  // Not a toggle: the check reverts on a timer; the name stays and the status region announces.`,
         '  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)',
         '  useEffect(() => () => clearTimeout(timer.current), [])',
         `  const ${p.from} = () => {`,
@@ -454,10 +451,16 @@ function motionCode(v: V): string {
         : [`  aria-label={${p.state} ? '${p.label[1]}' : '${p.label[0]}'}`]),
     reverts ? `  onClick={${p.from}}` : `  onClick={() => ${setter}(!${p.state})}`,
     '>',
-    '  {/* initial={false}: the first icon is painted at rest, no swap on page load.',
-    '      popLayout takes the leaving icon out of flow, so the two overlap. */}',
+    '  {/* initial={false}: no swap on page load; the first icon is painted at rest. */}',
     '  <AnimatePresence mode="popLayout" initial={false}>',
-    `    <motion.span key={${p.state} ? '${p.to}' : '${p.from}'} style={{ display: 'grid' }} initial={hidden} animate={shown} exit={hidden} transition={swap}>`,
+    '    <motion.span',
+    `      key={${p.state} ? '${p.to}' : '${p.from}'}`,
+    "      style={{ display: 'grid' }}",
+    '      initial={hidden}',
+    '      animate={shown}',
+    '      exit={hidden}',
+    '      transition={swap}',
+    '    >',
     `      {${p.state} ? ${iconB} : ${iconA}}`,
     '    </motion.span>',
     '  </AnimatePresence>',
@@ -473,11 +476,11 @@ function motionCode(v: V): string {
     '',
     '// Bounce 0: an icon is not a toy.',
     `const swap = ${SPRING.replace(/"/g, "'")} as const`,
-    '// The button is a 44px grid box, so the span is a box too and popLayout places',
-    '// the leaving icon against it: the two coincide, and the layout never shifts.',
+    '// A 44px grid box (the hit area): popLayout places the leaving icon against it,',
+    '// so the two icons coincide and the layout never shifts.',
     "const box = { position: 'relative', display: 'grid', placeItems: 'center', inlineSize: 44, blockSize: 44 } as const",
     ...(reverts
-      ? ['// Visually hidden, still read by assistive tech.', "const hiddenText = { position: 'absolute', inlineSize: 1, blockSize: 1, overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' } as const"]
+      ? ["const hiddenText = { position: 'absolute', inlineSize: 1, blockSize: 1, overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' } as const"]
       : []),
     '',
     `export function ${p.component}() {`,
@@ -485,8 +488,8 @@ function motionCode(v: V): string {
     ...click,
     ...(fadeOnly
       ? [
-          '  // Already opacity only, so reduced motion changes nothing here; useReducedMotion()',
-          '  // would gate the scale and blur the house adds.',
+          '  // Already opacity only, so nothing for reduced motion to drop; the house gates',
+          '  // its scale and blur with useReducedMotion().',
           `  const hidden = ${hidden}`,
           `  const shown = ${shown}`,
         ]

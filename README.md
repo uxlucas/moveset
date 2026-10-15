@@ -63,7 +63,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). The short version: copy `src/terms/stick
 
 ## Learned from
 
-Most of what is here comes from [Rauno Freiberg](https://rauno.me), [Emil Kowalski](https://emilkowal.ski), [Jakub Krehel](https://jakub.kr) and [Paco Coursey](https://paco.me), and from Gustavo Fior's [Craft](https://craft.gustavofior.com). Every term lists its sources; the full list is on [/about](https://moveset.lucaslima.design/about).
+Most of what is here comes from [Rauno Freiberg](https://rauno.me), [Emil Kowalski](https://emilkowal.ski), [Jakub Krehel](https://jakub.kr) and [Paco Coursey](https://paco.me). Every term lists its sources; the full list is on [/about](https://moveset.lucaslima.design/about).
 
 Made by [Lucas Lima](https://lucaslima.design).
 

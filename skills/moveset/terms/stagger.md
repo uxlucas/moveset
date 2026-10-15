@@ -60,11 +60,10 @@ Stagger this list's entrance.
 /* Markup: <ul class="stagger"><li style="--n: 0">…</li><li style="--n: 1">…
    </li>…</ul>. --n is the item's step: its index. */
 .stagger > * {
-  /* A one-shot entrance, so keyframes. `both` holds the hidden frame during
+  /* A one-shot entrance, so keyframes. `both` holds the hidden frame through
      the delay; the item keeps its space and takes clicks the whole time. */
   animation: rise-in 300ms var(--ease-out) both;
-  /* 60ms per step, capped at 6 steps: a long list never waits more
-     than 360ms for its last item. */
+  /* Capped at 6 steps: a long list never waits more than 360ms for its last item. */
   animation-delay: calc(min(var(--n, 0), 6) * 60ms);
 }
 
@@ -76,10 +75,8 @@ Stagger this list's entrance.
   }
 }
 
-/* Leaving: the whole list as one, faster, a few pixels up. Never per item:
-   an item still waiting to enter would flash in for a frame. Set
-   data-leaving on the list and remove the list on its transitionend
-   (opacity). */
+/* Leaving: the list as one, never per item, or an item still waiting to enter
+   would flash in. Set data-leaving on the list; remove it on transitionend. */
 .stagger {
   transition: opacity 150ms var(--ease-out), translate 150ms var(--ease-out);
 }
@@ -93,8 +90,7 @@ Stagger this list's entrance.
   animation-play-state: paused;
 }
 
-/* Reduced motion: no stagger, no movement, no blur. Everything fades in
-   together, and the exit only fades. */
+/* Reduced motion: everything fades in together; the exit only fades. */
 @media (prefers-reduced-motion: reduce) {
   .stagger > * {
     animation-name: fade-in;
@@ -121,14 +117,17 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
 export function staggerIn(list) {
   const items = [...list.children]
   items.forEach((el, i) => {
-    const n = Math.min(i, 6)
-    // Reduced motion: no stagger, no movement; every item fades in at once.
+    // Reduced motion: every item fades in at once.
     if (reduced) {
       el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, fill: 'backwards' })
       return
     }
+    const n = Math.min(i, 6)
     el.animate(
-      [{ opacity: 0, transform: 'translateY(8px)', filter: 'blur(2px)' }, { opacity: 1, transform: 'none', filter: 'none' }],
+      [
+        { opacity: 0, transform: 'translateY(8px)', filter: 'blur(2px)' },
+        { opacity: 1, transform: 'none', filter: 'none' },
+      ],
       // backwards: hidden through the delay, then the item's own styles.
       { duration: 300, delay: n * 60, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'backwards' },
     )
@@ -142,15 +141,15 @@ export function staggerIn(list) {
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion/react'
 import type { ReactNode } from 'react'
 
-// 60ms per step, capped at 6 steps. A delayChildren function gets each
-// child's (index, total); stagger(0.06), uncapped; it replaces staggerChildren.
+// A delayChildren function gets each child's (index, total); capped at 6 steps.
+// Shorthand: stagger(0.06), uncapped; it replaces staggerChildren.
 const delayChildren = (i: number) => Math.min(i, 6) * 0.06
 
 const enter: Variants = {
   hidden: { opacity: 0, y: 8, filter: 'blur(2px)' },
   show: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.3, ease: [0.23, 1, 0.32, 1] } },
 }
-// Reduced motion: no stagger, no movement, no blur; all items fade in together.
+// Reduced motion: all items fade in together.
 const fade: Variants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { duration: 0.15 } },

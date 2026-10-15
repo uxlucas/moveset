@@ -49,12 +49,10 @@ Animate this card between two spots with a spring.
 ### CSS
 
 ```css
-/* The spring { type: "spring", duration: 0.5, bounce: 0 }, sampled into
-   linear() with Motion's spring() generator. CSS can only replay it as a
-   fixed curve and keeps no velocity: a transition reversed mid-move starts
-   the curve over toward the other end and flips direction at speed. Fine
-   for moves nothing interrupts; for anything the user can redirect, use
-   the JS or Motion tab. */
+/* { type: "spring", duration: 0.5, bounce: 0 } sampled into linear() with
+   Motion's spring(). A fixed curve keeps no velocity: reversed mid-move it
+   flips direction at speed. For anything the user can redirect, use the JS
+   or Motion tab. */
 :root {
   --spring: linear(
     0, 0.058, 0.18, 0.321, 0.455, 0.573, 0.671, 0.75, 0.812,
@@ -79,7 +77,7 @@ Animate this card between two spots with a spring.
   transition: none;
 }
 
-/* Reduced motion: the card rests at its target at once, no travel. */
+/* Reduced motion: no travel. */
 @media (prefers-reduced-motion: reduce) {
   .card {
     transition: none;
@@ -92,16 +90,15 @@ Animate this card between two spots with a spring.
 ```js
 import { animate, motionValue } from 'motion'
 
-// { type: 'spring', duration: 0.5, bounce: 0 } as physics: the same path. Motion
-// hands each new animation the current velocity, but Motion 14 drops it on
-// duration/bounce (and visualDuration) springs; the physics form keeps it.
+// { type: 'spring', duration: 0.5, bounce: 0 } as physics, the same path: Motion 14
+// drops the current velocity on duration/bounce (and visualDuration) springs;
+// the physics form keeps it.
 const spring = { type: 'spring', stiffness: 341, damping: 36.9, mass: 1 }
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 
-// Its own class, not the CSS tab's .card: a CSS transition on transform
-// would fight the transform written every frame.
+// Not the CSS tab's .card: its transition would fight the transform written every frame.
 const card = document.querySelector('.spring-card')
-// A number Motion can measure velocity on. A transform string has none.
+// A number Motion can measure velocity on; a transform string has none.
 const x = motionValue(0)
 x.on('change', (v) => (card.style.transform = `translateX(${v}px)`))
 let side = 'a'
@@ -110,12 +107,10 @@ card.addEventListener('click', (event) => {
   side = side === 'a' ? 'b' : 'a'
   card.setAttribute('aria-pressed', String(side === 'b'))
   const to = side === 'b' ? 240 : 0
-  // Reduced motion, or a click from the keyboard (Enter or Space report
-  // detail 0): jump to the other spot.
+  // Reduced motion, or a click from the keyboard (detail 0): no travel.
   if (reduced.matches || event.detail === 0) return x.jump(to)
-  // Retargets mid-move from the current position and velocity. The velocity
-  // is passed explicitly so the handoff does not depend on when Motion
-  // samples it. Never wait for the move to end.
+  // Retargets mid-move; the velocity is passed explicitly so the handoff does
+  // not depend on when Motion samples it. Never wait for the move to end.
   animate(x, to, { ...spring, velocity: x.getVelocity() })
 })
 ```
@@ -126,36 +121,33 @@ card.addEventListener('click', (event) => {
 import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useState, type MouseEvent } from 'react'
 
-// { type: 'spring', duration: 0.5, bounce: 0 } as physics: the same path. Motion
-// hands each new animation the current velocity, but Motion 14 drops it on
-// duration/bounce (and visualDuration) springs; the physics form keeps it.
-// For a one-shot move nothing interrupts, transition={{ type: 'spring',
-// duration: 0.5, bounce: 0 }} on a motion.div works as written.
+// { type: 'spring', duration: 0.5, bounce: 0 } as physics, the same path: Motion 14
+// drops the current velocity on duration/bounce (and visualDuration) springs;
+// the physics form keeps it. For a one-shot move nothing interrupts, the
+// duration/bounce form in a transition prop works as written.
 const spring = { type: 'spring', stiffness: 341, damping: 36.9, mass: 1 } as const
 
 export function SpringCard() {
   const [on, setOn] = useState(false)
   const reduced = useReducedMotion()
-  // A number Motion can measure velocity on. A transform string has none.
+  // A number Motion can measure velocity on; a transform string has none.
   const x = useMotionValue(0)
 
   const toggle = (event: MouseEvent) => {
     const to = on ? 0 : 240
     setOn(!on)
-    // Reduced motion, or a click from the keyboard (Enter or Space report
-    // detail 0): jump to the other spot.
+    // Reduced motion, or a click from the keyboard (detail 0): no travel.
     if (reduced || event.detail === 0) return x.jump(to)
-    // Retargets mid-move from the current position and velocity. The velocity
-    // is passed explicitly so the handoff does not depend on when Motion
-    // samples it. Never wait for the move to end.
+    // Retargets mid-move; the velocity is passed explicitly so the handoff does
+    // not depend on when Motion samples it. Never wait for the move to end.
     animate(x, to, { ...spring, velocity: x.getVelocity() })
   }
 
   return (
     <motion.button
       type="button"
-      // Its own class, not the CSS tab's .card: a CSS transition on transform
-      // would fight the transform Motion writes every frame.
+      // Not the CSS tab's .card: its transition would fight the transform Motion
+      // writes every frame.
       className="spring-card"
       aria-pressed={on}
       onClick={toggle}

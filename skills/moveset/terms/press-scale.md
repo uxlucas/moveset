@@ -59,7 +59,7 @@ Give this button press feedback.
    high-frequency controls (toolbars, list rows, 100+ uses a day) add
    data-still: a colour change on press, no scale. */
 .button {
-  position: relative; /* for the hit area below */
+  position: relative;
   transform-origin: center;
   /* On the base rule, not :active, so press and release both glide and a
      release mid-press turns back from where it is. */
@@ -75,15 +75,13 @@ Give this button press feedback.
   height: max(100%, 46px);
   translate: -50% -50%;
 }
-/* :active fires for the pointer and for Space held; Enter clicks on keydown with
-   no press. A press driven from JS (pointer capture, a demo loop) sets
-   data-pressed="true". */
+/* :active fires for the pointer and Space held; Enter clicks on keydown with no
+   press. A press driven from JS (pointer capture, a loop) sets data-pressed="true". */
 .button:not(:disabled):active,
 .button[data-pressed="true"] {
   scale: 0.97; /* Emil ships 0.96 to 0.97; never below 0.95 */
 }
 
-/* The opt-out: feedback by colour, over the same 150ms, and no scale. */
 .button[data-still] {
   transition: background-color var(--duration-1) ease;
 }
@@ -93,8 +91,7 @@ Give this button press feedback.
   background-color: var(--button-pressed);
 }
 
-/* Reduced motion: the pressed scale stays (it is feedback, not motion); the
-   transitions go, the colour one too. */
+/* Reduced motion: the pressed scale stays (feedback, not motion); the transitions go. */
 @media (prefers-reduced-motion: reduce) {
   .button,
   .button[data-still] {
@@ -110,10 +107,10 @@ import { motion, useReducedMotion } from 'motion/react'
 import type { ComponentProps } from 'react'
 
 const ease = [0.23, 1, 0.32, 1] as const
-// The button is its own hit area, at least 46px. It scales with the press
+// The button is its own hit area, 46px so it is still over 44px while pressed
 // (44.6px at 0.97); the layout box never changes.
 const box = { position: 'relative', minBlockSize: 46, minInlineSize: 46, transformOrigin: 'center' } as const
-// The opt-out presses by colour: the resting grey, and one step under it.
+// The opt-out's colours: the resting grey and one step under it.
 const surface = '#f0f0f0'
 const pressed = '#e0e0e0'
 
@@ -129,11 +126,11 @@ export function Button({ still = false, style, ...rest }: Props) {
     <motion.button
       type="button"
       style={{ ...box, backgroundColor: still ? surface : undefined, ...style }}
+      // whileTap covers the pointer and Enter held (not Space, which activates with
+      // no press), and ends on pointerup anywhere or pointercancel.
       // Emil ships 0.96 to 0.97; never below 0.95, which starts to read as cartoon.
       whileTap={still ? { backgroundColor: pressed } : { scale: 0.97 }}
       transition={reduced ? { duration: 0 } : { duration: 0.15, ease }}
-      // whileTap covers the pointer and Enter held (not Space: that key activates
-      // with no press), and ends on pointerup anywhere or pointercancel.
       {...rest}
     />
   )

@@ -296,11 +296,7 @@ const EFFECT = {
   },
 } as const
 
-const HOUSE_RULE = [
-  'House rule: a progress indicator keeps tracking under reduced motion.',
-  'Its position is the information, and it moves only as far as the',
-  'reader scrolls.',
-]
+const HOUSE_RULE = 'House rule: a progress bar keeps tracking under reduced motion; its position is the information.'
 
 function cssCode(v: V): string {
   const bar = v.effect === 'bar'
@@ -315,13 +311,13 @@ function cssCode(v: V): string {
         : ['/* 0: its top reaches the bottom edge. 1: its bottom does. */', 'animation-timeline: view();', 'animation-range: entry;']
   const linkedPage = bar && range === 'page'
   const animated = [
-    '/* Same test as the JS tab, which sets data-fallback when it takes over. */',
     ...(linkedPage
       ? [
-          '/* .is-linked is in the markup; the JS tab takes it off while the page cannot',
-          '   scroll, so the bar empties, and puts it back when it can. */',
+          '/* Same test as the JS tab, which sets data-fallback when it takes over.',
+          '   .is-linked is in the markup; the JS tab drops it while the page cannot',
+          '   scroll, so the bar empties instead of holding its last value. */',
         ]
-      : []),
+      : ['/* Same test as the JS tab, which sets data-fallback when it takes over. */']),
     '@supports (animation-timeline: scroll()) {',
     `  html:not([data-fallback]) ${sel}${linkedPage ? '.is-linked' : ''} {`,
     '    /* The shorthand resets animation-timeline, so it comes first. linear maps',
@@ -368,9 +364,7 @@ function cssCode(v: V): string {
     `  from { ${fx.from}; }`,
     `  to { ${fx.to}; }`,
     '}',
-    ...(bar
-      ? ['', '/* prefers-reduced-motion: no override.', ...HOUSE_RULE.map((l, i) => `   ${l}${i === HOUSE_RULE.length - 1 ? ' */' : ''}`)]
-      : []),
+    ...(bar ? ['', '/* prefers-reduced-motion: no override.', `   ${HOUSE_RULE} */`] : []),
   ].join('\n')
 }
 
@@ -381,7 +375,8 @@ const LINKED_PAGE_JS = [
   '// Markup: <div class="progress is-linked" aria-hidden="true"></div>',
   '// Same test as the CSS @supports, so the two routes never both drive the bar.',
   "const supported = CSS.supports('animation-timeline', 'scroll()')",
-  ...['prefers-reduced-motion: no override.', ...HOUSE_RULE].map((l) => `// ${l}`),
+  '// prefers-reduced-motion: no override.',
+  `// ${HOUSE_RULE}`,
   "const bar = document.querySelector('.progress')",
   '',
   'if (bar) {',
@@ -392,8 +387,8 @@ const LINKED_PAGE_JS = [
   '  const render = () => {',
   '    frame = 0',
   '    const max = root.scrollHeight - root.clientHeight',
-  '    // Both routes: while the page cannot scroll, .is-linked comes off and the',
-  '    // bar empties instead of holding its last value. It goes back on when it can.',
+  '    // Both routes: .is-linked comes off while the page cannot scroll, so the bar',
+  '    // empties instead of holding its last value.',
   "    bar.classList.toggle('is-linked', max > 0)",
   '    if (!supported) bar.style.transform = `scaleX(${max > 0 ? clamp(root.scrollTop / max) : 0})`',
   '  }',
@@ -446,7 +441,7 @@ function jsCode(v: V): string {
     '// Same test as the CSS @supports, so the two routes never both run.',
     "const supported = CSS.supports('animation-timeline', 'scroll()')",
     ...(bar
-      ? ['prefers-reduced-motion: no override.', ...HOUSE_RULE].map((l) => `// ${l}`)
+      ? ['// prefers-reduced-motion: no override.', `// ${HOUSE_RULE}`]
       : ['// Reduced motion: leave the figure in its final state.', "const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches"]),
     `const ${el} = document.querySelector('.${bar ? 'progress' : 'figure'}')`,
     ...(range === 'barSection' ? ["const section = document.querySelector('.marked-section')"] : []),
@@ -483,7 +478,7 @@ function jsCode(v: V): string {
     '',
     `  addEventListener('scroll', ${bar ? 'schedule' : 'onScroll'}, { passive: true })`,
     "  addEventListener('resize', schedule)",
-    '  // Content that loads later (images, embeds) changes the range without a scroll.',
+    '  // Content that loads or goes away changes the range without a scroll.',
     '  new ResizeObserver(schedule).observe(document.body)',
     '  render()',
     '}',
@@ -499,7 +494,8 @@ function motionCode(v: V): string {
       "import { motion, useScroll } from 'motion/react'",
       ...(page ? [] : ["import { useRef, type ReactNode } from 'react'"]),
       '',
-      ...[...HOUSE_RULE.slice(0, 1), 'So there is no useReducedMotion gate here.'].map((l) => `// ${l}`),
+      `// ${HOUSE_RULE}`,
+      '// So there is no useReducedMotion gate.',
       'const barClass =',
       "  'pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5 origin-left bg-current'",
       '',

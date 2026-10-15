@@ -355,7 +355,7 @@ function cssCode(v: V): string {
     '   high-frequency controls (toolbars, list rows, 100+ uses a day) add',
     '   data-still: a colour change on press, no scale. */',
     '.button {',
-    '  position: relative; /* for the hit area below */',
+    '  position: relative;',
     '  transform-origin: center;',
     ...(glide
       ? [
@@ -364,9 +364,8 @@ function cssCode(v: V): string {
           '  transition: scale var(--duration-1) var(--ease-out);',
         ]
       : [
-          '  /* No transition: the common mistake. It jumps to the pressed scale and back.',
-          '     The house ships transition: scale var(--duration-1) var(--ease-out) here,',
-          '     on the base rule, so both ways glide. */',
+          '  /* No transition, the common mistake: it jumps to the pressed scale and back.',
+          '     The house ships transition: scale var(--duration-1) var(--ease-out) here. */',
         ]),
     '}',
     `/* The hit area: ${HIT}px whatever the visual size. It sits inside the button, so it`,
@@ -379,15 +378,13 @@ function cssCode(v: V): string {
     `  height: max(100%, ${HIT}px);`,
     '  translate: -50% -50%;',
     '}',
-    '/* :active fires for the pointer and for Space held; Enter clicks on keydown with',
-    '   no press. A press driven from JS (pointer capture, a demo loop) sets',
-    '   data-pressed="true". */',
+    '/* :active fires for the pointer and Space held; Enter clicks on keydown with no',
+    '   press. A press driven from JS (pointer capture, a loop) sets data-pressed="true". */',
     '.button:not(:disabled):active,',
     '.button[data-pressed="true"] {',
     `  scale: ${v.amount};${v.amount === HOUSE ? ' /* Emil ships 0.96 to 0.97; never below 0.95 */' : v.amount === FLOOR ? ' /* the floor; the house ships 0.97 */' : ' /* cartoon: under the 0.95 floor; the house ships 0.97 */'}`,
     '}',
     '',
-    '/* The opt-out: feedback by colour, over the same 150ms, and no scale. */',
     '.button[data-still] {',
     '  transition: background-color var(--duration-1) ease;',
     '}',
@@ -397,8 +394,7 @@ function cssCode(v: V): string {
     '  background-color: var(--button-pressed);',
     '}',
     '',
-    '/* Reduced motion: the pressed scale stays (it is feedback, not motion); the',
-    '   transitions go, the colour one too. */',
+    '/* Reduced motion: the pressed scale stays (feedback, not motion); the transitions go. */',
     '@media (prefers-reduced-motion: reduce) {',
     '  .button,',
     '  .button[data-still] {',
@@ -415,10 +411,10 @@ function motionCode(v: V): string {
     "import type { ComponentProps } from 'react'",
     '',
     ...(glide ? [`const ease = ${EASE.motion} as const`] : []),
-    `// The button is its own hit area, at least ${HIT}px. It scales with the press`,
+    `// The button is its own hit area, ${HIT}px so it is still over 44px while pressed`,
     `// (${hitPressed(v)}px at ${v.amount}); the layout box never changes.`,
     `const box = { position: 'relative', minBlockSize: ${HIT}, minInlineSize: ${HIT}, transformOrigin: 'center' } as const`,
-    '// The opt-out presses by colour: the resting grey, and one step under it.',
+    "// The opt-out's colours: the resting grey and one step under it.",
     "const surface = '#f0f0f0'",
     `const pressed = '${PRESSED_COLOR}'`,
     '',
@@ -430,11 +426,13 @@ function motionCode(v: V): string {
     'export function Button({ still = false, style, ...rest }: Props) {',
     ...(glide
       ? ['  // Reduced motion: the pressed scale stays (feedback, not motion); the transition goes.', '  const reduced = useReducedMotion()']
-      : ['  // Reduced motion: nothing to drop here. The house build zeroes its transition', '  // with useReducedMotion() and keeps the pressed scale.']),
+      : ['  // Reduced motion: nothing to drop here; the house zeroes its transition with useReducedMotion().']),
     '  return (',
     '    <motion.button',
     '      type="button"',
     '      style={{ ...box, backgroundColor: still ? surface : undefined, ...style }}',
+    '      // whileTap covers the pointer and Enter held (not Space, which activates with',
+    '      // no press), and ends on pointerup anywhere or pointercancel.',
     ...(v.amount === HOUSE
       ? ['      // Emil ships 0.96 to 0.97; never below 0.95, which starts to read as cartoon.']
       : v.amount === FLOOR
@@ -444,13 +442,10 @@ function motionCode(v: V): string {
     ...(glide
       ? [`      transition={reduced ? { duration: 0 } : { duration: ${PRESS_MS / 1000}, ease }}`]
       : [
-          '      // No transition on the scale: the common mistake. It jumps to the pressed',
-          `      // scale and back; the opt-out colour keeps its ${PRESS_MS}ms. The house ships`,
-          `      // { duration: ${PRESS_MS / 1000}, ease } here.`,
+          '      // No transition on the scale, the common mistake: it jumps to the pressed scale',
+          `      // and back. The house ships { duration: ${PRESS_MS / 1000}, ease: ${EASE.motion} } here.`,
           `      transition={{ duration: 0, backgroundColor: { duration: ${PRESS_MS / 1000} } }}`,
         ]),
-    '      // whileTap covers the pointer and Enter held (not Space: that key activates',
-    '      // with no press), and ends on pointerup anywhere or pointercancel.',
     '      {...rest}',
     '    />',
     '  )',

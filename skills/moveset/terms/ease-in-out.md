@@ -54,10 +54,9 @@ Animate a reorder in this row of cards.
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
-/* Fixed slots, like a segmented control knob. Every card is stacked at the
-   row's start and moved by a known offset, so a transition on transform is
-   enough. Copied into a flex row, the offsets would be counted twice.
-   For a DOM reorder, use the FLIP in the JS tab. */
+/* Fixed slots: every card sits at the row's start and is offset by its slot,
+   so a transition on transform is enough. In a flex row the offsets would
+   count twice. For a DOM reorder, use the FLIP in the JS tab. */
 .row {
   position: relative;
   height: 72px; /* the cards are out of flow: give the row their height */
@@ -69,31 +68,33 @@ Animate a reorder in this row of cards.
   top: 0;
   width: 96px;
   --slot: 0;
-  /* A translateX percentage is the card's own width, so one slot is
-     100% + the gap. Never left or margin: they relayout every frame. */
+  /* A translateX percentage is the card's own width, so one slot is 100% +
+     the gap. Never left or margin: they relayout every frame. */
   transform: translateX(calc(var(--slot) * (100% + 8px)));
-  /* Ease-in-out quart, the house --ease-in-out. */
-  /* Accelerates, then brakes, like something with mass. A transition, so
-     a new target mid-flight continues from where the card is. */
+  /* Accelerates, then brakes, like something with mass. A transition, so a
+     new target mid-flight continues from where the card is. */
   transition: transform 300ms var(--ease-in-out);
 }
-.item[data-slot="1"] { --slot: 1; }
-.item[data-slot="2"] { --slot: 2; }
+.item[data-slot="1"] {
+  --slot: 1;
+}
+.item[data-slot="2"] {
+  --slot: 2;
+}
 
-/* Set data-moving on the card that crosses the others when its move starts,
-   and remove it on transitionend: it passes above them. */
+/* Set data-moving on the crossing card when its move starts and remove it on
+   transitionend. Then re-sort the DOM to match the slots (same data-slot, so
+   nothing moves) for Tab order and screen readers; a keyed React reorder
+   mid-move remounts the nodes and kills their transitions. */
 .item[data-moving] {
   z-index: 1;
 }
 
-/* Keep DOM order stable while cards move. After transitionend, re-sort the
-   DOM to match the slots (each card keeps its data-slot, so nothing moves),
-   so Tab order and screen readers follow the screen. A keyed React reorder
-   in the middle of a move remounts nodes and kills their transitions. */
-
 /* Reduced motion: cards jump to their new place. */
 @media (prefers-reduced-motion: reduce) {
-  .item { transition: none; }
+  .item {
+    transition: none;
+  }
 }
 ```
 
@@ -104,13 +105,13 @@ Animate a reorder in this row of cards.
 const EASE = 'cubic-bezier(0.77, 0, 0.175, 1)'
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 
-// FLIP: measure (First), reorder and measure again (Last), offset each card
-// back to where it was (Invert), then animate the offset away (Play).
-// Moving the nodes keeps Tab order and screen readers in step with the screen.
+// FLIP: measure, reorder the nodes and measure again, offset each card back
+// to where it was, then animate the offset away. Moving the nodes keeps Tab
+// order and screen readers in step with the screen.
 export function reorder(list, apply) {
   const items = [...list.children]
-  // Measured with any running transform, so a reorder mid-flight starts
-  // from where each card is on screen, not from its old slot.
+  // Measured with any running transform, so a reorder mid-flight starts from
+  // where each card is on screen.
   const first = new Map(items.map((el) => [el, el.getBoundingClientRect()]))
   items.forEach((el) => el.getAnimations().forEach((a) => a.cancel()))
   apply() // move the nodes
@@ -140,7 +141,7 @@ type Item = { id: string; label: string }
 
 export function Row({ items }: { items: Item[] }) {
   return (
-    // reducedMotion="user": under reduced motion, cards jump to their new place.
+    // Under reduced motion, cards jump to their new place.
     <MotionConfig reducedMotion="user">
       <ul className="row">
         {items.map((item) => (
