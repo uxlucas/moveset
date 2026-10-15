@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { Mail, X } from 'lucide-react'
 import { animate, motionValue, type AnimationPlaybackControls, type MotionValue } from 'motion/react'
 import { useEffect, useRef, type CSSProperties, type MouseEvent, type PointerEvent, type RefObject } from 'react'
 import { scaled } from '@/components/demo/playback'
@@ -132,8 +132,18 @@ function Frame({ size, toastRef }: { size: DemoProps['size']; toastRef: RefObjec
           // No text selection or long-press menu mid-drag.
           className={`flex w-full items-center rounded-lg bg-surface shadow-card ${detail ? 'h-9 gap-2 px-3 touch-pan-y select-none [-webkit-touch-callout:none] cursor-grab data-[dragging=true]:cursor-grabbing' : 'h-6 gap-1.5 px-2'}`}
         >
-          <span className={`shrink-0 rounded-full bg-demo-subject ${detail ? 'size-2' : 'size-1.5'}`} />
-          <span className="h-1.5 w-2/5 rounded-full bg-demo-2" />
+          {/* The entry page's toast is a notification: an icon and a line of text. The card draws it as a dot and a bar. */}
+          {detail ? (
+            <>
+              <Mail size={14} aria-hidden className="shrink-0 text-ink" />
+              <span className="min-w-0 truncate text-[13px] text-ink">New message from Ada</span>
+            </>
+          ) : (
+            <>
+              <span className="size-1.5 shrink-0 rounded-full bg-demo-subject" />
+              <span className="h-1.5 w-2/5 rounded-full bg-demo-2" />
+            </>
+          )}
           {detail ? (
             <button
               type="button"
@@ -761,7 +771,7 @@ export default defineTerm({
   demo: {
     component: SwipeToDismissDemo,
     label:
-      'A toast rests at the bottom of a page frame. It is dragged slowly to a quarter of its width and let go: it springs back. Then it is flicked a short way, fast: it flies off the side on a spring that keeps the speed of the flick, and after a beat a new toast enters and rests. Beside the frame, the rule: past a third of the width or 0.1 pixels per millisecond, on a spring. On the entry page the toast is real: drag it with a mouse or a finger and it follows 1:1, with the distance and speed read out under the frame; let go and it leaves or comes back; the Dismiss button on it does the same exit from the keyboard. With distance only, the flick springs back; with a fixed ease-out, the exit ignores the speed of the flick.',
+      'On the entry page, a notification toast (a mail icon, New message from Ada, and a Dismiss button) rests at the bottom of a page frame. It is dragged slowly to a quarter of its width and let go: it springs back. Then it is flicked a short way, fast: it flies off the side on a spring that keeps the speed of the flick, and after a beat a new toast enters and rests. Beside the frame, the rule: past a third of the width or 0.1 pixels per millisecond, on a spring. The toast is real: drag it with a mouse or a finger and it follows 1:1, with the distance and speed read out under the frame; let go and it leaves or comes back; the Dismiss button on it does the same exit from the keyboard. With distance only, the flick springs back; with a fixed ease-out, the exit ignores the speed of the flick. The index card is a wireframe of the same frame: a dot and a bar on the toast, no text.',
     controls,
     glyph: SwipeToDismissGlyph,
   },

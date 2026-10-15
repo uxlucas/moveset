@@ -73,7 +73,7 @@ for (const { slug, name, subject } of [
 
 test.describe('Enter and Exit', () => {
   const toast = (page: Page) => demo(page, 'enter-and-exit').locator('[data-toast]')
-  const show = (page: Page) => demo(page, 'enter-and-exit').getByRole('button', { name: 'Show toast' })
+  const show = (page: Page) => demo(page, 'enter-and-exit').getByRole('button', { name: 'Send' })
   const dismiss = (page: Page) => demo(page, 'enter-and-exit').getByRole('button', { name: 'Dismiss toast' })
   const exitLabel = (page: Page) => demo(page, 'enter-and-exit').locator('[data-exit-label]')
   const enterLabel = (page: Page) => demo(page, 'enter-and-exit').locator('[data-enter-label]')
@@ -162,7 +162,7 @@ test.describe('Enter and Exit', () => {
     }
   })
 
-  test('Dismiss plays the quiet exit and takes the stage; Show toast plays the enter from the travel', async ({ page }) => {
+  test('Dismiss plays the quiet exit and takes the stage; Send plays the enter from the travel', async ({ page }) => {
     await page.goto('/terms/enter-and-exit')
     await settled(page)
     await startRecording(toast(page), 700)
@@ -261,7 +261,7 @@ test.describe('Enter and Exit', () => {
     expect(Math.max(...rec.map((f) => ty(f.m)))).toBeLessThanOrEqual(4.5)
   })
 
-  test('from the keyboard, Enter on Dismiss plays the exit and hands focus to Show toast; Space on Show toast plays the enter', async ({ page, isMobile }) => {
+  test('from the keyboard, Enter on Dismiss plays the exit and hands focus to Send; Space on Send plays the enter', async ({ page, isMobile }) => {
     test.skip(isMobile, 'keyboard')
     await page.goto('/terms/enter-and-exit')
     await settled(page)

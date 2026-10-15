@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { Check, Send, X } from 'lucide-react'
 import { useRef, type CSSProperties, type MouseEvent, type TransitionEvent } from 'react'
 import { scaled } from '@/components/demo/playback'
 import { snap, useCycle } from '@/components/demo/use-cycle'
@@ -60,22 +60,36 @@ function exitOf(v: V): { ms: number; px: number } {
 const TOAST =
   'invisible opacity-0 transition-[opacity,transform,visibility] duration-(--x) ease-(--ease-out) [transform:translateY(var(--c))] data-[state=closed]:[transform:translateY(var(--t))] data-[state=closed]:duration-0 data-[state=open]:visible data-[state=open]:opacity-100 data-[state=open]:duration-(--d) data-[state=open]:[transform:none] group-data-[snap=true]/stage:transition-none motion-reduce:group-data-[taken-over=true]/stage:[--c:0px] motion-reduce:group-data-[taken-over=true]/stage:[--t:0px]'
 
+// The entry page's frame is a message being sent: a draft with its recipient and a Send button, and the toast that
+// confirms it. The card is a wireframe of the same layout: two bars and a pill, a dot and a bar on the toast.
 function Frame({ size }: { size: DemoProps['size'] }) {
   const detail = size === 'detail'
-  const trigger = `inline-flex items-center rounded-md bg-surface font-mono text-ink shadow-card ${detail ? 'h-7 px-2.5 text-[11px]' : 'h-5 px-1.5 text-[9px]'}`
   return (
     <div data-toast-frame="" className={`relative w-full overflow-hidden rounded-lg bg-demo ${detail ? 'h-44 sm:h-56' : 'h-[112px]'}`}>
-      {/* The page: an action that shows the toast, and some copy. On the entry page the action is a real button. */}
-      <div className={`absolute inset-x-0 top-0 flex flex-col items-start ${detail ? 'gap-3 p-3' : 'gap-2 p-2'}`}>
+      {/* The page: the action that shows the toast, and what it acts on. On the entry page the action is a real button. */}
+      <div className={`absolute inset-x-0 top-0 flex flex-col items-start ${detail ? 'gap-2 p-3' : 'gap-2 p-2'}`}>
         {detail ? (
-          <button type="button" data-toast-trigger="" className={`${trigger} press hit cursor-pointer`}>
-            Show toast
-          </button>
+          <>
+            <span className="text-[12px] text-ink-muted">To: Ada Lovelace</span>
+            <span className="text-[13px] text-ink">Thanks, see you at 10.</span>
+            <button
+              type="button"
+              data-toast-trigger=""
+              className="press hit mt-1 inline-flex h-8 cursor-pointer items-center gap-2 rounded-full bg-demo-subject px-3.5 text-[13px] font-medium text-surface shadow-card"
+            >
+              <Send size={14} aria-hidden />
+              Send
+            </button>
+          </>
         ) : (
-          <span className={trigger}>Show toast</span>
+          <>
+            <span className="h-1.5 w-1/3 rounded-full bg-demo-2" />
+            <span className="h-1.5 w-2/3 rounded-full bg-demo-2" />
+            <span className="mt-0.5 inline-flex h-5 w-12 items-center justify-center rounded-full bg-demo-subject">
+              <span className="h-1.5 w-6 rounded-full bg-surface" />
+            </span>
+          </>
         )}
-        <span className="h-1.5 w-2/3 rounded-full bg-demo-2" />
-        <span className="h-1.5 w-1/2 rounded-full bg-demo-2" />
       </div>
       {/* The toast, resting in place: the still frame, so the first paint shows no entrance. Centred by margins, never
           by a transform, which the enter and exit own. */}
@@ -84,8 +98,17 @@ function Frame({ size }: { size: DemoProps['size'] }) {
         data-state="open"
         className={`${TOAST} absolute inset-x-0 mx-auto flex items-center rounded-lg bg-surface shadow-card ${detail ? 'bottom-3 h-9 w-[min(220px,calc(100%-24px))] gap-2 px-3' : 'bottom-2 h-6 w-[min(140px,calc(100%-16px))] gap-1.5 px-2'}`}
       >
-        <span className={`shrink-0 rounded-full bg-demo-subject ${detail ? 'size-2' : 'size-1.5'}`} />
-        <span className="h-1.5 w-2/5 rounded-full bg-demo-2" />
+        {detail ? (
+          <>
+            <Check size={14} aria-hidden className="shrink-0 text-ink" />
+            <span className="min-w-0 truncate text-[13px] text-ink">Message sent</span>
+          </>
+        ) : (
+          <>
+            <span className="size-1.5 shrink-0 rounded-full bg-demo-subject" />
+            <span className="h-1.5 w-2/5 rounded-full bg-demo-2" />
+          </>
+        )}
         {detail ? (
           <button
             type="button"
@@ -436,7 +459,7 @@ export default defineTerm({
   demo: {
     component: EnterAndExitDemo,
     label:
-      'A toast rests at the bottom edge of a page frame. It fades out with a nudge of a few pixels toward the edge, quick and quiet; a beat later it enters again: it fades in while rising 16px into place over 200ms, then holds. Beside the frame, the two sets of numbers: the enter and the exit. On the entry page a Show toast button in the frame plays the enter and the Dismiss button on the toast plays the exit. With the Mirrored exit the toast slides the full 16px back down at the enter duration; with None it disappears in one frame.',
+      'On the entry page, a message draft (To: Ada Lovelace, a line of text) sits over a Send button, and a Message sent toast with a check and a Dismiss button rests at the bottom edge of the frame. The toast fades out with a nudge of a few pixels toward the edge, quick and quiet; a beat later it enters again: it fades in while rising 16px into place over 200ms, then holds. Beside the frame, the two sets of numbers: the enter and the exit. Pressing Send plays the enter and the Dismiss button on the toast plays the exit. With the Mirrored exit the toast slides the full 16px back down at the enter duration; with None it disappears in one frame. The index card is a wireframe of the same frame: bars and a pill for the draft, a dot and a bar on the toast, no text.',
     controls,
     glyph: EnterAndExitGlyph,
   },
