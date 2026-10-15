@@ -1,6 +1,7 @@
 import { ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import { CopyButton } from '@/components/copy-button'
+import { Mark } from '@/components/site/mark'
 import { AUTHOR_NAME, AUTHOR_URL, REPO, REPO_URL, SKILL_COMMAND } from '@/lib/site'
 
 // The command's first word ("npx") is the one accented token in the install block.
@@ -17,6 +18,7 @@ export function Intro() {
       <p className="mt-4 leading-relaxed text-ink-muted">
         Brought to you by{' '}
         <a href={AUTHOR_URL} className="link text-ink">
+          <Mark size={13} className="mr-1.5 inline-block align-[-1px]" />
           {AUTHOR_NAME}
         </a>
         . I started it because I kept describing motion to agents as “that thing where…” and getting back something

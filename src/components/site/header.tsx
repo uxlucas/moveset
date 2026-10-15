@@ -1,12 +1,10 @@
-import Link from 'next/link'
+import { Logo } from './mark'
 import { ThemeToggle } from './theme-toggle'
 
 export function Header() {
   return (
     <header className="flex items-center justify-between px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-      <Link href="/" className="text-[15px] font-medium tracking-[-0.01em] text-ink">
-        moveset
-      </Link>
+      <Logo />
       <ThemeToggle />
     </header>
   )
