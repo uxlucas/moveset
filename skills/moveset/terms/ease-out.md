@@ -51,8 +51,7 @@ Animate this menu open and closed.
 ### CSS
 
 ```css
-/* Ease-out: fast start, long settle. The fast start is the feedback: the
-   menu visibly answers the click in the first frames. */
+/* The house ease-out: the fast start is the feedback, the long settle is the rest. */
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -64,21 +63,20 @@ Animate this menu open and closed.
   position: relative;
 }
 
-/* Stays mounted while closed so it can animate out; inert keeps it out of
-   the tab order and the accessibility tree. */
+/* Stays mounted while closed so it can animate out; inert hides it meanwhile. */
 .menu {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  /* Grow out of the trigger, not the center. With Radix:
-     var(--radix-popper-transform-origin); Base UI: var(--transform-origin). */
+  /* Grow out of the trigger. Radix: var(--radix-popper-transform-origin);
+     Base UI: var(--transform-origin). */
   transform-origin: top left;
   opacity: 0;
   transform: scale(0.95); /* a visible shape from the first frame, never 0 */
   pointer-events: none;
   transition-property: opacity, transform;
-  /* A transition takes the duration of the state it is heading to: this
-     closed rule holds the close, [data-open] holds the open. */
+  /* A transition takes the duration of the state it heads to: this closed
+     rule times the close, [data-open] the open. */
   transition-duration: 150ms; /* close: about 25% faster */
   transition-timing-function: var(--ease-out);
 }
@@ -88,10 +86,10 @@ Animate this menu open and closed.
   opacity: 1;
   transform: none;
   pointer-events: auto;
-  transition-duration: 200ms; /* open */
+  transition-duration: 200ms;
 }
 
-/* Reduced motion: fade only, no change in size. */
+/* Reduced motion: fade only. */
 @media (prefers-reduced-motion: reduce) {
   .menu,
   .menu[data-open] {
@@ -106,31 +104,29 @@ Animate this menu open and closed.
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react'
 import type { ReactNode } from 'react'
 
-// Ease-out quint, the house --ease-out: [0.23, 1, 0.32, 1].
+// Ease-out quint, the house --ease-out.
 // Render it inside a position: relative wrapper with the trigger.
 export function Menu({ open, children }: { open: boolean; children: ReactNode }) {
   return <AnimatePresence>{open && <MenuPanel>{children}</MenuPanel>}</AnimatePresence>
 }
 
 function MenuPanel({ children }: { children: ReactNode }) {
-  // false while the exit plays: the closing menu takes no clicks and is
-  // hidden from screen readers until it unmounts.
+  // false while the exit plays: the closing menu takes no clicks and is hidden
+  // from screen readers.
   const present = useIsPresent()
   // Reduced motion: fade only.
   const from = useReducedMotion() ? 1 : 0.95
   return (
     <motion.div
-      // Its own class, not the CSS tab's .menu: that one carries a CSS transition
-      // that would fight the transform Motion writes every frame. .menu-panel only
-      // places it: absolutely, 4px below the trigger, left-aligned.
+      // Not the CSS tab's .menu: its transition would fight the transform Motion
+      // writes every frame. .menu-panel only positions the panel below the trigger.
       className="menu-panel"
       aria-hidden={present ? undefined : true}
-      // Grow out of the trigger. Motion drives the scale, so the origin goes here.
+      // Grow out of the trigger.
       style={{ transformOrigin: 'top left', pointerEvents: present ? 'auto' : 'none' }}
       initial={{ opacity: 0, scale: from }}
       animate={{ opacity: 1, scale: 1, transition: { duration: 0.2, ease: [0.23, 1, 0.32, 1] } }}
-      // Closing runs about 25% faster. Reopened mid-exit, it animates back
-      // from its current values instead of restarting.
+      // Closing runs about 25% faster; reopened mid-exit, it comes back from where it is.
       exit={{ opacity: 0, scale: from, transition: { duration: 0.15, ease: [0.23, 1, 0.32, 1] } }}
     >
       {children}

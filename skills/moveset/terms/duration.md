@@ -54,7 +54,7 @@ Time this dropdown.
 
 ```css
 /* Durations by kind of element. Product UI stays at or under --duration-4;
-   only page-level transitions go further, to 400ms at most. */
+   only page-level transitions go past it, to 400ms at most. */
 :root {
   --duration-1: 150ms; /* hover, press, color; tooltips */
   --duration-2: 200ms; /* menus, dropdowns, popovers */
@@ -63,8 +63,8 @@ Time this dropdown.
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* Hover and press: the short end, and only color and scale. Color on ease,
-   the press scale on --ease-out; both the same length each way. */
+/* Hover and press: --duration-1 each way; color on ease, the press scale on
+   --ease-out. */
 .button {
   transition-property: background-color, scale;
   transition-duration: var(--duration-1);
@@ -79,8 +79,8 @@ Time this dropdown.
   scale: 0.97;
 }
 
-/* The dropdown. A transition takes the duration of the state it heads
-   to: this closed rule times the close, [data-open] the open. To open, set
+/* The dropdown. A transition takes the duration of the state it heads to:
+   this closed rule times the close, [data-open] the open. To open, set
    data-open and remove inert; to close, the reverse. */
 .dropdown {
   transform-origin: top left; /* grow out of the trigger */
@@ -93,7 +93,7 @@ Time this dropdown.
 .dropdown[data-open] {
   opacity: 1;
   transform: none;
-  transition-duration: var(--duration-2); /* open: 200ms */
+  transition-duration: var(--duration-2);
 }
 
 /* Arrow keys move the highlight: no transition, ever. */
@@ -119,8 +119,8 @@ Time this dropdown.
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import type { ReactNode } from 'react'
 
-// Seconds by kind: hover and press 0.15, tooltip 0.15, dropdown 0.2, dialog
-// and toast 0.25, sheet 0.3. Page-level transitions only: up to 0.4.
+// Seconds by kind: hover, press and tooltip 0.15, dropdown 0.2, dialog and
+// toast 0.25, sheet 0.3; only page-level transitions go past that, to 0.4.
 // Exits run at 0.75 × the enter.
 export function Dropdown({ open, children }: { open: boolean; children: ReactNode }) {
   // Reduced motion: no scale, a fade over the same durations.

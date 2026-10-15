@@ -306,36 +306,23 @@ function cssCode(v: V): string {
     '}',
     '',
     '/* Markup: <div class="toast" data-state="closed">…<button>Dismiss</button></div>.',
-    '   Kept mounted, not display + @starting-style: that also plays on first paint.',
-    '   Show: data-state="open". Dismiss: data-state="closing",',
+    '   Kept mounted rather than display + @starting-style, which also plays on',
+    '   first paint. Show: data-state="open". Dismiss: data-state="closing",',
     ...(none
       ? ['   which here is the same as "closed": no exit transition.']
       : [
-          '   and on its own transitionend (event.target the toast, propertyName',
-          '   "opacity") data-state="closed", the enter origin, so the next show',
-          `   starts from ${t}px below.`,
+          '   then data-state="closed" on its own transitionend (event.target the toast,',
+          `   propertyName "opacity"), the enter origin, so the next show starts from ${t}px below.`,
         ]),
     '   Focus inside the toast: trigger.focus({ preventScroll: true }) before',
     '   closing, or it drops to body. */',
     '.toast {',
     ...(none
-      ? ['  /* Gone in the next frame. The house ships a 150ms fade, 4px toward the', '     edge: see the Quiet exit. */', '  opacity: 0;', `  transform: translateY(${t}px);`, '  visibility: hidden;', '  transition-property: opacity, transform, visibility;', '  transition-duration: 0ms;']
+      ? ['  /* Gone in the next frame. The house ships a 150ms fade, 4px toward the edge. */', '  opacity: 0;', `  transform: translateY(${t}px);`, '  visibility: hidden;', '  transition-property: opacity, transform, visibility;', '  transition-duration: 0ms;']
       : [
-          ...(v.exit === 'mirrored'
-            ? [
-                '  /* The exit target: faded, slid the full travel back to the bottom edge, and',
-                '     out of the tab order once the transition ends. visibility is transitioned',
-                '     too, so the toast stays visible for the whole exit. A transition takes',
-                '     the duration of the state it heads to: this rule times the exit, the',
-                '     open rule the enter. */',
-              ]
-            : [
-                '  /* The exit target: faded, nudged toward the bottom edge, and out of the',
-                '     tab order once the transition ends. visibility is transitioned too, so',
-                '     the toast stays visible for the whole exit. A transition takes the',
-                '     duration of the state it heads to: this rule times the exit, the open',
-                '     rule the enter. */',
-              ]),
+          '  /* The base rule is the exit target, so it times the exit (a transition takes',
+          '     the duration of the state it heads to). visibility is transitioned too,',
+          '     so the toast is hidden from the tab order only once the exit ends. */',
           '  opacity: 0;',
           `  transform: translateY(${x.px}px);`,
           '  visibility: hidden;',
@@ -347,8 +334,8 @@ function cssCode(v: V): string {
     ...(v.exit === 'quiet'
       ? [
           '.toast[data-state="closed"] {',
-          `  /* The enter origin: ${t}px below its spot, where the exit nudges toward. In`,
-          '     no time, so a show right after the exit starts from the full travel. */',
+          '  /* The enter origin, reached in no time, so a show right after the exit',
+          '     starts from the full travel. */',
           `  transform: translateY(${t}px);`,
           '  transition-duration: 0ms;',
           '}',
@@ -356,8 +343,7 @@ function cssCode(v: V): string {
       : v.exit === 'mirrored'
         ? [
             '.toast[data-state="closed"] {',
-            "  /* Same values as the exit's end; 0ms only so it matches the Quiet route,",
-            '     where closed is reached in no time. */',
+            "  /* Already at the exit's end; 0ms so closed is reached in no time on every route. */",
             '  transition-duration: 0ms;',
             '}',
           ]
@@ -366,7 +352,7 @@ function cssCode(v: V): string {
     '  opacity: 1;',
     '  transform: none;',
     '  visibility: visible;',
-    `  transition-duration: var(--duration-2); /* enter: ${ENTER_MS}ms */`,
+    '  transition-duration: var(--duration-2);',
     '}',
     '',
     '/* Reduced motion: a fade over the same durations, no travel. */',
@@ -384,11 +370,11 @@ function motionCode(v: V): string {
   const x = exitOf(v)
   const exit =
     v.exit === 'none'
-      ? ['          // No exit: gone in the next frame. The house ships { opacity: 0, y: 4 }', '          // over 0.15s, 0.75 × the enter.', '          exit={{ opacity: 0, transition: { duration: 0 } }}']
+      ? ['          // No exit: gone in the next frame. The house ships { opacity: 0, y: 4 } over 0.15s, 0.75 × the enter.', '          exit={{ opacity: 0, transition: { duration: 0 } }}']
       : [
           v.exit === 'mirrored'
-            ? "          // The enter's duration and travel, back on the same curve. The house ships y: 4 over 0.15s, 0.75 × the enter."
-            : '          // Quieter and faster: a few pixels toward the edge it came from, 0.75 × the enter.',
+            ? "          // The enter's duration and travel, back. The house ships y: 4 over 0.15s, 0.75 × the enter."
+            : '          // Exits are quieter: a few pixels toward the edge it came from, 0.75 × the enter.',
           `          exit={{ opacity: 0, y: y(${x.px}), transition: { duration: ${s(x.ms)}, ease } }}`,
         ]
   return [
@@ -404,8 +390,7 @@ function motionCode(v: V): string {
     '  const reduced = useReducedMotion()',
     '  const y = (px: number) => (reduced ? 0 : px)',
     '  return (',
-    '    // initial={false}: a toast open at first paint is painted in place, with no',
-    '    // entrance. It unmounts once the exit has played.',
+    '    // initial={false}: a toast open at first paint gets no entrance.',
     '    <AnimatePresence initial={false}>',
     '      {open && (',
     '        <motion.div',
@@ -416,7 +401,7 @@ function motionCode(v: V): string {
     ...exit,
     '        >',
     '          {children}',
-    '          {/* Focus goes back to the trigger before the exit, or it drops to body when the toast unmounts. */}',
+    '          {/* Focus goes back to the trigger first, or it drops to body when the toast unmounts. */}',
     '          <button',
     '            type="button"',
     '            onClick={() => {',

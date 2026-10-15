@@ -68,11 +68,10 @@ Add parallax to this page's top hero.
   position: absolute;
   inset: 0; /* the hero's height, so 100% in the keyframes is the hero too */
   pointer-events: none;
-  will-change: transform; /* set here once, never toggled */
+  will-change: transform;
 }
 
-/* Speed ratio: the layer moves ratio x the scroll. Set only here;
-   the JS tab reads it back. */
+/* Speed ratio: the layer moves ratio x the scroll. Set only here; the JS tab reads it. */
 .layer-back { --ratio: 0.4; }
 
 /* In front, at full speed. Opaque, so it slides over the layers. */
@@ -81,8 +80,7 @@ Add parallax to this page's top hero.
   background: var(--surface, #fff);
 }
 
-/* House rule: parallax drops the speed difference under reduced motion.
-   Every layer moves with the content: no animation at all. */
+/* House rule: parallax drops the speed difference under reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
   /* Same test as the JS tab, which sets data-fallback when it takes over. */
   @supports (animation-timeline: scroll()) {
@@ -136,8 +134,7 @@ if (hero && !supported) {
     if (!frame) frame = requestAnimationFrame(render)
   }
 
-  // Armed while motion is allowed; flat (no listeners, no transform) while
-  // reduced motion is on. Follows the setting live.
+  // Follows the setting live: listeners and transforms only while motion is allowed.
   const arm = () => {
     if (reduce.matches) {
       removeEventListener('scroll', schedule)
@@ -164,8 +161,7 @@ import { useRef, type ReactNode } from 'react'
 
 // Speed ratios: a layer moves ratio x the scroll; the content moves 1x.
 const BACK = 0.4
-// The layer scrolls with the hero; pushing it down (1 - ratio) of its height,
-// which is the hero's, leaves it moving ratio x the scroll on screen.
+// Pushing a layer down (1 - ratio) of the hero's height leaves it moving ratio x the scroll.
 const shift = (ratio: number) => `${(1 - ratio) * 100}%`
 const layer = 'pointer-events-none absolute inset-0 will-change-transform'
 

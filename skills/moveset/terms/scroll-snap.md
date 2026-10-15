@@ -86,8 +86,8 @@ body {
 /* Nested scroller only: the page behind stays put at either end.
    .snap { overscroll-behavior-y: contain; } */
 
-/* Snapping is where scrolling comes to rest, not an animation, so it stays
-   under reduced motion. Only the glide between panels goes. */
+/* Snapping stays under reduced motion: it is where scrolling rests, not an
+   animation. Only the glide (scroll-behavior: smooth, where set) goes. */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
@@ -114,14 +114,11 @@ function show(i) {
 
 function go(i) {
   const target = Math.min(Math.max(i, 0), panels.length - 1)
-  // Step from the target, not the panel on screen, so a quick double click
-  // moves two panels.
+  // From the target, not the panel on screen, so a quick double click moves two.
   show(target)
-  // block matches scroll-snap-align; scrollIntoView respects scroll-padding.
-  // Snapping stays under reduced motion; only the glide goes.
-  // Nested scroller: scrollIntoView would scroll the page too. Call
-  // scroller.scrollTo with the panel's offsetTop minus the scroller's
-  // padding-top instead (the scroller is position: relative).
+  // scrollIntoView respects scroll-padding. Under reduced motion the glide goes; the snap stays.
+  // Nested scroller: this would scroll the page too. Use scroller.scrollTo with the panel's
+  // offsetTop minus the scroller's padding-top (the scroller is position: relative).
   panels[target].scrollIntoView({ block: 'start', behavior: reduce.matches ? 'instant' : 'smooth' })
 }
 
@@ -137,8 +134,7 @@ next.addEventListener('click', () => go(current + 1))
 
 if ('onscrollsnapchange' in window) {
   // Chromium 129+: fires when a scroll comes to rest on a different snap target.
-  // The page fires it on document; a nested scroller fires it on itself, so
-  // listen on the scroller there.
+  // A nested scroller fires it on itself, not on document: listen there.
   // The target is null when a scroll rests between two panels (proximity).
   document.addEventListener('scrollsnapchange', (e) => {
     show(e.snapTargetBlock ? panels.indexOf(e.snapTargetBlock) : nearest())

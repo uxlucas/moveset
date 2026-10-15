@@ -190,20 +190,18 @@ function cssCode(v: V): string {
           const rows: string[] = []
           for (let i = 0; i < points.length; i += 10) rows.push(`    ${points.slice(i, i + 10).join(', ')}${i + 10 < points.length ? ',' : ''}`)
           return [
-            `  /* The spring { type: "spring", duration: ${s(ENTER_MS)}, bounce: ${a.bounce} }, sampled`,
-            `     into linear() with Motion's spring() generator: ${a.bounce === 0 ? 'it never passes the target' : `about ${a.springPeak}% past, then settled`}. */`,
+            `  /* { type: "spring", duration: ${s(ENTER_MS)}, bounce: ${a.bounce} }, sampled into linear() with`,
+            `     Motion's spring() generator: ${a.bounce === 0 ? 'it never passes the target' : `about ${a.springPeak}% past the target`}. */`,
             '  --arrive: linear(',
             ...rows,
             '  );',
           ]
         })()
       : v.amount === '0'
-        ? ['  --arrive: cubic-bezier(0.23, 1, 0.32, 1); /* no overshoot */']
+        ? ['  --arrive: cubic-bezier(0.23, 1, 0.32, 1); /* no overshoot: plain ease-out */']
         : [
-            `  /* A back curve: y1 above 1 carries it ${v.amount}% of the travel past the`,
-            '     target before it settles. 3% is cubic-bezier(0.34, 1.3, 0.64, 1), 8%',
-            '     (0.34, 1.5, 0.64, 1), 15% (0.34, 1.72, 0.64, 1). The common easeOutBack,',
-            '     (0.34, 1.56, 0.64, 1), goes about 10% past. */',
+            `  /* y1 above 1 is the overshoot: about ${v.amount}% of the travel past the target.`,
+            '     The common easeOutBack, (0.34, 1.56, 0.64, 1), goes about 10% past. */',
             `  --arrive: ${bezier(v.amount).css};`,
           ]
   return [
@@ -212,14 +210,13 @@ function cssCode(v: V): string {
     ...arrival,
     '}',
     '',
-    '/* Markup: <button class="chip" aria-pressed="false">…</button>. On click,',
-    '   toggle data-placed and aria-pressed. A curve with y above 1 would push',
-    '   any property past its end, so keep it on transform: opacity clamps at 1',
-    '   (the fade just ends early), and layout properties relayout every frame. */',
+    '/* Markup: <button class="chip" aria-pressed="false">…</button>; a click',
+    '   toggles data-placed and aria-pressed. Transform only: a curve past 1 pushes',
+    '   any property past its end (opacity clamps at 1, layout relayouts every frame). */',
     '.chip {',
     '  transition-property: transform;',
-    '  /* A transition takes the timing of the state it heads to. Going home:',
-    `     plain ease-out, ${RETURN_MS}ms, no overshoot. */`,
+    '  /* The base rule times the return (a transition takes the timing of the state',
+    '     it heads to): plain and faster, since overshoot marks an arrival. */',
     `  transition-duration: ${RETURN_MS}ms;`,
     '  transition-timing-function: var(--ease-out);',
     '}',
@@ -229,16 +226,15 @@ function cssCode(v: V): string {
     '  transition-timing-function: var(--arrive);',
     '}',
     ...(v.compare === 'plain'
-      ? ['', '/* Comparison only: the twin arrives on plain ease-out and stops at the', '   target without passing it. */', '.chip.compare[data-placed] {', '  transition-timing-function: var(--ease-out);', '}']
+      ? ['', '/* Comparison only: the twin arrives on plain ease-out and never passes the target. */', '.chip.compare[data-placed] {', '  transition-timing-function: var(--ease-out);', '}']
       : []),
     '',
-    '/* A click from the keyboard lands at once: in the click handler, set',
-    '   data-instant when event.detail === 0 (Enter or Space), remove it otherwise. */',
+    '/* Keyboard clicks land at once: set data-instant when event.detail === 0 (Enter or Space). */',
     '.chip[data-instant] {',
     '  transition-property: none;',
     '}',
     '',
-    '/* Reduced motion: no overshoot and no travel; it is in place at once. */',
+    '/* Reduced motion: in place at once, no travel and no overshoot. */',
     '@media (prefers-reduced-motion: reduce) {',
     '  .chip {',
     '    transition-property: none;',
@@ -257,9 +253,9 @@ function motionCode(v: V): string {
     "import { motion, useReducedMotion } from 'motion/react'",
     "import { useState, type MouseEvent } from 'react'",
     '',
-    `// Arriving: ${v.amount === '0' ? 'no overshoot' : `about ${v.source === 'spring' ? a.springPeak : v.amount}% of the travel past the target, then settled`}.`,
+    `// Arriving: ${v.amount === '0' ? 'no overshoot' : `about ${v.source === 'spring' ? a.springPeak : v.amount}% of the travel past the target`}.`,
     `const arrive = ${arrive}`,
-    '// Going home: plain ease-out, faster, no overshoot.',
+    '// Going home: plain ease-out and faster, since overshoot marks an arrival.',
     `const leave = { duration: ${s(RETURN_MS)}, ease: [0.23, 1, 0.32, 1] } as const`,
     ...(v.compare === 'plain'
       ? [`// Comparison only: the twin arrives on { duration: ${s(ENTER_MS)}, ease: [0.23, 1, 0.32, 1] }.`]
@@ -279,15 +275,15 @@ function motionCode(v: V): string {
     '  return (',
     '    <motion.button',
     '      type="button"',
-    '      className="overshoot-chip"',
+    '      className="chip"',
     '      aria-pressed={placed}',
     '      onClick={toggle}',
-    '      // No animation on mount: it starts where it is.',
+    '      // initial={false}: no animation on mount.',
     '      initial={false}',
-    '      // x is transform only. Never animate opacity or a layout property on this curve.',
+    '      // x only: opacity clamps at 1 and layout relayouts, so neither takes this curve.',
     `      animate={{ x: placed ? ${TRAVEL} : 0 }}`,
-    '      // Reduced motion or a keyboard click: no animated travel. Chosen in the same',
-    '      // render as x, so the move never runs on the previous transition.',
+    '      // Reduced motion or a keyboard click: no travel. Chosen in the same render',
+    '      // as x, so the move never runs on the previous transition.',
     '      transition={reduced || instant ? { duration: 0 } : placed ? arrive : leave}',
     '    />',
     '  )',

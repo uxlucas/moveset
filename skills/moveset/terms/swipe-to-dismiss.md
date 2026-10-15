@@ -56,15 +56,14 @@ import { animate, motionValue } from 'motion'
 // Markup: <div role="status"><div class="toast">…<button class="dismiss">Dismiss
 // </button></div></div>, shown by <button class="show-toast">. The toast spans
 // its container less an inset, so its own width plus a margin takes it clear.
-// No CSS transition on .toast: the transform is written here.
+// No CSS transition on .toast: the transform is written here, 1:1 with the pointer.
 const DISTANCE = 1 / 3 // of the toast's width, the house number (Sonner 45px, Vaul 25%)
-const VELOCITY = 0.1 // px/ms: Emil's ~0.1px/ms, here read over the last 100ms
-const WINDOW = 100 // ms of movement the velocity is read over
+const VELOCITY = 0.1 // px/ms, Emil's number
+const WINDOW = 100 // ms the velocity is read over
 const SPAN = 8 // ms: samples closer than this read as no velocity
 const EDGE = 16 // px past the width, so a shadow clears too
-// { type: "spring", duration: 0.3, bounce: 0 } and { type: "spring", duration: 0.5, bounce: 0 } as physics: the same
-// curves, and they take the release velocity, which Motion 14 drops on
-// duration/bounce springs.
+// { duration: 0.3, bounce: 0 } out and { duration: 0.5, bounce: 0 } back, as physics:
+// Motion 14 drops the release velocity on duration/bounce springs.
 const exit = { type: 'spring', stiffness: 947, damping: 61.6, mass: 1 }
 const back = { type: 'spring', stiffness: 341, damping: 36.9, mass: 1 }
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
@@ -75,7 +74,6 @@ const opener = document.querySelector('.show-toast')
 // selected mid-drag.
 toast.style.touchAction = 'pan-y'
 toast.style.userSelect = 'none'
-// A number Motion can animate from; its change handler writes the transform.
 const x = motionValue(0)
 x.on('change', (v) => (toast.style.transform = `translateX(${v}px)`))
 let drag = null // { pointerId, startX, base, samples: [{ t, x }] }
@@ -89,13 +87,12 @@ toast.addEventListener('pointerdown', (e) => {
 
 toast.addEventListener('pointermove', (e) => {
   if (!drag || e.pointerId !== drag.pointerId) return
-  const px = drag.base + e.clientX - drag.startX // 1:1 with the pointer
+  const px = drag.base + e.clientX - drag.startX
   x.set(px)
   drag.samples.push({ t: e.timeStamp, x: px }) // the event's clock, not the handler's
 })
 
-// Velocity in px/ms over the last WINDOW ms of movement; a drag that stopped
-// before the release has none, and samples under SPAN apart read as none too.
+// px/ms over the last WINDOW ms, so a drag that stopped before the release has none.
 function velocityOf(samples, now) {
   const recent = samples.filter((s) => s.t >= now - WINDOW)
   if (recent.length < 2) return 0
@@ -104,8 +101,7 @@ function velocityOf(samples, now) {
   return b.t - a.t < SPAN ? 0 : (b.x - a.x) / (b.t - a.t)
 }
 
-// Past a third of the width, or flicked faster than VELOCITY in the direction of
-// the drag: off toward the sign of x. Otherwise back.
+// A flick counts only in the drag's direction: a fast move back toward rest goes back.
 function leave(px, v, width) {
   const side = Math.sign(px)
   const fast = Math.abs(v) >= VELOCITY && Math.sign(v) === side
@@ -134,8 +130,7 @@ const end = (e) => {
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) toast.addEventListener(type, end)
 
 // The non-gesture way out: the same exit, to the right, with no speed. Focus
-// inside the toast goes back to the opener (or its container) first, or it
-// drops to body.
+// inside the toast goes back to the opener first, or it drops to body.
 toast.querySelector('.dismiss').addEventListener('click', () => {
   if (toast.contains(document.activeElement)) opener.focus({ preventScroll: true })
   release(1, 0)
@@ -149,26 +144,23 @@ import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useRef, type PointerEvent, type ReactNode, type RefObject } from 'react'
 
 const DISTANCE = 1 / 3 // of the toast's width, the house number (Sonner 45px, Vaul 25%)
-const VELOCITY = 0.1 // px/ms: Emil's ~0.1px/ms, here read over the last 100ms
-const WINDOW = 100 // ms of movement the velocity is read over
+const VELOCITY = 0.1 // px/ms, Emil's number
+const WINDOW = 100 // ms the velocity is read over
 const SPAN = 8 // ms: samples closer than this read as no velocity
 const EDGE = 16 // px past the width, so a shadow clears too
-// { type: "spring", duration: 0.3, bounce: 0 } and { type: "spring", duration: 0.5, bounce: 0 } as physics: the same
-// curves, and they take the release velocity, which Motion 14 drops on
-// duration/bounce springs.
+// { duration: 0.3, bounce: 0 } out and { duration: 0.5, bounce: 0 } back, as physics:
+// Motion 14 drops the release velocity on duration/bounce springs.
 const exit = { type: 'spring', stiffness: 947, damping: 61.6, mass: 1 } as const
 const back = { type: 'spring', stiffness: 341, damping: 36.9, mass: 1 } as const
-// The toast spans its container (a flex column, or give it margin-inline: auto)
-// less an inset, so its own width plus a margin takes it clear. No stylesheet
-// assumed: a vertical swipe still scrolls the page, and nothing is selected
-// mid-drag.
+// The toast spans its container (a flex column, or margin-inline: auto) less an
+// inset, so its own width plus a margin takes it clear. No stylesheet assumed: a
+// vertical swipe still scrolls the page, and nothing is selected mid-drag.
 const box = { position: 'relative', inlineSize: 'calc(100% - 24px)', touchAction: 'pan-y', userSelect: 'none' } as const
 
 type Sample = { t: number; x: number }
 type Drag = { pointerId: number; startX: number; base: number; samples: Sample[] }
 
-// Velocity in px/ms over the last WINDOW ms of movement; a drag that stopped
-// before the release has none, and samples under SPAN apart read as none too.
+// px/ms over the last WINDOW ms, so a drag that stopped before the release has none.
 function velocityOf(samples: Sample[], now: number) {
   const recent = samples.filter((s) => s.t >= now - WINDOW)
   if (recent.length < 2) return 0
@@ -185,11 +177,10 @@ export function Toast({ onDismiss, opener, children }: Props) {
   const x = useMotionValue(0)
   const reduced = useReducedMotion()
 
-  // Off toward the sign of x, or back to 0, from where it is and at the speed it
-  // was going (v in px/ms). Under reduced motion the release jumps to the end.
   const release = (side: number, v: number) => {
     const target = side * ((ref.current?.offsetWidth ?? 0) + EDGE)
     const onComplete = () => side && onDismiss()
+    // Reduced motion: the drag followed the pointer; the release jumps to the end.
     if (reduced) {
       x.jump(target)
       return onComplete()
@@ -198,9 +189,9 @@ export function Toast({ onDismiss, opener, children }: Props) {
     animate(x, target, { ...(side ? exit : back), velocity: v * 1000, onComplete })
   }
 
-  // Past a third of the width, or flicked faster than VELOCITY in the direction of
-  // the drag: off toward the sign of x. Otherwise back. Decided on x.get(), the
-  // position: a toast caught on its way back is not at the grab point.
+  // Decided on x.get(), the position, not the drag distance: a toast caught on
+  // its way back is not at the grab point.
+  // A flick counts only in the drag's direction: a fast move back toward rest goes back.
   const leave = (px: number, v: number) => {
     const width = ref.current?.offsetWidth ?? 0
     const side = Math.sign(px)
@@ -208,8 +199,6 @@ export function Toast({ onDismiss, opener, children }: Props) {
     return Math.abs(px) >= width * DISTANCE || fast ? side : 0
   }
 
-  // The drag starts on the toast body, not on its Dismiss button, and picks the
-  // toast up from wherever it is, even mid-spring.
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (!e.isPrimary || e.button !== 0 || drag.current || (e.target as HTMLElement).closest('button')) return
     e.currentTarget.setPointerCapture(e.pointerId) // moves and the release stay ours
@@ -220,13 +209,12 @@ export function Toast({ onDismiss, opener, children }: Props) {
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
     if (!d || e.pointerId !== d.pointerId) return
-    const px = d.base + e.clientX - d.startX // 1:1 with the pointer
+    const px = d.base + e.clientX - d.startX
     x.set(px)
     d.samples.push({ t: e.timeStamp, x: px }) // the event's clock, not the handler's
   }
 
-  // pointerup, pointercancel (a touch that became a scroll) or the capture lost:
-  // whichever comes first is the release.
+  // pointercancel (a touch that became a scroll) and a lost capture release too.
   const end = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
     if (!d || e.pointerId !== d.pointerId) return
@@ -237,7 +225,7 @@ export function Toast({ onDismiss, opener, children }: Props) {
 
   return (
     // Pointer events, not drag="x": the drag prop starts after 3px, decides in
-    // postRender, has no cancel path before the drag starts and drags from child buttons.
+    // postRender, cannot be cancelled before it starts and drags from child buttons.
     <motion.div
       ref={ref}
       className="toast"
@@ -250,7 +238,7 @@ export function Toast({ onDismiss, opener, children }: Props) {
     >
       {children}
       {/* The non-gesture way out: the same exit, to the right, with no speed. Focus
-          goes back to the opener (or its container) first, or it drops to body. */}
+          goes back to the opener first, or it drops to body. */}
       <button
         type="button"
         onClick={() => {

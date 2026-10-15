@@ -48,21 +48,18 @@ Give this element a slight overshoot when it arrives.
 ```css
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  /* A back curve: y1 above 1 carries it 3% of the travel past the
-     target before it settles. 3% is cubic-bezier(0.34, 1.3, 0.64, 1), 8%
-     (0.34, 1.5, 0.64, 1), 15% (0.34, 1.72, 0.64, 1). The common easeOutBack,
-     (0.34, 1.56, 0.64, 1), goes about 10% past. */
+  /* y1 above 1 is the overshoot: about 3% of the travel past the target.
+     The common easeOutBack, (0.34, 1.56, 0.64, 1), goes about 10% past. */
   --arrive: cubic-bezier(0.34, 1.3, 0.64, 1);
 }
 
-/* Markup: <button class="chip" aria-pressed="false">…</button>. On click,
-   toggle data-placed and aria-pressed. A curve with y above 1 would push
-   any property past its end, so keep it on transform: opacity clamps at 1
-   (the fade just ends early), and layout properties relayout every frame. */
+/* Markup: <button class="chip" aria-pressed="false">…</button>; a click
+   toggles data-placed and aria-pressed. Transform only: a curve past 1 pushes
+   any property past its end (opacity clamps at 1, layout relayouts every frame). */
 .chip {
   transition-property: transform;
-  /* A transition takes the timing of the state it heads to. Going home:
-     plain ease-out, 225ms, no overshoot. */
+  /* The base rule times the return (a transition takes the timing of the state
+     it heads to): plain and faster, since overshoot marks an arrival. */
   transition-duration: 225ms;
   transition-timing-function: var(--ease-out);
 }
@@ -72,13 +69,12 @@ Give this element a slight overshoot when it arrives.
   transition-timing-function: var(--arrive);
 }
 
-/* A click from the keyboard lands at once: in the click handler, set
-   data-instant when event.detail === 0 (Enter or Space), remove it otherwise. */
+/* Keyboard clicks land at once: set data-instant when event.detail === 0 (Enter or Space). */
 .chip[data-instant] {
   transition-property: none;
 }
 
-/* Reduced motion: no overshoot and no travel; it is in place at once. */
+/* Reduced motion: in place at once, no travel and no overshoot. */
 @media (prefers-reduced-motion: reduce) {
   .chip {
     transition-property: none;
@@ -92,9 +88,9 @@ Give this element a slight overshoot when it arrives.
 import { motion, useReducedMotion } from 'motion/react'
 import { useState, type MouseEvent } from 'react'
 
-// Arriving: about 3% of the travel past the target, then settled.
+// Arriving: about 3% of the travel past the target.
 const arrive = { duration: 0.3, ease: [0.34, 1.3, 0.64, 1] } as const
-// Going home: plain ease-out, faster, no overshoot.
+// Going home: plain ease-out and faster, since overshoot marks an arrival.
 const leave = { duration: 0.225, ease: [0.23, 1, 0.32, 1] } as const
 
 export function Chip() {
@@ -111,15 +107,15 @@ export function Chip() {
   return (
     <motion.button
       type="button"
-      className="overshoot-chip"
+      className="chip"
       aria-pressed={placed}
       onClick={toggle}
-      // No animation on mount: it starts where it is.
+      // initial={false}: no animation on mount.
       initial={false}
-      // x is transform only. Never animate opacity or a layout property on this curve.
+      // x only: opacity clamps at 1 and layout relayouts, so neither takes this curve.
       animate={{ x: placed ? 240 : 0 }}
-      // Reduced motion or a keyboard click: no animated travel. Chosen in the same
-      // render as x, so the move never runs on the previous transition.
+      // Reduced motion or a keyboard click: no travel. Chosen in the same render
+      // as x, so the move never runs on the previous transition.
       transition={reduced || instant ? { duration: 0 } : placed ? arrive : leave}
     />
   )

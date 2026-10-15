@@ -61,9 +61,9 @@ Add a reading progress bar that follows the scroll position of the page.
   pointer-events: none;
 }
 
-/* Same test as the JS tab, which sets data-fallback when it takes over. */
-/* .is-linked is in the markup; the JS tab takes it off while the page cannot
-   scroll, so the bar empties, and puts it back when it can. */
+/* Same test as the JS tab, which sets data-fallback when it takes over.
+   .is-linked is in the markup; the JS tab drops it while the page cannot
+   scroll, so the bar empties instead of holding its last value. */
 @supports (animation-timeline: scroll()) {
   html:not([data-fallback]) .progress.is-linked {
     /* The shorthand resets animation-timeline, so it comes first. linear maps
@@ -80,9 +80,7 @@ Add a reading progress bar that follows the scroll position of the page.
 }
 
 /* prefers-reduced-motion: no override.
-   House rule: a progress indicator keeps tracking under reduced motion.
-   Its position is the information, and it moves only as far as the
-   reader scrolls. */
+   House rule: a progress bar keeps tracking under reduced motion; its position is the information. */
 ```
 
 ### JS
@@ -93,9 +91,7 @@ Add a reading progress bar that follows the scroll position of the page.
 // Same test as the CSS @supports, so the two routes never both drive the bar.
 const supported = CSS.supports('animation-timeline', 'scroll()')
 // prefers-reduced-motion: no override.
-// House rule: a progress indicator keeps tracking under reduced motion.
-// Its position is the information, and it moves only as far as the
-// reader scrolls.
+// House rule: a progress bar keeps tracking under reduced motion; its position is the information.
 const bar = document.querySelector('.progress')
 
 if (bar) {
@@ -106,8 +102,8 @@ if (bar) {
   const render = () => {
     frame = 0
     const max = root.scrollHeight - root.clientHeight
-    // Both routes: while the page cannot scroll, .is-linked comes off and the
-    // bar empties instead of holding its last value. It goes back on when it can.
+    // Both routes: .is-linked comes off while the page cannot scroll, so the bar
+    // empties instead of holding its last value.
     bar.classList.toggle('is-linked', max > 0)
     if (!supported) bar.style.transform = `scaleX(${max > 0 ? clamp(root.scrollTop / max) : 0})`
   }
@@ -131,8 +127,8 @@ if (bar) {
 ```tsx
 import { motion, useScroll } from 'motion/react'
 
-// House rule: a progress indicator keeps tracking under reduced motion.
-// So there is no useReducedMotion gate here.
+// House rule: a progress bar keeps tracking under reduced motion; its position is the information.
+// So there is no useReducedMotion gate.
 const barClass =
   'pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5 origin-left bg-current'
 
