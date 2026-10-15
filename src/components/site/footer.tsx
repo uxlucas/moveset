@@ -10,7 +10,7 @@ export function Footer() {
         <Link href="/about" className={LINK}>
           About
         </Link>
-        <a href={REPO_URL} className={LINK}>
+        <a href={REPO_URL} target="_blank" rel="noreferrer" className={LINK}>
           GitHub
         </a>
       </nav>

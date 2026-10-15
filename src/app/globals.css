@@ -394,3 +394,42 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+/* The logo's hover, as on merki-icons: two clipped copies of the name flash offset for a third of a second, in two
+   steps, and the mark jitters. Pointer devices only, and never under reduced motion. */
+.logo-word::before,
+.logo-word::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .logo:hover .logo-word::before {
+    clip-path: inset(0 0 55% 0);
+    animation: glitch-top 0.32s steps(2, end) 1;
+  }
+  .logo:hover .logo-word::after {
+    clip-path: inset(45% 0 0 0);
+    animation: glitch-bottom 0.32s steps(2, end) 1;
+  }
+  .logo:hover .logo-mark {
+    animation: glitch-mark 0.32s steps(3, end) 1;
+  }
+}
+@keyframes glitch-top {
+  0% { opacity: 1; transform: translate(-2px); }
+  50% { opacity: 1; transform: translate(2px, -1px); }
+  to { opacity: 0; transform: none; }
+}
+@keyframes glitch-bottom {
+  0% { opacity: 1; transform: translate(2px); }
+  50% { opacity: 1; transform: translate(-2px, 1px); }
+  to { opacity: 0; transform: none; }
+}
+@keyframes glitch-mark {
+  0% { transform: translate(-1px); }
+  50% { transform: translate(1px); }
+  to { transform: none; }
+}

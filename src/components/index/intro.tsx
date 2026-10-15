@@ -16,7 +16,7 @@ export function Intro() {
       </p>
       <p className="mt-4 leading-relaxed text-ink-muted">
         Brought to you by{' '}
-        <a href={AUTHOR_URL} className="link text-ink">
+        <a href={AUTHOR_URL} target="_blank" rel="noreferrer" className="link text-ink">
           <Mark size={13} className="mr-1.5 inline-block align-[-1px]" />
           {AUTHOR_NAME}
         </a>
@@ -32,6 +32,8 @@ export function Intro() {
       <p className="mt-2 text-[13px] text-ink-muted">Adds the whole vocabulary to your agent as a skill.</p>
       <a
         href={REPO_URL}
+        target="_blank"
+        rel="noreferrer"
         className="press mt-4 flex items-center justify-between rounded-2xl bg-surface px-5 py-4 text-ink shadow-card hover:shadow-card-hover"
       >
         <span className="flex items-center gap-2.5 text-sm">
