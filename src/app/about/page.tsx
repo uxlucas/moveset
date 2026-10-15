@@ -7,7 +7,8 @@ import { AUTHOR_NAME, AUTHOR_URL, REPO_URL } from '@/lib/site'
 export const metadata: Metadata = { title: 'About' }
 
 // Each site's own favicon. Rauno's and Paco's are drawn inline (a circle; a glyph in the current colour, so it follows
-// the site's theme rather than the system's); Emil's and Jakub's are images, copied at 96px into public/learned-from.
+// the site's theme rather than the system's); Emil's, Jakub's and Interface Craft's are images, copied at 96px into
+// public/learned-from.
 const PEOPLE: { name: string; role: string; url: string; icon: ReactNode }[] = [
   {
     name: 'Rauno Freiberg',
@@ -26,6 +27,12 @@ const PEOPLE: { name: string; role: string; url: string; icon: ReactNode }[] = [
     role: 'Founding design engineer at Interfere',
     url: 'https://jakub.kr',
     icon: <Image src="/learned-from/jakub.png" alt="" width={24} height={24} className="size-6 rounded-full" />,
+  },
+  {
+    name: 'Josh Puckett',
+    role: 'Interface Craft',
+    url: 'https://www.interfacecraft.dev',
+    icon: <Image src="/learned-from/josh.png" alt="" width={24} height={24} className="size-6 rounded-md" />,
   },
   {
     name: 'Paco Coursey',
@@ -72,7 +79,7 @@ export default function About() {
       <h2 id="learned-from" className={h2}>
         Where I learned this
       </h2>
-      <p className={p}>Most of what is here comes from four design engineers who write about their craft. Read them.</p>
+      <p className={p}>Most of what is here comes from five people who write about their craft. Read them.</p>
       <ul className="mt-4 space-y-1">
         {PEOPLE.map((person) => (
           <li key={person.url} className="flex min-h-11 items-center gap-3 text-sm">
