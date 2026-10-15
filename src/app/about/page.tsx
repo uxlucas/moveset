@@ -1,41 +1,52 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
+import type { ReactNode } from 'react'
 import { Mark } from '@/components/site/mark'
-import data from '@/generated/terms-data.json'
-import { isVisible } from '@/lib/content'
 import { AUTHOR_NAME, AUTHOR_URL, REPO_URL } from '@/lib/site'
-import type { TermData } from '@/lib/term-data'
 
 export const metadata: Metadata = { title: 'About' }
 
-// The design engineers most of the site is learned from. Initials, not photos: the site carries no brand marks.
-const PEOPLE = [
-  { name: 'Rauno Freiberg', role: 'Design engineer at Vercel', url: 'https://rauno.me' },
-  { name: 'Emil Kowalski', role: 'Design engineer at Linear', url: 'https://emilkowal.ski' },
-  { name: 'Jakub Krehel', role: 'Founding design engineer at Interfere', url: 'https://jakub.kr' },
-  { name: 'Paco Coursey', role: 'Design engineer at Linear', url: 'https://paco.me' },
+// Each site's own favicon. Rauno's and Paco's are drawn inline (a circle; a glyph in the current colour, so it follows
+// the site's theme rather than the system's); Emil's and Jakub's are images, copied at 96px into public/learned-from.
+const PEOPLE: { name: string; role: string; url: string; icon: ReactNode }[] = [
+  {
+    name: 'Rauno Freiberg',
+    role: 'Design engineer at Vercel',
+    url: 'https://rauno.me',
+    icon: <span aria-hidden className="block size-[22px] rounded-full bg-[#ffff02]" />,
+  },
+  {
+    name: 'Emil Kowalski',
+    role: 'Design engineer at Linear',
+    url: 'https://emilkowal.ski',
+    icon: <Image src="/learned-from/emil.png" alt="" width={24} height={24} className="size-6" />,
+  },
+  {
+    name: 'Jakub Krehel',
+    role: 'Founding design engineer at Interfere',
+    url: 'https://jakub.kr',
+    icon: <Image src="/learned-from/jakub.png" alt="" width={24} height={24} className="size-6 rounded-full" />,
+  },
+  {
+    name: 'Paco Coursey',
+    role: 'Design engineer at Linear',
+    url: 'https://paco.me',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden focusable="false" className="text-ink">
+        <path
+          d="M8.2 2.5C5 2.5 5 5.7 5 5.7v12.8m3.2-16h6.4m-6.4 0h6.4m0 0s6.4 0 6.4 6.4-6.4 6.4-6.4 6.4h-3.2m0 0S5 15.3 5 18.5m6.4-3.2v3.2s0 3.2-3.2 3.2S5 18.5 5 18.5"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        />
+      </svg>
+    ),
+  },
 ]
-
-const REFERENCES = [
-  { label: 'Rauno Freiberg: Web Interface Guidelines', url: 'https://interfaces.rauno.me' },
-  { label: 'Gustavo Fior: Craft', url: 'https://craft.gustavofior.com' },
-]
-
-const initials = (name: string) =>
-  name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
 
 const h2 = 'mb-3 mt-10 text-[15px] font-medium'
 const p = 'leading-relaxed text-ink-muted'
 
 export default function About() {
-  const seen = new Set([...PEOPLE.map((p) => p.url), ...REFERENCES.map((r) => r.url)])
-  const sources = (data as TermData[])
-    .filter((t) => isVisible(t))
-    .flatMap((t) => t.sources)
-    .filter((s) => (seen.has(s.url) ? false : (seen.add(s.url), true)))
-
   return (
     <article>
       <h1 className="mb-4 text-[17px] font-medium">About</h1>
@@ -65,9 +76,7 @@ export default function About() {
       <ul className="mt-4 space-y-1">
         {PEOPLE.map((person) => (
           <li key={person.url} className="flex min-h-11 items-center gap-3 text-sm">
-            <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-full bg-demo-2 text-[11px] font-medium text-ink">
-              {initials(person.name)}
-            </span>
+            <span className="flex size-6 shrink-0 items-center justify-center">{person.icon}</span>
             {/* One line from sm, name over role below it (a wrapped line starting with the dot read wrong). */}
             <span className="flex flex-col sm:flex-row sm:items-baseline sm:gap-x-2">
               <a href={person.url} className="link self-start text-ink">
@@ -80,18 +89,6 @@ export default function About() {
                 {person.role}
               </span>
             </span>
-          </li>
-        ))}
-      </ul>
-
-      <h2 className={h2}>Sources</h2>
-      <p className={p}>Every term lists what it draws on. Together:</p>
-      <ul className="mt-3 space-y-1.5 text-sm">
-        {[...REFERENCES, ...sources].map((s) => (
-          <li key={s.url}>
-            <a href={s.url} className="link text-ink-muted">
-              {s.label}
-            </a>
           </li>
         ))}
       </ul>
