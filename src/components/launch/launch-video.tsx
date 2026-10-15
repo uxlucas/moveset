@@ -14,15 +14,21 @@ declare global {
 }
 
 // The launch video: a vague sentence typed out, crossed out and replaced by its name; two more names; a grid of the
-// rest; the logo. 540 by 540 CSS px, recorded at 2x. It starts when the recorder calls window.__launchStart(), so
+// rest; the logo. Twenty seconds, 540 by 540 CSS px, recorded at 2x. It starts when the recorder calls window.__launchStart(), so
 // every timer runs on the recorder's clock.
 const SENTENCE = 'that thing where the header sticks and the list slides under it'
 // Typing: an even cadence, a longer beat after each space.
 const TYPE_START = 600
 const CHAR_MS = 32
 const SPACE_MS = 90
-const SHOWS = ['sticky', 'stagger', 'press-scale'] as const
-const GRID = ['scroll-triggered', 'parallax', 'ease-out', 'spring', 'enter-and-exit', 'swipe-to-dismiss'] as const
+// The three showcases, slowed for the camera where a beat is quick: Stagger's 60ms step at 0.6 speed so each row
+// reads, Spring's throw and catch at 0.75. Spring plays twice in its slot (`replay` below): its move is one second.
+const SHOWS = [
+  { slug: 'sticky', timeScale: 1 },
+  { slug: 'stagger', timeScale: 0.6 },
+  { slug: 'spring', timeScale: 0.75 },
+] as const
+const GRID = ['scroll-triggered', 'parallax', 'ease-out', 'press-scale', 'enter-and-exit', 'swipe-to-dismiss'] as const
 
 type State = {
   typed: number
@@ -32,6 +38,7 @@ type State = {
   label: boolean
   mount: number
   show: number
+  replay: number
   grid: boolean
   gridIn: boolean
   end: boolean
@@ -46,6 +53,7 @@ const INITIAL: State = {
   label: false,
   mount: -1,
   show: -1,
+  replay: 0,
   grid: false,
   gridIn: false,
   end: false,
@@ -57,20 +65,20 @@ const INITIAL: State = {
 // (Stagger's list leaves before it cascades in; Press Scale rests before it presses), so the crossfade lands on motion.
 const STEPS: [number, Partial<State>][] = [
   [3000, { demo: true, mount: 0, show: 0 }],
-  [5000, { strike: true }],
-  [5900, { sentenceOut: true }],
-  [6200, { label: true }],
-  [6500, { mount: 1 }],
-  [7100, { show: 1 }],
-  [8300, { mount: 2 }],
-  [8700, { show: 2 }],
-  [10000, { grid: true }],
-  [10200, { gridIn: true }],
-  [13000, { end: true }],
-  [13300, { endStep: 1 }],
-  [13900, { glitch: true }],
-  [14100, { endStep: 2 }],
-  [14400, { endStep: 3 }],
+  [5600, { strike: true }],
+  [6500, { sentenceOut: true }],
+  [6800, { label: true }],
+  [8000, { mount: 1 }],
+  [8600, { show: 1 }],
+  [12000, { mount: 2, show: 2 }],
+  [13500, { replay: 1 }],
+  [15200, { grid: true }],
+  [15400, { gridIn: true }],
+  [18200, { end: true }],
+  [18500, { endStep: 1 }],
+  [19100, { glitch: true }],
+  [19200, { endStep: 2 }],
+  [19500, { endStep: 3 }],
 ]
 
 // When each character of the sentence lands, ms from the start.
@@ -169,7 +177,7 @@ export function LaunchVideo() {
             {/* A steady cursor, there until the line is crossed out. */}
             {s.typed > 0 && !s.strike && <span aria-hidden className="ml-px inline-block h-[1.05em] w-[2px] translate-y-[0.18em] bg-ink" />}
           </p>
-          {SHOWS.map((slug, i) => {
+          {SHOWS.map(({ slug }, i) => {
             const term = getTerm(slug)
             return (
               <div key={slug} className={`absolute inset-x-0 top-0 flex items-baseline gap-3 ${fade(s.label && s.show === i)}`}>
@@ -183,10 +191,10 @@ export function LaunchVideo() {
           className={`relative mt-5 h-[320px] rounded-2xl bg-surface p-3 shadow-card transition-[opacity,translate] duration-300 ease-(--ease-out) ${s.demo ? 'opacity-100' : 'translate-y-4 opacity-0'}`}
         >
           {SHOWS.map(
-            (slug, i) =>
+            ({ slug, timeScale }, i) =>
               s.mount >= i && (
                 <div key={slug} className={`absolute inset-3 ${fade(s.show === i)}`}>
-                  <DemoPlayer slug={slug} size="detail" />
+                  <DemoPlayer slug={slug} size="detail" timeScale={timeScale} replayRequest={i === 2 ? s.replay : 0} />
                 </div>
               ),
           )}
