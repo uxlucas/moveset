@@ -53,3 +53,6 @@ next-env.d.ts
 /public/terms/
 /public/api/
 /public/skills/
+
+# Claude Code preview config, personal to each machine
+/.claude/
