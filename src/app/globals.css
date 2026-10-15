@@ -8,23 +8,25 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* Greys carry a trace of the accent's hue (286, chroma 0.02 at most): a pure grey reads warm on screen. Lightness is
+   what contrast is measured on, so it is the same in both tints. */
 :root {
-  --canvas: oklch(0.985 0 0);
+  --canvas: oklch(0.985 0.002 286);
   --surface: oklch(1 0 0);
-  --line: oklch(0.922 0 0);
-  --line-strong: oklch(0.86 0 0);
-  --ink: oklch(0.205 0 0);
-  --ink-muted: oklch(0.48 0 0);
-  --ink-faint: oklch(0.66 0 0);
-  --demo: oklch(0.93 0 0);
-  --demo-2: oklch(0.87 0 0);
-  --demo-subject: oklch(0.55 0 0);
-  --shadow-color: oklch(0 0 0 / 0.04);
+  --line: oklch(0.922 0.004 286);
+  --line-strong: oklch(0.86 0.006 286);
+  --ink: oklch(0.205 0.006 286);
+  --ink-muted: oklch(0.48 0.016 286);
+  --ink-faint: oklch(0.66 0.015 286);
+  --demo: oklch(0.93 0.004 286);
+  --demo-2: oklch(0.87 0.006 286);
+  --demo-subject: oklch(0.55 0.016 286);
+  --shadow-color: oklch(0.2 0.02 286 / 0.05);
   /* The one accent (#946AFF family). Marks where you are and what is live; see docs/house-rules.md for its uses. */
   --accent: oklch(0.62 0.2 292);
   --accent-ink: oklch(0.53 0.2 292);
   --accent-soft: oklch(0.62 0.2 292 / 0.14);
-  --seg: oklch(0.205 0 0 / 0.05);
+  --seg: oklch(0.205 0.006 286 / 0.05);
   --cat-l: 0.58;
   --duration-1: 150ms;
   --duration-2: 200ms;
@@ -34,16 +36,16 @@
 }
 
 .dark {
-  --canvas: oklch(0.145 0 0);
-  --surface: oklch(0.185 0 0);
-  --line: oklch(0.26 0 0);
-  --line-strong: oklch(0.34 0 0);
-  --ink: oklch(0.95 0 0);
-  --ink-muted: oklch(0.7 0 0);
-  --ink-faint: oklch(0.52 0 0);
-  --demo: oklch(0.25 0 0);
-  --demo-2: oklch(0.32 0 0);
-  --demo-subject: oklch(0.72 0 0);
+  --canvas: oklch(0.145 0.005 286);
+  --surface: oklch(0.185 0.006 286);
+  --line: oklch(0.26 0.006 286);
+  --line-strong: oklch(0.34 0.01 286);
+  --ink: oklch(0.95 0.002 286);
+  --ink-muted: oklch(0.7 0.015 286);
+  --ink-faint: oklch(0.52 0.016 286);
+  --demo: oklch(0.25 0.006 286);
+  --demo-2: oklch(0.32 0.01 286);
+  --demo-subject: oklch(0.72 0.015 286);
   --shadow-color: transparent;
   /* Lighter and calmer on the dark surface; already passes as text, so ink and base are one color. */
   --accent: oklch(0.72 0.15 292);
