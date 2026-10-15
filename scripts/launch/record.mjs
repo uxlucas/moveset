@@ -48,11 +48,12 @@ const step = (vnow) => {
 
 const total = Math.round(SECONDS * FPS)
 const t0 = Date.now()
+// The clock steps whole milliseconds, so a frame is 16 or 17 ms, whichever keeps the running total exact.
 for (let f = 0; f < total; f++) {
-  const vnow = f * DT
+  const vnow = Math.round(f * DT)
   await page.evaluate(step, vnow)
   await page.screenshot({ path: `${out}/f${String(f).padStart(4, '0')}.png`, animations: 'allow', caret: 'hide' })
-  await page.clock.runFor(DT)
+  await page.clock.runFor(Math.round((f + 1) * DT) - vnow)
   if (f % 120 === 0) console.log(`frame ${f}/${total} (${((Date.now() - t0) / 1000).toFixed(0)}s)`)
 }
 await browser.close()
