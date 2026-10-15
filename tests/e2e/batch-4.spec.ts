@@ -26,6 +26,30 @@ for (const { slug, name, subject } of [
   })
 }
 
+/** The house ease-out, `cubic-bezier(0.23, 1, 0.32, 1)`, as progress 0 to 1 at a share of the duration. */
+function easeOut(x: number): number {
+  if (x <= 0) return 0
+  if (x >= 1) return 1
+  const [p1x, p1y, p2x, p2y] = [0.23, 1, 0.32, 1]
+  const cx = 3 * p1x
+  const bx = 3 * (p2x - p1x) - cx
+  const ax = 1 - cx - bx
+  const cy = 3 * p1y
+  const by = 3 * (p2y - p1y) - cy
+  const ay = 1 - cy - by
+  const sampleX = (t: number) => ((ax * t + bx) * t + cx) * t
+  const sampleY = (t: number) => ((ay * t + by) * t + cy) * t
+  let t = x
+  for (let i = 0; i < 20; i++) {
+    const err = sampleX(t) - x
+    if (Math.abs(err) < 1e-6) break
+    const slope = (3 * ax * t + 2 * bx) * t + cx
+    if (slope === 0) break
+    t -= err / slope
+  }
+  return sampleY(t)
+}
+
 const springCard = (page: Page) => demo(page, 'spring').locator('[data-spring-card]')
 const springHint = (page: Page) => demo(page, 'spring').locator('p[aria-hidden]')
 
@@ -400,6 +424,7 @@ test.describe('Stagger', () => {
         target.click()
         // Frames until the new cycle lands (React runs it after the click), keeping the last cascade frame.
         let last = before
+        let lastAt = performance.now()
         // Any painted frame between the click and the switch: no item may drop, or jump up faster than the
         // entrance itself allows (a re-timed item would pop in or out here).
         let worstDrop = 0
@@ -411,14 +436,17 @@ test.describe('Stagger', () => {
             worstJump = Math.max(worstJump, o - last[i])
           })
           last = now
+          lastAt = performance.now()
           await frame()
         }
         const atSwitch = opacities()
+        // How long the switch took after the last cascade sample: a waiting item may have come due in that time.
+        const gapMs = performance.now() - lastAt
         await frame()
         const next = opacities()
         await frame()
         const listOpacity = Number(getComputedStyle(list).opacity)
-        return { phase: String(root.getAttribute('data-phase')), before, last, atSwitch, next, listOpacity, worstDrop, worstJump }
+        return { phase: String(root.getAttribute('data-phase')), before, last, atSwitch, next, listOpacity, worstDrop, worstJump, gapMs }
       }, interrupt)
       expect(result.phase).toBe('leave')
       expect(result.worstDrop).toBeLessThanOrEqual(0.001)
@@ -426,10 +454,16 @@ test.describe('Stagger', () => {
       // Mid-cascade: some items in, some still waiting.
       expect(result.before.some((o) => o > 0.9)).toBe(true)
       expect(result.before.some((o) => o === 0)).toBe(true)
+      // A waiting item whose step came due between the last cascade sample and the switch has started, as it should:
+      // the pause lands on the switch frame, not before. It rises from 0 by no more than the entrance itself does in
+      // that time (the house ease-out over 300ms), with a frame of slack for the sample's own age. A re-timed item
+      // would be further along than its step allows, or pop: `worstJump` and the hold on the next frame catch that.
+      const cameDue = easeOut((result.gapMs + 17) / 300)
       result.atSwitch.forEach((o, i) => {
-        // No visible item drops out, and the waiting ones stay at 0: nothing was re-timed.
+        // No visible item drops out, and a waiting one is at most where its own entrance would put it: nothing was
+        // re-timed.
         expect(o).toBeGreaterThanOrEqual(result.last[i] - 0.001)
-        if (result.last[i] === 0) expect(o).toBe(0)
+        if (result.last[i] === 0) expect(o).toBeLessThanOrEqual(cameDue)
         // Once the list is leaving, every item holds: no opacity rises on the next frame.
         expect(result.next[i]).toBeLessThanOrEqual(o + 0.001)
         expect(result.next[i]).toBeGreaterThanOrEqual(o - 0.001)
