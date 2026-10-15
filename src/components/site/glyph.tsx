@@ -54,6 +54,16 @@ export function IndexGlyph({ active }: GlyphProps) {
   )
 }
 
+/** The About row: a head over shoulders. */
+export function AboutGlyph({ active }: GlyphProps) {
+  return (
+    <GlyphSvg kind="about" active={active}>
+      <circle cx="6" cy="4.4" r="1.5" fill="currentColor" />
+      <rect x="3.1" y="7" width="5.8" height="1.8" rx=".9" fill="currentColor" opacity=".6" />
+    </GlyphSvg>
+  )
+}
+
 /** For written terms that don't have their own glyph yet. Never moves. */
 export function GenericGlyph({ active }: GlyphProps) {
   return (

@@ -7,7 +7,7 @@ import { groupByCategory, isVisible, progress } from '@/lib/content'
 import { useSpy } from '@/lib/spy-store'
 import type { GlyphProps } from '@/lib/term-types'
 import { terms } from '@/lib/terms'
-import { GenericGlyph, IndexGlyph, SoonGlyph } from './glyph'
+import { AboutGlyph, GenericGlyph, IndexGlyph, SoonGlyph } from './glyph'
 
 const groups = groupByCategory(terms)
 
@@ -66,8 +66,9 @@ export function Sidebar() {
   const pathname = usePathname()
   const spied = useSpy()
   const onTerm = routeSlug(pathname)
-  // An entry page marks its own term. The index marks the card being read, or "Index" above the first one.
-  const current = onTerm ?? (pathname === '/' ? (spied ?? 'index') : null)
+  // An entry page marks its own term. The index marks the card being read, or "Index" above the first one. About
+  // marks its own row.
+  const current = onTerm ?? (pathname === '/' ? (spied ?? 'index') : pathname === '/about' ? 'about' : null)
 
   const scrollerRef = useRef<HTMLDivElement>(null)
   const railRef = useRef<HTMLDivElement>(null)
@@ -147,6 +148,11 @@ export function Sidebar() {
               <li>
                 <RowLink id="index" href="/" current={current === 'index'} routeMatch={pathname === '/'} glyph={IndexGlyph}>
                   Index
+                </RowLink>
+              </li>
+              <li>
+                <RowLink id="about" href="/about" current={current === 'about'} routeMatch={pathname === '/about'} glyph={AboutGlyph}>
+                  About
                 </RowLink>
               </li>
             </ul>

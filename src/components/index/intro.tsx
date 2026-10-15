@@ -1,7 +1,6 @@
 import { ArrowUpRight } from 'lucide-react'
-import Link from 'next/link'
 import { CopyButton } from '@/components/copy-button'
-import { Mark } from '@/components/site/mark'
+import { GitHubMark, Mark } from '@/components/site/mark'
 import { AUTHOR_NAME, AUTHOR_URL, REPO, REPO_URL, SKILL_COMMAND } from '@/lib/site'
 
 // The command's first word ("npx") is the one accented token in the install block.
@@ -21,11 +20,6 @@ export function Intro() {
           <Mark size={13} className="mr-1.5 inline-block align-[-1px]" />
           {AUTHOR_NAME}
         </a>
-        . I started it because I kept describing motion to agents as “that thing where…” and getting back something
-        close, but wrong. Most of what I know about this I learned from{' '}
-        <Link href="/about#learned-from" className="link text-ink">
-          four design engineers
-        </Link>
         .
       </p>
       <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-surface px-5 py-4 shadow-card">
@@ -40,7 +34,10 @@ export function Intro() {
         href={REPO_URL}
         className="press mt-4 flex items-center justify-between rounded-2xl bg-surface px-5 py-4 text-ink shadow-card hover:shadow-card-hover"
       >
-        <span className="text-sm">{REPO}</span>
+        <span className="flex items-center gap-2.5 text-sm">
+          <GitHubMark className="shrink-0" />
+          {REPO}
+        </span>
         <ArrowUpRight size={16} aria-hidden className="text-ink-muted" />
       </a>
     </section>
