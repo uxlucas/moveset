@@ -1,4 +1,3 @@
-import { Check } from 'lucide-react'
 import { spring } from 'motion/react'
 import { useRef, type CSSProperties } from 'react'
 import { scaled } from '@/components/demo/playback'
@@ -97,10 +96,6 @@ function Track({ size, ease, label, twin }: { size: DemoProps['size']; ease: str
   const detail = size === 'detail'
   const pad = detail ? 6 : 4
   const box: CSSProperties = { left: pad, top: pad, height: detail ? 48 : 32, width: `calc((100% - ${2 * pad}px) / ${SHARE})` }
-  // The entry page's chip is a "Saved" status pill sliding into its slot, the same box as before (a toggle knob would
-  // be a circle, which shrinks the box and the travel); the overshooting pill is the subject, filled. The index card
-  // draws a square and a bar.
-  const shape = detail ? 'rounded-full' : 'rounded-lg'
   return (
     <div className="w-full" style={{ maxWidth: detail ? 440 : 240 }}>
       {label && <p className={`font-mono text-ink-muted ${detail ? 'mb-2 text-[11px]' : 'mb-1.5 text-[10px]'}`}>{label}</p>}
@@ -109,7 +104,7 @@ function Track({ size, ease, label, twin }: { size: DemoProps['size']; ease: str
         <span
           aria-hidden
           data-overshoot-target=""
-          className={`absolute border border-dashed border-line-strong [transform:translateX(300%)] ${shape}`}
+          className="absolute rounded-lg border border-dashed border-line-strong [transform:translateX(300%)]"
           style={box}
         />
         {/* Heading to the slot (`data-at=b`) it takes the overshooting timing, --d; heading home, plain ease-out, --x. */}
@@ -117,21 +112,10 @@ function Track({ size, ease, label, twin }: { size: DemoProps['size']; ease: str
           data-overshoot-chip={twin ? 'twin' : 'main'}
           data-at="b"
           style={{ ...box, '--e': ease } as CSSProperties}
-          className={`absolute flex items-center shadow-card transition-[transform] duration-(--x) ease-out data-[at=b]:duration-(--d) data-[at=b]:ease-(--e) data-[at=b]:[transform:translateX(300%)] group-data-[snap=true]/stage:transition-none ${shape} ${
-            detail ? `justify-center gap-1.5 px-2 ${twin ? 'bg-surface text-ink' : 'bg-demo-subject text-surface'}` : 'gap-1.5 bg-surface px-1.5'
-          }`}
+          className={`absolute flex items-center rounded-lg bg-surface shadow-card transition-[transform] duration-(--x) ease-out data-[at=b]:duration-(--d) data-[at=b]:ease-(--e) data-[at=b]:[transform:translateX(300%)] group-data-[snap=true]/stage:transition-none ${detail ? 'gap-2 px-2.5' : 'gap-1.5 px-1.5'}`}
         >
-          {detail ? (
-            <>
-              <Check size={14} aria-hidden className={`shrink-0 ${twin ? 'text-ink-muted' : ''}`} />
-              <span className="text-[12px] font-medium leading-4">Saved</span>
-            </>
-          ) : (
-            <>
-              <span className={`size-2.5 shrink-0 rounded-sm ${twin ? 'bg-demo-2' : 'bg-demo-subject'}`} />
-              <span className="h-1.5 min-w-0 flex-1 rounded-full bg-demo-2" />
-            </>
-          )}
+          <span className={`shrink-0 rounded-sm ${twin ? 'bg-demo-2' : 'bg-demo-subject'} ${detail ? 'size-3.5' : 'size-2.5'}`} />
+          <span className="h-1.5 min-w-0 flex-1 rounded-full bg-demo-2" />
         </div>
       </div>
     </div>
@@ -336,7 +320,7 @@ export default defineTerm({
   demo: {
     component: OvershootDemo,
     label:
-      'On the entry page, a Saved status pill (a check and the word) sits in a dashed slot at the far end of a track. It slides back to the start, plain and quick, then slides into the slot again, travels slightly past it and settles back in place. The amount runs from none to 15%, from a back curve or a spring. With a comparison picked, a twin pill below makes the same move on plain ease-out and stops at the slot without passing it; each track is named by its amount. The index card is a wireframe of the same chip and slot: a square and a bar.',
+      'A chip sits in an empty slot at the far end of a track. It slides back to the start, plain and quick, then slides into the slot again, travels slightly past it and settles back in place. The amount runs from none to 15%, from a back curve or a spring. With a comparison picked, a twin chip below makes the same move on plain ease-out and stops at the slot without passing it.',
     controls,
     glyph: OvershootGlyph,
   },

@@ -1,4 +1,5 @@
 import { ArrowUpRight } from 'lucide-react'
+import Link from 'next/link'
 import { CopyButton } from '@/components/copy-button'
 import { AUTHOR_NAME, AUTHOR_URL, REPO, REPO_URL, SKILL_COMMAND } from '@/lib/site'
 
@@ -19,7 +20,11 @@ export function Intro() {
           {AUTHOR_NAME}
         </a>
         . I started it because I kept describing motion to agents as “that thing where…” and getting back something
-        close, but wrong.
+        close, but wrong. Most of what I know about this I learned from{' '}
+        <Link href="/about#learned-from" className="link text-ink">
+          four design engineers
+        </Link>
+        .
       </p>
       <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-surface px-5 py-4 shadow-card">
         <code className="font-mono text-[13px] text-ink">
