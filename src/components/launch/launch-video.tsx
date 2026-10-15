@@ -13,15 +13,19 @@ declare global {
   }
 }
 
-// The launch video: a vague sentence, crossed out and replaced by its name; two more names; a grid of the rest; the
-// logo. 540 by 540 CSS px, recorded at 2x. It starts when the recorder calls window.__launchStart(), so every timer
-// runs on the recorder's clock.
+// The launch video: a vague sentence typed out, crossed out and replaced by its name; two more names; a grid of the
+// rest; the logo. 540 by 540 CSS px, recorded at 2x. It starts when the recorder calls window.__launchStart(), so
+// every timer runs on the recorder's clock.
 const SENTENCE = 'that thing where the header sticks and the list slides under it'
+// Typing: an even cadence, a longer beat after each space.
+const TYPE_START = 600
+const CHAR_MS = 32
+const SPACE_MS = 90
 const SHOWS = ['sticky', 'stagger', 'press-scale'] as const
 const GRID = ['scroll-triggered', 'parallax', 'ease-out', 'spring', 'enter-and-exit', 'swipe-to-dismiss'] as const
 
 type State = {
-  words: boolean
+  typed: number
   demo: boolean
   strike: boolean
   sentenceOut: boolean
@@ -35,7 +39,7 @@ type State = {
   glitch: boolean
 }
 const INITIAL: State = {
-  words: false,
+  typed: 0,
   demo: false,
   strike: false,
   sentenceOut: false,
@@ -52,25 +56,45 @@ const INITIAL: State = {
 // ms from the start. A demo is mounted a beat before it is shown where its cycle opens with a beat of its own
 // (Stagger's list leaves before it cascades in; Press Scale rests before it presses), so the crossfade lands on motion.
 const STEPS: [number, Partial<State>][] = [
-  [600, { words: true }],
-  [2600, { demo: true, mount: 0, show: 0 }],
+  [3000, { demo: true, mount: 0, show: 0 }],
   [5000, { strike: true }],
-  [6000, { sentenceOut: true }],
-  [6300, { label: true }],
-  [6800, { mount: 1 }],
-  [7400, { show: 1 }],
-  [8800, { mount: 2 }],
-  [9200, { show: 2 }],
-  [10800, { grid: true }],
-  [11000, { gridIn: true }],
-  [12600, { end: true }],
-  [12900, { endStep: 1 }],
-  [13600, { glitch: true }],
-  [13800, { endStep: 2 }],
-  [14100, { endStep: 3 }],
+  [5900, { sentenceOut: true }],
+  [6200, { label: true }],
+  [6500, { mount: 1 }],
+  [7100, { show: 1 }],
+  [8300, { mount: 2 }],
+  [8700, { show: 2 }],
+  [10000, { grid: true }],
+  [10200, { gridIn: true }],
+  [13000, { end: true }],
+  [13300, { endStep: 1 }],
+  [13900, { glitch: true }],
+  [14100, { endStep: 2 }],
+  [14400, { endStep: 3 }],
 ]
 
+// When each character of the sentence lands, ms from the start.
+const TYPED_AT: number[] = []
+for (let i = 0, at = TYPE_START; i < SENTENCE.length; i++) {
+  at += SENTENCE[i - 1] === ' ' ? SPACE_MS : CHAR_MS
+  TYPED_AT.push(at)
+}
+
 const FADE = 'transition-opacity duration-400 ease-(--ease-out)'
+
+/** The sentence as typed so far, split into words. A word is `done` once its space has been typed (or the line is
+ * complete); `spaced` says whether a space follows it on screen, which the last word never has. */
+function typedWords(typed: number): { word: string; done: boolean; spaced: boolean }[] {
+  const text = SENTENCE.slice(0, typed)
+  const words = text.split(' ')
+  const endsWithSpace = text.endsWith(' ')
+  return words
+    .filter((w, i) => w.length > 0 || i < words.length - 1)
+    .map((word, i, all) => {
+      const spaced = i < all.length - 1 || endsWithSpace
+      return { word, done: spaced || typed === SENTENCE.length, spaced }
+    })
+}
 const fade = (on: boolean) => `${FADE} ${on ? 'opacity-100' : 'opacity-0'}`
 
 export function LaunchVideo() {
@@ -87,6 +111,7 @@ export function LaunchVideo() {
   useEffect(() => {
     if (!started) return
     const timers = STEPS.map(([at, patch]) => setTimeout(() => set((prev) => ({ ...prev, ...patch })), at))
+    TYPED_AT.forEach((at, i) => timers.push(setTimeout(() => set((prev) => ({ ...prev, typed: i + 1 })), at)))
     return () => timers.forEach(clearTimeout)
   }, [started])
 
@@ -97,12 +122,8 @@ export function LaunchVideo() {
         /* The demos' "press the button" hints are for the interactive page. */
         [data-launch] [data-demo] p[aria-hidden] { display: none }
 
-        /* The sentence: words rise in one after another. */
-        [data-launch] .word { position: relative; opacity: 0; translate: 0 4px; transition: color 300ms ease; }
-        [data-launch] [data-words="true"] .word {
-          animation: launch-word 300ms var(--ease-out) both;
-          animation-delay: calc(var(--i) * 70ms);
-        }
+        /* The sentence is typed; each word is a span so it can be crossed out on its own. */
+        [data-launch] .word { position: relative; transition: color 300ms ease; }
         @keyframes launch-word { to { opacity: 1; translate: 0 0; } }
 
         /* Crossed out: a line is drawn through each word in turn, and the words go quiet. */
@@ -138,16 +159,15 @@ export function LaunchVideo() {
       {/* The story: the sentence, crossed out, then its name, over the demo. */}
       <div className={`absolute inset-0 flex flex-col px-10 pt-14 ${FADE} ${s.grid ? 'opacity-0' : 'opacity-100'}`}>
         <div className="relative h-[88px]">
-          <p
-            data-words={String(s.words)}
-            data-strike={String(s.strike)}
-            className={`absolute inset-x-0 top-0 text-[23px] leading-[1.4] text-ink ${fade(!s.sentenceOut)}`}
-          >
-            {SENTENCE.split(' ').map((word, i) => (
-              <span key={i} className="word inline-block" style={{ '--i': i } as CSSProperties}>
-                {word}&nbsp;
+          <p data-strike={String(s.strike)} className={`absolute inset-x-0 top-0 text-[23px] leading-[1.4] text-ink ${fade(!s.sentenceOut)}`}>
+            {typedWords(s.typed).map(({ word, done, spaced }, i) => (
+              <span key={i} className={`inline-block ${done ? 'word' : ''}`} style={{ '--i': i } as CSSProperties}>
+                {word}
+                {spaced && <>&nbsp;</>}
               </span>
             ))}
+            {/* A steady cursor, there until the line is crossed out. */}
+            {s.typed > 0 && !s.strike && <span aria-hidden className="ml-px inline-block h-[1.05em] w-[2px] translate-y-[0.18em] bg-ink" />}
           </p>
           {SHOWS.map((slug, i) => {
             const term = getTerm(slug)
