@@ -79,7 +79,7 @@ export default function About() {
             <span className="flex size-6 shrink-0 items-center justify-center">{person.icon}</span>
             {/* One line from sm, name over role below it (a wrapped line starting with the dot read wrong). */}
             <span className="flex flex-col sm:flex-row sm:items-baseline sm:gap-x-2">
-              <a href={person.url} className="link self-start text-ink">
+              <a href={person.url} target="_blank" rel="noreferrer" className="link self-start text-ink">
                 {person.name}
               </a>
               <span className="text-[13px] text-ink-muted sm:text-sm">
@@ -95,12 +95,12 @@ export default function About() {
 
       <h2 className={h2}>Made by</h2>
       <p className={p}>
-        <a href={AUTHOR_URL} className="link text-ink">
+        <a href={AUTHOR_URL} target="_blank" rel="noreferrer" className="link text-ink">
           <Mark size={13} className="mr-1.5 inline-block align-[-1px]" />
           {AUTHOR_NAME}
         </a>
         . The code is{' '}
-        <a href={REPO_URL} className="link text-ink">
+        <a href={REPO_URL} target="_blank" rel="noreferrer" className="link text-ink">
           on GitHub
         </a>
         , under the MIT licence.

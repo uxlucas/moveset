@@ -26,12 +26,15 @@ export function GitHubMark({ className, size = 16 }: { className?: string; size?
   )
 }
 
-// The logo as merki-icons sets it: the mark, a 9px gap, the name in the mono face at 15px medium.
+// The logo as merki-icons sets it: the mark, a 9px gap, the name in the mono face at 15px medium. On hover the name
+// glitches in two halves and the mark jitters (`.logo` rules in globals.css); data-text feeds the two copies.
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-[9px] text-ink">
-      <Mark className="shrink-0" />
-      <span className="font-mono text-[15px] font-medium leading-none tracking-[-0.01em]">moveset</span>
+    <Link href="/" className="logo flex items-center gap-[9px] text-ink">
+      <Mark className="logo-mark shrink-0" />
+      <span data-text="moveset" className="logo-word relative font-mono text-[15px] font-medium leading-none tracking-[-0.01em]">
+        moveset
+      </span>
     </Link>
   )
 }
